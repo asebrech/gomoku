@@ -1,4 +1,5 @@
 mod solver {
+    pub mod alpha_beta;
     pub mod game_state;
     pub mod minimax;
 }
@@ -10,5 +11,5 @@ mod game {
 use game::shell_game::new_game;
 
 fn main() {
-    new_game();
+    new_game(8, 4, 3);
 }

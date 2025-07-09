@@ -1,10 +1,10 @@
 use crate::{
-    game::utils::find_best_move,
+    game::utils::{Algorithm, find_best_move},
     solver::game_state::{GameState, Player},
 };
 use std::io;
 
-fn print_board(board: &[[Option<Player>; 4]; 4]) {
+fn print_board(board: &Vec<Vec<Option<Player>>>) {
     for row in board {
         for cell in row {
             match cell {
@@ -17,12 +17,8 @@ fn print_board(board: &[[Option<Player>; 4]; 4]) {
     }
 }
 
-pub fn new_game() {
-    let mut state = GameState {
-        board: [[None; 4]; 4],
-        current_player: Player::Max,
-    };
-
+pub fn new_game(board_size: usize, winning_condition: usize, depth: i32) {
+    let mut state = GameState::new(board_size, winning_condition);
     // Choose sides
     println!("Do you want to play as X (Max) or O (Min)?");
     let mut input = String::new();
@@ -39,7 +35,6 @@ pub fn new_game() {
     } else {
         Player::Max
     };
-    let depth = 4;
 
     loop {
         print_board(&state.board);
@@ -59,12 +54,11 @@ pub fn new_game() {
                 let mut move_input = String::new();
                 io::stdin().read_line(&mut move_input).unwrap();
                 let parts: Vec<_> = move_input
-                    .trim()
                     .split_whitespace()
                     .filter_map(|s| s.parse::<usize>().ok())
                     .collect();
 
-                if parts.len() == 2 && parts[0] < 4 && parts[1] < 4 {
+                if parts.len() == 2 && parts[0] < board_size && parts[1] < board_size {
                     let mv = (parts[0], parts[1]);
                     if state.board[mv.0][mv.1].is_none() {
                         state.make_move(mv);
@@ -78,7 +72,7 @@ pub fn new_game() {
             }
         } else {
             println!("🤖 AI is thinking...");
-            if let Some(mv) = find_best_move(&mut state, depth) {
+            if let Some(mv) = find_best_move(&mut state, depth, Algorithm::AlphaBeta) {
                 println!("AI chooses: {:?}", mv);
                 state.make_move(mv);
             } else {
