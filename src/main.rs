@@ -8,8 +8,8 @@ mod game {
     pub mod utils;
 }
 
-use game::shell_game::new_game;
+use game::{shell_game::new_game, utils::Algorithm};
 
 fn main() {
-    new_game(8, 4, 3);
+    new_game(8, 4, 3, Algorithm::AlphaBeta);
 }

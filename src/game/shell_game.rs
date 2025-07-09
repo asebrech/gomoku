@@ -17,7 +17,7 @@ fn print_board(board: &Vec<Vec<Option<Player>>>) {
     }
 }
 
-pub fn new_game(board_size: usize, winning_condition: usize, depth: i32) {
+pub fn new_game(board_size: usize, winning_condition: usize, depth: i32, algorithm: Algorithm) {
     let mut state = GameState::new(board_size, winning_condition);
     // Choose sides
     println!("Do you want to play as X (Max) or O (Min)?");
@@ -72,7 +72,7 @@ pub fn new_game(board_size: usize, winning_condition: usize, depth: i32) {
             }
         } else {
             println!("🤖 AI is thinking...");
-            if let Some(mv) = find_best_move(&mut state, depth, Algorithm::AlphaBeta) {
+            if let Some(mv) = find_best_move(&mut state, depth, algorithm.clone()) {
                 println!("AI chooses: {:?}", mv);
                 state.make_move(mv);
             } else {

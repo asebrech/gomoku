@@ -4,6 +4,7 @@ use crate::solver::{
     minimax::minimax,
 };
 
+#[derive(Clone)]
 pub enum Algorithm {
     Minimax,
     AlphaBeta,
