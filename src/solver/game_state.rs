@@ -1,4 +1,6 @@
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+use std::hash::{DefaultHasher, Hash, Hasher};
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Player {
     Max,
     Min,
@@ -12,6 +14,17 @@ pub struct GameState {
 }
 
 impl GameState {
+    pub fn hash(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        for row in &self.board {
+            for cell in row {
+                cell.hash(&mut hasher);
+            }
+        }
+        self.current_player.hash(&mut hasher);
+        hasher.finish()
+    }
+
     pub fn new(board_size: usize, win_condition: usize) -> Self {
         GameState {
             board: vec![vec![None; board_size]; board_size],
