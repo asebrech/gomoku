@@ -1,5 +1,5 @@
 use crate::{
-    game::utils::{Algorithm, find_best_move},
+    game::utils::find_best_move,
     solver::game_state::{GameState, Player},
 };
 use std::io;
@@ -36,7 +36,7 @@ pub fn print_board(state: &GameState) {
     }
 }
 
-pub fn new_game(board_size: usize, winning_condition: usize, depth: i32, algorithm: Algorithm) {
+pub fn new_game(board_size: usize, winning_condition: usize, depth: i32) {
     let mut state = GameState::new(board_size, winning_condition);
     // Choose sides
     println!("Do you want to play as X (Max) or O (Min)?");
@@ -115,7 +115,7 @@ pub fn new_game(board_size: usize, winning_condition: usize, depth: i32, algorit
             }
         } else {
             println!("🤖 AI is thinking...");
-            if let Some(mv) = find_best_move(&mut state, depth, algorithm.clone()) {
+            if let Some(mv) = find_best_move(&mut state, depth) {
                 println!("AI chooses: {:?}", mv);
                 state.make_move(mv);
             } else {

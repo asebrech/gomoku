@@ -1,27 +1,52 @@
 use crate::solver::game_state::GameState;
 use std::cmp::{max, min};
 
-pub fn minimax(state: &mut GameState, depth: i32, maximizing_player: bool) -> i32 {
+use super::{heuristic::Heuristic, transposition::TranspositionTable};
+
+pub fn minimax(
+    state: &mut GameState,
+    depth: i32,
+    mut alpha: i32,
+    mut beta: i32,
+    maximizing_player: bool,
+    tt: &mut TranspositionTable,
+) -> i32 {
     if depth == 0 || state.is_terminal() {
-        return state.evaluate();
+        let eval = Heuristic::evaluate(state);
+        tt.store(state.hash(), eval);
+        return eval;
     }
+
+    let key = state.hash();
+    if let Some(score) = tt.lookup(key) {
+        return score;
+    }
+
     if maximizing_player {
-        let mut max_eval = i32::MIN;
+        let mut value = i32::MIN;
         for move_ in state.get_possible_moves() {
             state.make_move(move_);
-            let eval = minimax(state, depth - 1, false);
+            value = max(value, minimax(state, depth - 1, alpha, beta, false, tt));
             state.undo_move(move_);
-            max_eval = max(max_eval, eval);
+            if value >= beta {
+                break;
+            }
+            alpha = max(alpha, value);
         }
-        max_eval
+        tt.store(key, value);
+        value
     } else {
-        let mut min_eval = i32::MAX;
+        let mut value = i32::MAX;
         for move_ in state.get_possible_moves() {
             state.make_move(move_);
-            let eval = minimax(state, depth - 1, true);
+            value = min(value, minimax(state, depth - 1, alpha, beta, true, tt));
             state.undo_move(move_);
-            min_eval = min(min_eval, eval);
+            if value <= alpha {
+                break;
+            }
+            beta = min(beta, value);
         }
-        min_eval
+        tt.store(key, value);
+        value
     }
 }
