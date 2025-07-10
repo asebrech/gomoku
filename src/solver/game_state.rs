@@ -11,6 +11,7 @@ pub struct GameState {
     pub current_player: Player,
     pub board_size: usize,
     pub win_condition: usize,
+    pub winner: Option<Player>,
 }
 
 impl GameState {
@@ -20,6 +21,7 @@ impl GameState {
             current_player: Player::Max,
             board_size,
             win_condition,
+            winner: None,
         }
     }
 
@@ -52,6 +54,12 @@ impl GameState {
         }
 
         self.board[mv.0][mv.1] = Some(self.current_player);
+
+        // Check if this move wins the game
+        if self.check_win_around(mv) {
+            self.winner = Some(self.current_player);
+        }
+
         self.current_player = match self.current_player {
             Player::Max => Player::Min,
             Player::Min => Player::Max,
@@ -92,6 +100,7 @@ impl GameState {
 
     pub fn undo_move(&mut self, move_: (usize, usize)) {
         self.board[move_.0][move_.1] = None;
+        self.winner = None;
         self.current_player = if self.current_player == Player::Max {
             Player::Min
         } else {
@@ -100,57 +109,53 @@ impl GameState {
     }
 
     pub fn is_terminal(&self) -> bool {
-        self.check_winner().is_some() || self.get_possible_moves().is_empty()
+        self.winner.is_some() || self.get_possible_moves().is_empty()
     }
 
     pub fn check_winner(&self) -> Option<Player> {
-        let b = &self.board;
+        self.winner
+    }
 
-        // Check rows
-        for i in 0..self.board_size {
-            for j in 0..self.board_size - self.win_condition + 1 {
-                if let Some(player) = b[i][j] {
-                    if (0..self.win_condition).all(|k| b[i][j + k] == Some(player)) {
-                        return Some(player);
-                    }
+    fn check_win_around(&self, mv: (usize, usize)) -> bool {
+        let (i, j) = mv;
+        let player = self.board[i][j].unwrap();
+        let directions = [(1, 0), (0, 1), (1, 1), (1, -1)];
+
+        for &(dx, dy) in directions.iter() {
+            let mut count = 1; // Count includes the current cell
+
+            // Check in positive direction
+            let mut x = i as isize + dx as isize;
+            let mut y = j as isize + dy as isize;
+            while x >= 0 && y >= 0 && x < self.board_size as isize && y < self.board_size as isize {
+                if self.board[x as usize][y as usize] == Some(player) {
+                    count += 1;
+                    x += dx as isize;
+                    y += dy as isize;
+                } else {
+                    break;
                 }
+            }
+
+            // Check in negative direction
+            let mut x = i as isize - dx as isize;
+            let mut y = j as isize - dy as isize;
+            while x >= 0 && y >= 0 && x < self.board_size as isize && y < self.board_size as isize {
+                if self.board[x as usize][y as usize] == Some(player) {
+                    count += 1;
+                    x -= dx as isize;
+                    y -= dy as isize;
+                } else {
+                    break;
+                }
+            }
+
+            if count >= self.win_condition {
+                return true;
             }
         }
 
-        // Check columns
-        for j in 0..self.board_size {
-            for i in 0..self.board_size - self.win_condition + 1 {
-                if let Some(player) = b[i][j] {
-                    if (0..self.win_condition).all(|k| b[i + k][j] == Some(player)) {
-                        return Some(player);
-                    }
-                }
-            }
-        }
-
-        // Check main diagonals
-        for i in 0..self.board_size - self.win_condition + 1 {
-            for j in 0..self.board_size - self.win_condition + 1 {
-                if let Some(player) = b[i][j] {
-                    if (0..self.win_condition).all(|k| b[i + k][j + k] == Some(player)) {
-                        return Some(player);
-                    }
-                }
-            }
-        }
-
-        // Check anti-diagonals
-        for i in 0..self.board_size - self.win_condition + 1 {
-            for j in (self.win_condition - 1)..self.board_size {
-                if let Some(player) = b[i][j] {
-                    if (0..self.win_condition).all(|k| b[i + k][j - k] == Some(player)) {
-                        return Some(player);
-                    }
-                }
-            }
-        }
-
-        None
+        false
     }
 
     pub fn hash(&self) -> u64 {
@@ -166,12 +171,13 @@ impl GameState {
 
     pub fn evaluate(&self) -> i32 {
         // Terminal state evaluation: check for wins or draws
-        if let Some(winner) = self.check_winner() {
+        if let Some(winner) = self.winner {
             return match winner {
-                Player::Max => 1_000_000,  // Max wins
-                Player::Min => -1_000_000, // Min wins
+                Player::Max => 1_000_000,
+                Player::Min => -1_000_000,
             };
         }
+
         if self.get_possible_moves().is_empty() {
             return 0; // Draw
         }
