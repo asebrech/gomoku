@@ -11,7 +11,7 @@ pub fn alpha_beta_transposition(
     maximizing_player: bool,
     tt: &mut TranspositionTable,
 ) -> i32 {
-    if depth == 0 || state.is_terminal() {
+    if depth == 0 {
         let eval = state.evaluate();
         tt.store(state.hash(), eval);
         return eval;
@@ -32,7 +32,7 @@ pub fn alpha_beta_transposition(
             );
             state.undo_move(move_);
             if value >= beta {
-                break; // Beta cutoff
+                break;
             }
             alpha = max(alpha, value);
         }
@@ -48,7 +48,7 @@ pub fn alpha_beta_transposition(
             );
             state.undo_move(move_);
             if value <= alpha {
-                break; // Alpha cutoff
+                break;
             }
             beta = min(beta, value);
         }

@@ -153,15 +153,6 @@ impl GameState {
         None
     }
 
-    // Evaluate the board state for a player
-    pub fn evaluate(&self) -> i32 {
-        match self.check_winner() {
-            Some(Player::Max) => 1000,
-            Some(Player::Min) => -1000,
-            None => 0,
-        }
-    }
-
     pub fn hash(&self) -> u64 {
         let mut hasher = DefaultHasher::new();
         for row in &self.board {
@@ -171,5 +162,9 @@ impl GameState {
         }
         self.current_player.hash(&mut hasher);
         hasher.finish()
+    }
+
+    pub fn evaluate(&self) -> i32 {
+        0
     }
 }
