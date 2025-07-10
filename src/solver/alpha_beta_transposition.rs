@@ -11,7 +11,7 @@ pub fn alpha_beta_transposition(
     maximizing_player: bool,
     tt: &mut TranspositionTable,
 ) -> i32 {
-    if depth == 0 {
+    if depth == 0 || state.is_terminal() {
         let eval = state.evaluate();
         tt.store(state.hash(), eval);
         return eval;
