@@ -4,13 +4,13 @@ use gomoku::core::captures::CaptureHandler;
 #[test]
 fn test_horizontal_capture() {
     let mut board = Board::new(19);
-    
+
     // Set up: X - O - O - X (horizontal capture)
     board.place_stone(5, 5, Player::Max);
     board.place_stone(5, 6, Player::Min);
     board.place_stone(5, 7, Player::Min);
     board.place_stone(5, 8, Player::Max);
-    
+
     // Test capture detection
     let captures = CaptureHandler::detect_captures(&board, 5, 8, Player::Max);
     assert_eq!(captures.len(), 2);
@@ -21,13 +21,13 @@ fn test_horizontal_capture() {
 #[test]
 fn test_vertical_capture() {
     let mut board = Board::new(19);
-    
+
     // Set up: X - O - O - X (vertical capture)
     board.place_stone(5, 5, Player::Max);
     board.place_stone(6, 5, Player::Min);
     board.place_stone(7, 5, Player::Min);
     board.place_stone(8, 5, Player::Max);
-    
+
     // Test capture detection
     let captures = CaptureHandler::detect_captures(&board, 8, 5, Player::Max);
     assert_eq!(captures.len(), 2);
@@ -38,13 +38,13 @@ fn test_vertical_capture() {
 #[test]
 fn test_diagonal_capture() {
     let mut board = Board::new(19);
-    
+
     // Set up: X - O - O - X (diagonal capture)
     board.place_stone(5, 5, Player::Max);
     board.place_stone(6, 6, Player::Min);
     board.place_stone(7, 7, Player::Min);
     board.place_stone(8, 8, Player::Max);
-    
+
     // Test capture detection
     let captures = CaptureHandler::detect_captures(&board, 8, 8, Player::Max);
     assert_eq!(captures.len(), 2);
@@ -55,13 +55,13 @@ fn test_diagonal_capture() {
 #[test]
 fn test_anti_diagonal_capture() {
     let mut board = Board::new(19);
-    
+
     // Set up: X - O - O - X (anti-diagonal capture)
     board.place_stone(8, 5, Player::Max);
     board.place_stone(7, 6, Player::Min);
     board.place_stone(6, 7, Player::Min);
     board.place_stone(5, 8, Player::Max);
-    
+
     // Test capture detection
     let captures = CaptureHandler::detect_captures(&board, 5, 8, Player::Max);
     assert_eq!(captures.len(), 2);
@@ -72,22 +72,22 @@ fn test_anti_diagonal_capture() {
 #[test]
 fn test_multiple_captures() {
     let mut board = Board::new(19);
-    
+
     // Set up multiple captures in different directions
     // Horizontal: X - O - O - X
     board.place_stone(5, 5, Player::Max);
     board.place_stone(5, 6, Player::Min);
     board.place_stone(5, 7, Player::Min);
-    
+
     // Vertical: X - O - O - X
     board.place_stone(6, 8, Player::Min);
     board.place_stone(7, 8, Player::Min);
     board.place_stone(8, 8, Player::Max);
-    
+
     // Place the final stone that creates both captures
     board.place_stone(5, 8, Player::Max);
     let captures = CaptureHandler::detect_captures(&board, 5, 8, Player::Max);
-    
+
     // Should detect both horizontal and vertical captures
     assert_eq!(captures.len(), 4);
     assert!(captures.contains(&(5, 6)));
@@ -99,13 +99,13 @@ fn test_multiple_captures() {
 #[test]
 fn test_no_capture_empty_space() {
     let mut board = Board::new(19);
-    
+
     // Set up: X - O - empty - X (no capture)
     board.place_stone(5, 5, Player::Max);
     board.place_stone(5, 6, Player::Min);
     // Empty space at (5, 7)
     board.place_stone(5, 8, Player::Max);
-    
+
     let captures = CaptureHandler::detect_captures(&board, 5, 8, Player::Max);
     assert_eq!(captures.len(), 0);
 }
@@ -113,13 +113,13 @@ fn test_no_capture_empty_space() {
 #[test]
 fn test_no_capture_same_player() {
     let mut board = Board::new(19);
-    
+
     // Set up: X - X - X - X (no capture)
     board.place_stone(5, 5, Player::Max);
     board.place_stone(5, 6, Player::Max);
     board.place_stone(5, 7, Player::Max);
     board.place_stone(5, 8, Player::Max);
-    
+
     let captures = CaptureHandler::detect_captures(&board, 5, 8, Player::Max);
     assert_eq!(captures.len(), 0);
 }
@@ -127,79 +127,37 @@ fn test_no_capture_same_player() {
 #[test]
 fn test_execute_captures() {
     let mut board = Board::new(19);
-    
+
     // Set up a capture scenario
     board.place_stone(5, 5, Player::Max);
     board.place_stone(5, 6, Player::Min);
     board.place_stone(5, 7, Player::Min);
     board.place_stone(5, 8, Player::Max);
-    
+
     let captures = CaptureHandler::detect_captures(&board, 5, 8, Player::Max);
     CaptureHandler::execute_captures(&mut board, &captures);
-    
+
     // Check that captured stones are removed
     assert_eq!(board.get_player(5, 6), None);
     assert_eq!(board.get_player(5, 7), None);
-    
+
     // Check that other stones remain
     assert_eq!(board.get_player(5, 5), Some(Player::Max));
     assert_eq!(board.get_player(5, 8), Some(Player::Max));
 }
 
 #[test]
-fn test_can_stone_be_captured() {
-    let mut board = Board::new(19);
-    
-    // Set up proper capture pattern: O - X - X - empty
-    // Where Min (O) can capture the X stones by playing at the empty space
-    board.place_stone(5, 5, Player::Min);   // Opponent behind
-    board.place_stone(5, 6, Player::Max);   // Stone to be captured
-    board.place_stone(5, 7, Player::Max);   // Same player as stone being tested
-    // Empty space at (5, 8) where opponent can play to capture
-    
-    // Test if the Max stones can be captured by Min
-    assert!(CaptureHandler::can_stone_be_captured(&board, 5, 6, Player::Min));
-    assert!(CaptureHandler::can_stone_be_captured(&board, 5, 7, Player::Min));
-}
-
-#[test]
-fn test_can_stone_be_captured_false() {
-    let mut board = Board::new(19);
-    
-    // Set up: X - X - X (stone cannot be captured)
-    board.place_stone(5, 5, Player::Max);
-    board.place_stone(5, 6, Player::Max);
-    board.place_stone(5, 7, Player::Max);
-    
-    assert!(!CaptureHandler::can_stone_be_captured(&board, 5, 6, Player::Min));
-}
-
-#[test]
-fn test_can_capture_from_line() {
-    let mut board = Board::new(19);
-    
-    // Set up a line where one stone can be captured
-    board.place_stone(5, 5, Player::Min);
-    board.place_stone(5, 6, Player::Max);
-    board.place_stone(5, 7, Player::Max);
-    
-    let line = vec![(5, 6), (5, 7), (5, 8)];
-    assert!(CaptureHandler::can_capture_from_line(&board, &line, Player::Min));
-}
-
-#[test]
 fn test_edge_case_captures() {
     let mut board = Board::new(19);
-    
+
     // Test capture at board edge
     board.place_stone(0, 0, Player::Max);
     board.place_stone(0, 1, Player::Min);
     board.place_stone(0, 2, Player::Min);
     board.place_stone(0, 3, Player::Max);
-    
+
     let captures = CaptureHandler::detect_captures(&board, 0, 3, Player::Max);
     assert_eq!(captures.len(), 2);
     assert!(captures.contains(&(0, 1)));
     assert!(captures.contains(&(0, 2)));
 }
-

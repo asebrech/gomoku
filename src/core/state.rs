@@ -76,7 +76,7 @@ impl GameState {
             return true;
         }
 
-        if self.check_win_around(mv) && !self.can_break_five_by_capture(self.current_player) {
+        if self.check_win_around(mv) {
             self.winner = Some(self.current_player);
             return true;
         }
@@ -133,9 +133,5 @@ impl GameState {
 
     pub fn check_capture_win(&self) -> Option<Player> {
         WinChecker::check_capture_win(self.max_captures, self.min_captures)
-    }
-
-    fn can_break_five_by_capture(&self, player: Player) -> bool {
-        WinChecker::can_break_five_by_capture(&self.board, player, self.win_condition)
     }
 }
