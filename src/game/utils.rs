@@ -1,7 +1,6 @@
 use crate::ai::{minimax::minimax, transposition::TranspositionTable};
-use crate::game::game_state::GameState;
-
-use super::game_state::Player;
+use crate::game::state::GameState;
+use crate::game::board::Player;
 
 pub fn find_best_move(state: &mut GameState, depth: i32) -> Option<(usize, usize)> {
     let mut best_move = None;
