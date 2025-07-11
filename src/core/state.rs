@@ -1,8 +1,8 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
 use crate::core::board::{Board, Player};
 use crate::core::captures::CaptureHandler;
 use crate::core::moves::MoveHandler;
 use crate::core::rules::WinChecker;
+use std::hash::{DefaultHasher, Hash, Hasher};
 
 pub struct GameState {
     pub board: Board,
@@ -31,27 +31,23 @@ impl GameState {
         MoveHandler::get_possible_moves(&self.board, self.current_player)
     }
 
-    pub fn make_move(&mut self, mv: (usize, usize)) -> bool {
+    pub fn make_move(&mut self, mv: (usize, usize)) {
         self.board.place_stone(mv.0, mv.1, self.current_player);
 
-        let captures = CaptureHandler::detect_captures(&self.board, mv.0, mv.1, self.current_player);
+        let captures =
+            CaptureHandler::detect_captures(&self.board, mv.0, mv.1, self.current_player);
         self.execute_captures(captures);
 
-        if self.check_for_wins(mv) {
-            self.switch_player();
-            return true;
-        }
-
+        self.check_for_wins(mv);
         self.switch_player();
-        true
     }
 
     pub fn undo_move(&mut self, move_: (usize, usize)) {
         self.current_player = self.current_player.opponent();
-        
+
         self.board.remove_stone(move_.0, move_.1);
         self.winner = None;
-        
+
         self.restore_captured_stones();
     }
 
@@ -80,15 +76,7 @@ impl GameState {
             return true;
         }
 
-        if self.check_win_around(mv) {
-            if !self.can_break_five_by_capture(self.current_player) {
-                self.winner = Some(self.current_player);
-                return true;
-            }
-        }
-
-        let opponent = self.current_player.opponent();
-        if self.is_about_to_lose_by_capture(opponent) && self.can_capture_to_win(self.current_player) {
+        if self.check_win_around(mv) && !self.can_break_five_by_capture(self.current_player) {
             self.winner = Some(self.current_player);
             return true;
         }
@@ -117,11 +105,11 @@ impl GameState {
         if let Some(last_captures) = self.capture_history.pop() {
             if !last_captures.is_empty() {
                 let opponent = self.current_player.opponent();
-                
+
                 for &(row, col) in &last_captures {
                     self.board.place_stone(row, col, opponent);
                 }
-                
+
                 let pairs_captured = last_captures.len() / 2;
                 match self.current_player {
                     Player::Max => {
@@ -150,14 +138,4 @@ impl GameState {
     fn can_break_five_by_capture(&self, player: Player) -> bool {
         WinChecker::can_break_five_by_capture(&self.board, player, self.win_condition)
     }
-
-    fn is_about_to_lose_by_capture(&self, player: Player) -> bool {
-        WinChecker::is_about_to_lose_by_capture(self.max_captures, self.min_captures, player)
-    }
-
-    fn can_capture_to_win(&self, player: Player) -> bool {
-        WinChecker::can_capture_to_win(&self.board, self.max_captures, self.min_captures, player)
-    }
-
 }
-

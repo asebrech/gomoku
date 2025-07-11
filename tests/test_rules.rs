@@ -4,12 +4,12 @@ use gomoku::core::rules::WinChecker;
 #[test]
 fn test_horizontal_win() {
     let mut board = Board::new(19);
-    
+
     // Place 5 stones horizontally
     for i in 0..5 {
         board.place_stone(9, 5 + i, Player::Max);
     }
-    
+
     // Test win detection from different positions
     assert!(WinChecker::check_win_around(&board, 9, 5, 5));
     assert!(WinChecker::check_win_around(&board, 9, 7, 5));
@@ -19,12 +19,12 @@ fn test_horizontal_win() {
 #[test]
 fn test_vertical_win() {
     let mut board = Board::new(19);
-    
+
     // Place 5 stones vertically
     for i in 0..5 {
         board.place_stone(5 + i, 9, Player::Max);
     }
-    
+
     // Test win detection
     assert!(WinChecker::check_win_around(&board, 5, 9, 5));
     assert!(WinChecker::check_win_around(&board, 7, 9, 5));
@@ -34,12 +34,12 @@ fn test_vertical_win() {
 #[test]
 fn test_diagonal_win() {
     let mut board = Board::new(19);
-    
+
     // Place 5 stones diagonally
     for i in 0..5 {
         board.place_stone(5 + i, 5 + i, Player::Max);
     }
-    
+
     // Test win detection
     assert!(WinChecker::check_win_around(&board, 5, 5, 5));
     assert!(WinChecker::check_win_around(&board, 7, 7, 5));
@@ -49,12 +49,12 @@ fn test_diagonal_win() {
 #[test]
 fn test_anti_diagonal_win() {
     let mut board = Board::new(19);
-    
+
     // Place 5 stones anti-diagonally
     for i in 0..5 {
         board.place_stone(5 + i, 9 - i, Player::Max);
     }
-    
+
     // Test win detection
     assert!(WinChecker::check_win_around(&board, 5, 9, 5));
     assert!(WinChecker::check_win_around(&board, 7, 7, 5));
@@ -64,12 +64,12 @@ fn test_anti_diagonal_win() {
 #[test]
 fn test_no_win_four_in_row() {
     let mut board = Board::new(19);
-    
+
     // Place only 4 stones horizontally
     for i in 0..4 {
         board.place_stone(9, 5 + i, Player::Max);
     }
-    
+
     // Should not detect win
     assert!(!WinChecker::check_win_around(&board, 9, 5, 5));
     assert!(!WinChecker::check_win_around(&board, 9, 8, 5));
@@ -78,14 +78,14 @@ fn test_no_win_four_in_row() {
 #[test]
 fn test_blocked_line_no_win() {
     let mut board = Board::new(19);
-    
+
     // Place 4 stones with opponent stone blocking
     board.place_stone(9, 5, Player::Max);
     board.place_stone(9, 6, Player::Max);
     board.place_stone(9, 7, Player::Max);
     board.place_stone(9, 8, Player::Max);
     board.place_stone(9, 9, Player::Min); // Blocking stone
-    
+
     // Should not detect win
     assert!(!WinChecker::check_win_around(&board, 9, 5, 5));
     assert!(!WinChecker::check_win_around(&board, 9, 8, 5));
@@ -118,15 +118,15 @@ fn test_no_capture_win() {
 #[test]
 fn test_find_five_in_a_row_lines() {
     let mut board = Board::new(19);
-    
+
     // Create a line of 5 stones
     for i in 0..5 {
         board.place_stone(9, 5 + i, Player::Max);
     }
-    
+
     let lines = WinChecker::find_five_in_a_row_lines(&board, Player::Max, 5);
     assert!(lines.len() > 0);
-    
+
     // Check that the line contains all 5 positions
     let line = &lines[0];
     assert_eq!(line.len(), 5);
@@ -138,17 +138,17 @@ fn test_find_five_in_a_row_lines() {
 #[test]
 fn test_find_multiple_five_lines() {
     let mut board = Board::new(19);
-    
+
     // Create horizontal line
     for i in 0..5 {
         board.place_stone(9, 5 + i, Player::Max);
     }
-    
+
     // Create vertical line
     for i in 0..5 {
         board.place_stone(5 + i, 9, Player::Max);
     }
-    
+
     let lines = WinChecker::find_five_in_a_row_lines(&board, Player::Max, 5);
     assert!(lines.len() >= 2);
 }
@@ -156,86 +156,60 @@ fn test_find_multiple_five_lines() {
 #[test]
 fn test_can_break_five_by_capture() {
     let mut board = Board::new(19);
-    
+
     // Create a line of 5 stones for Max
     for i in 0..5 {
         board.place_stone(9, 5 + i, Player::Max);
     }
-    
+
     // Set up capture possibility: place Min stones adjacent to Max line
     board.place_stone(8, 6, Player::Min);
     board.place_stone(10, 6, Player::Min);
     board.place_stone(8, 7, Player::Min);
     // Empty space at (10, 7) would allow capture
-    
+
     // This should detect that the five can be broken by capture
-    assert!(WinChecker::can_break_five_by_capture(&board, Player::Max, 5));
+    assert!(WinChecker::can_break_five_by_capture(
+        &board,
+        Player::Max,
+        5
+    ));
 }
 
 #[test]
 fn test_cannot_break_five_by_capture() {
     let mut board = Board::new(19);
-    
+
     // Create a line of 5 stones for Max
     for i in 0..5 {
         board.place_stone(9, 5 + i, Player::Max);
     }
-    
+
     // No capture opportunities available
-    assert!(!WinChecker::can_break_five_by_capture(&board, Player::Max, 5));
-}
-
-#[test]
-fn test_is_about_to_lose_by_capture() {
-    // Test when a player is about to lose (has 4 pairs captured)
-    assert!(WinChecker::is_about_to_lose_by_capture(4, 0, Player::Max));
-    assert!(WinChecker::is_about_to_lose_by_capture(0, 4, Player::Min));
-    assert!(!WinChecker::is_about_to_lose_by_capture(3, 0, Player::Max));
-    assert!(!WinChecker::is_about_to_lose_by_capture(0, 3, Player::Min));
-}
-
-#[test]
-fn test_can_capture_to_win() {
-    let mut board = Board::new(19);
-    
-    // Set up scenario where Min is about to lose by capture (4 pairs)
-    // and Max can capture to win
-    board.place_stone(9, 5, Player::Min);
-    board.place_stone(9, 6, Player::Min);
-    board.place_stone(9, 8, Player::Max);
-    // Empty space at (9, 7) allows Max to capture and win
-    
-    assert!(WinChecker::can_capture_to_win(&board, 4, 0, Player::Max));
-}
-
-#[test]
-fn test_cannot_capture_to_win() {
-    let mut board = Board::new(19);
-    
-    // No capture opportunities
-    assert!(!WinChecker::can_capture_to_win(&board, 0, 0, Player::Max));
-    
-    // Opponent not about to lose
-    assert!(!WinChecker::can_capture_to_win(&board, 2, 0, Player::Max));
+    assert!(!WinChecker::can_break_five_by_capture(
+        &board,
+        Player::Max,
+        5
+    ));
 }
 
 #[test]
 fn test_win_different_conditions() {
     let mut board = Board::new(19);
-    
+
     // Test with 4-in-a-row win condition
     for i in 0..4 {
         board.place_stone(9, 5 + i, Player::Max);
     }
-    
+
     assert!(WinChecker::check_win_around(&board, 9, 5, 4));
     assert!(!WinChecker::check_win_around(&board, 9, 5, 5));
-    
+
     // Test with 6-in-a-row win condition
     for i in 4..6 {
         board.place_stone(9, 5 + i, Player::Max);
     }
-    
+
     assert!(WinChecker::check_win_around(&board, 9, 5, 6));
     assert!(WinChecker::check_win_around(&board, 9, 5, 5));
 }
@@ -243,21 +217,20 @@ fn test_win_different_conditions() {
 #[test]
 fn test_edge_case_wins() {
     let mut board = Board::new(19);
-    
+
     // Test win at board edge
     for i in 0..5 {
         board.place_stone(0, i, Player::Max);
     }
-    
+
     assert!(WinChecker::check_win_around(&board, 0, 0, 5));
     assert!(WinChecker::check_win_around(&board, 0, 4, 5));
-    
+
     // Test win at board corner
     for i in 0..5 {
         board.place_stone(i, 0, Player::Min);
     }
-    
+
     assert!(WinChecker::check_win_around(&board, 0, 0, 5));
     assert!(WinChecker::check_win_around(&board, 4, 0, 5));
 }
-

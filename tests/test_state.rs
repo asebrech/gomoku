@@ -1,10 +1,10 @@
-use gomoku::core::state::GameState;
 use gomoku::core::board::Player;
+use gomoku::core::state::GameState;
 
 #[test]
 fn test_game_state_creation() {
     let state = GameState::new(19, 5);
-    
+
     assert_eq!(state.board.size, 19);
     assert_eq!(state.win_condition, 5);
     assert_eq!(state.current_player, Player::Max);
@@ -19,7 +19,7 @@ fn test_game_state_creation() {
 fn test_first_move_only_center() {
     let state = GameState::new(19, 5);
     let moves = state.get_possible_moves();
-    
+
     assert_eq!(moves.len(), 1);
     assert_eq!(moves[0], (9, 9));
 }
@@ -27,15 +27,15 @@ fn test_first_move_only_center() {
 #[test]
 fn test_make_move_basic() {
     let mut state = GameState::new(19, 5);
-    
+
     // Make first move
-    assert!(state.make_move((9, 9)));
+    state.make_move((9, 9));
     assert_eq!(state.board.get_player(9, 9), Some(Player::Max));
     assert_eq!(state.current_player, Player::Min);
     assert_eq!(state.winner, None);
-    
+
     // Make second move
-    assert!(state.make_move((9, 10)));
+    state.make_move((9, 10));
     assert_eq!(state.board.get_player(9, 10), Some(Player::Min));
     assert_eq!(state.current_player, Player::Max);
 }
@@ -43,16 +43,16 @@ fn test_make_move_basic() {
 #[test]
 fn test_make_move_with_capture() {
     let mut state = GameState::new(19, 5);
-    
+
     // Set up capture scenario
     state.board.place_stone(9, 9, Player::Max);
     state.board.place_stone(9, 10, Player::Min);
     state.board.place_stone(9, 11, Player::Min);
     state.current_player = Player::Max;
-    
+
     // Make capturing move
-    assert!(state.make_move((9, 12)));
-    
+    state.make_move((9, 12));
+
     // Check capture was executed
     assert_eq!(state.board.get_player(9, 10), None);
     assert_eq!(state.board.get_player(9, 11), None);
@@ -63,12 +63,12 @@ fn test_make_move_with_capture() {
 #[test]
 fn test_undo_move_basic() {
     let mut state = GameState::new(19, 5);
-    
+
     // Make move
     state.make_move((9, 9));
     assert_eq!(state.board.get_player(9, 9), Some(Player::Max));
     assert_eq!(state.current_player, Player::Min);
-    
+
     // Undo move
     state.undo_move((9, 9));
     assert_eq!(state.board.get_player(9, 9), None);
@@ -79,20 +79,20 @@ fn test_undo_move_basic() {
 #[test]
 fn test_undo_move_with_capture() {
     let mut state = GameState::new(19, 5);
-    
+
     // Set up capture scenario
     state.board.place_stone(9, 9, Player::Max);
     state.board.place_stone(9, 10, Player::Min);
     state.board.place_stone(9, 11, Player::Min);
     state.current_player = Player::Max;
-    
+
     // Make capturing move
     state.make_move((9, 12));
     assert_eq!(state.min_captures, 1);
-    
+
     // Undo move
     state.undo_move((9, 12));
-    
+
     // Check capture was restored
     assert_eq!(state.board.get_player(9, 10), Some(Player::Min));
     assert_eq!(state.board.get_player(9, 11), Some(Player::Min));
@@ -104,36 +104,36 @@ fn test_undo_move_with_capture() {
 #[test]
 fn test_is_terminal_no_moves() {
     let mut state = GameState::new(3, 3);
-    
+
     // Fill the board
     for i in 0..3 {
         for j in 0..3 {
             state.board.place_stone(i, j, Player::Max);
         }
     }
-    
+
     assert!(state.is_terminal());
 }
 
 #[test]
 fn test_is_terminal_winner_exists() {
     let mut state = GameState::new(19, 5);
-    
+
     // Create winning condition
     for i in 0..5 {
         state.board.place_stone(9, 5 + i, Player::Max);
     }
     state.winner = Some(Player::Max);
-    
+
     assert!(state.is_terminal());
 }
 
 #[test]
 fn test_check_winner() {
     let mut state = GameState::new(19, 5);
-    
+
     assert_eq!(state.check_winner(), None);
-    
+
     state.winner = Some(Player::Max);
     assert_eq!(state.check_winner(), Some(Player::Max));
 }
@@ -142,15 +142,15 @@ fn test_check_winner() {
 fn test_hash_consistency() {
     let mut state1 = GameState::new(19, 5);
     let mut state2 = GameState::new(19, 5);
-    
+
     // Same states should have same hash
     assert_eq!(state1.hash(), state2.hash());
-    
+
     // Same moves should produce same hash
     state1.make_move((9, 9));
     state2.make_move((9, 9));
     assert_eq!(state1.hash(), state2.hash());
-    
+
     // Different moves should produce different hash
     state1.make_move((9, 10));
     state2.make_move((10, 9));
@@ -160,14 +160,14 @@ fn test_hash_consistency() {
 #[test]
 fn test_capture_win_detection() {
     let mut state = GameState::new(19, 5);
-    
+
     // Set captures to winning amount
     state.max_captures = 5;
-    
+
     // Make any move to trigger win check
     state.board.place_stone(9, 9, Player::Max);
     state.current_player = Player::Max;
-    
+
     // Should detect capture win
     assert_eq!(state.check_capture_win(), Some(Player::Max));
 }
@@ -175,16 +175,16 @@ fn test_capture_win_detection() {
 #[test]
 fn test_winning_by_line() {
     let mut state = GameState::new(19, 5);
-    
+
     // Place first 4 stones
     for i in 0..4 {
         state.board.place_stone(9, 5 + i, Player::Max);
     }
     state.current_player = Player::Max;
-    
+
     // Make winning move
     state.make_move((9, 9));
-    
+
     // Should detect line win
     assert_eq!(state.winner, Some(Player::Max));
 }
@@ -192,7 +192,7 @@ fn test_winning_by_line() {
 #[test]
 fn test_multiple_captures_same_move() {
     let mut state = GameState::new(19, 5);
-    
+
     // Set up multiple capture scenario
     state.board.place_stone(9, 9, Player::Max);
     state.board.place_stone(9, 10, Player::Min);
@@ -200,11 +200,11 @@ fn test_multiple_captures_same_move() {
     state.board.place_stone(10, 9, Player::Min);
     state.board.place_stone(11, 9, Player::Min);
     state.current_player = Player::Max;
-    
+
     // Make move that captures in two directions
     state.make_move((9, 12));
     state.make_move((12, 9));
-    
+
     // Should capture multiple pairs
     assert!(state.min_captures >= 2);
 }
@@ -213,39 +213,39 @@ fn test_multiple_captures_same_move() {
 fn test_game_state_different_sizes() {
     let state15 = GameState::new(15, 5);
     let state19 = GameState::new(19, 5);
-    
+
     assert_eq!(state15.board.size, 15);
     assert_eq!(state19.board.size, 19);
-    
+
     // Different sized boards should have different starting moves
     let moves15 = state15.get_possible_moves();
     let moves19 = state19.get_possible_moves();
-    
+
     assert_ne!(moves15[0], moves19[0]);
 }
 
 #[test]
 fn test_complex_game_sequence() {
     let mut state = GameState::new(19, 5);
-    
+
     // Play a sequence of moves
     let moves = vec![
-        (9, 9),   // Max
-        (9, 10),  // Min
-        (9, 8),   // Max
-        (10, 9),  // Min
-        (9, 7),   // Max
-        (11, 9),  // Min
+        (9, 9),  // Max
+        (9, 10), // Min
+        (9, 8),  // Max
+        (10, 9), // Min
+        (9, 7),  // Max
+        (11, 9), // Min
     ];
-    
+
     for (i, &mv) in moves.iter().enumerate() {
         let expected_player = if i % 2 == 0 { Player::Max } else { Player::Min };
         assert_eq!(state.current_player, expected_player);
-        
+
         state.make_move(mv);
         assert_eq!(state.board.get_player(mv.0, mv.1), Some(expected_player));
     }
-    
+
     // Check final state
     assert_eq!(state.current_player, Player::Max);
     assert_eq!(state.winner, None);
@@ -254,22 +254,21 @@ fn test_complex_game_sequence() {
 #[test]
 fn test_capture_history_tracking() {
     let mut state = GameState::new(19, 5);
-    
+
     // Make moves without capture
     state.make_move((9, 9));
     state.make_move((9, 10));
-    
+
     // Should have empty capture history entries
     assert_eq!(state.capture_history.len(), 2);
     assert!(state.capture_history[0].is_empty());
     assert!(state.capture_history[1].is_empty());
-    
+
     // Set up and make capture
     state.board.place_stone(9, 11, Player::Min);
     state.make_move((9, 12));
-    
+
     // Should have capture in history
     assert_eq!(state.capture_history.len(), 3);
     assert!(!state.capture_history[2].is_empty());
 }
-
