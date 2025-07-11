@@ -56,33 +56,35 @@ impl CaptureHandler {
 
     pub fn can_stone_be_captured(board: &Board, row: usize, col: usize, opponent: Player) -> bool {
         let directions = [(1, 0), (0, 1), (1, 1), (1, -1)];
-        let player = board.get_player(row, col).unwrap();
+        let player = match board.get_player(row, col) {
+            Some(p) => p,
+            None => return false,
+        };
 
         for &(dx, dy) in &directions {
-            let back_x = row as isize - dx;
-            let back_y = col as isize - dy;
-            
-            if back_x >= 0 && back_y >= 0 && 
-               back_x < board.size as isize && back_y < board.size as isize {
-                
-                if board.cells[back_x as usize][back_y as usize] == Some(opponent) {
-                    let next_x = row as isize + dx;
-                    let next_y = col as isize + dy;
-                    
-                    if next_x >= 0 && next_y >= 0 && 
-                       next_x < board.size as isize && next_y < board.size as isize {
-                        
-                        if board.cells[next_x as usize][next_y as usize] == Some(player) {
-                            let capture_x = next_x + dx;
-                            let capture_y = next_y + dy;
-                            
-                            if capture_x >= 0 && capture_y >= 0 && 
-                               capture_x < board.size as isize && capture_y < board.size as isize {
-                                
-                                if board.cells[capture_x as usize][capture_y as usize].is_none() {
-                                    return true;
-                                }
-                            }
+            for multiplier in [-1, 1] {
+                let back_x = row as isize - multiplier * dx;
+                let back_y = col as isize - multiplier * dy;
+
+                let next_x = row as isize + multiplier * dx;
+                let next_y = col as isize + multiplier * dy;
+
+                let capture_x = next_x + multiplier * dx;
+                let capture_y = next_y + multiplier * dy;
+
+                if back_x >= 0 && back_y >= 0 &&
+                   next_x >= 0 && next_y >= 0 &&
+                   capture_x >= 0 && capture_y >= 0 &&
+                   back_x < board.size as isize && back_y < board.size as isize &&
+                   next_x < board.size as isize && next_y < board.size as isize &&
+                   capture_x < board.size as isize && capture_y < board.size as isize {
+
+                    if board.cells[back_x as usize][back_y as usize] == Some(opponent)
+                        && board.cells[next_x as usize][next_y as usize] == Some(player)
+                        && board.cells[capture_x as usize][capture_y as usize].is_none() {
+
+                        if board.cells[row][col] == board.cells[next_x as usize][next_y as usize] {
+                            return true;
                         }
                     }
                 }
@@ -93,12 +95,7 @@ impl CaptureHandler {
     }
 
     pub fn can_capture_from_line(board: &Board, line: &[(usize, usize)], opponent: Player) -> bool {
-        for &(row, col) in line {
-            if Self::can_stone_be_captured(board, row, col, opponent) {
-                return true;
-            }
-        }
-        false
+        line.iter().any(|&(row, col)| Self::can_stone_be_captured(board, row, col, opponent))
     }
 }
 
