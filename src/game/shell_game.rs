@@ -6,6 +6,7 @@ use std::io;
 
 pub fn print_board(state: &GameState) {
     let n = state.board.len();
+    let possible_moves = state.get_possible_moves();
 
     // Print column headers
     print!("   ");
@@ -22,9 +23,7 @@ pub fn print_board(state: &GameState) {
                 Some(Player::Min) => print!(" O "),
                 None => {
                     let mv = (i, j);
-                    if state.is_board_empty() && mv == (n / 2, n / 2) {
-                        print!(" + ");
-                    } else if !state.is_board_empty() && state.is_move_adjacent(mv) {
+                    if possible_moves.contains(&mv) {
                         print!(" + ");
                     } else {
                         print!(" . ");
@@ -90,24 +89,20 @@ pub fn new_game(board_size: usize, winning_condition: usize, depth: i32) {
                         continue;
                     }
 
-                    if state.board[mv.0][mv.1].is_some() {
-                        println!("❌ That cell is already occupied.");
-                        continue;
-                    }
-
-                    // Try the move
-                    if state.make_move(mv) {
+                    let possible_moves = state.get_possible_moves();
+                    if possible_moves.contains(&mv) {
+                        state.make_move(mv);
                         break; // Move accepted
+                    } else if state.board[mv.0][mv.1].is_some() {
+                        println!("❌ That cell is already occupied.");
                     } else if state.is_board_empty() {
-                        println!(
-                            "❌ Invalid first move. You must start at the center: ({}, {}).",
-                            state.board.len() / 2,
-                            state.board.len() / 2
-                        );
+                        println!("❌ First move must be at the center ({}, {}).", state.board.len() / 2, state.board.len() / 2);
+                    } else if !state.is_move_adjacent(mv) {
+                        println!("❌ Move must be adjacent to an existing piece.");
+                    } else if state.creates_double_three(mv.0, mv.1, state.current_player) {
+                        println!("❌ This move would create a double-three, which is forbidden.");
                     } else {
-                        println!(
-                            "❌ Invalid move. You must place your piece adjacent to an existing one."
-                        );
+                        println!("❌ Invalid move. This move is not allowed by the game rules.");
                     }
                 } else {
                     println!("❌ Invalid input format. Type two numbers like `7 7`.");

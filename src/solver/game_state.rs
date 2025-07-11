@@ -35,7 +35,10 @@ impl GameState {
                     {
                         moves.push((i, j));
                     } else if !self.is_board_empty() && self.is_move_adjacent((i, j)) {
-                        moves.push((i, j));
+                        // Check if this move would create a double-three (forbidden)
+                        if !self.creates_double_three(i, j, self.current_player) {
+                            moves.push((i, j));
+                        }
                     }
                 }
             }
@@ -44,15 +47,6 @@ impl GameState {
     }
 
     pub fn make_move(&mut self, mv: (usize, usize)) -> bool {
-        if self.is_board_empty() {
-            let center = self.board.len() / 2;
-            if mv != (center, center) {
-                return false;
-            }
-        } else if !self.is_move_adjacent(mv) {
-            return false;
-        }
-
         self.board[mv.0][mv.1] = Some(self.current_player);
 
         // Check if this move wins the game
@@ -167,5 +161,122 @@ impl GameState {
         }
         self.current_player.hash(&mut hasher);
         hasher.finish()
+    }
+
+    /// Check if a move would create a free-three pattern
+    /// A free-three is a pattern of 3 stones that can become an open-four if not blocked
+    pub fn is_free_three(
+        &self,
+        row: usize,
+        col: usize,
+        player: Player,
+        direction: (isize, isize),
+    ) -> bool {
+        let (dx, dy) = direction;
+
+        // Check if we can form a free-three in this direction
+        // We need to check patterns like _XXX_, _X_XX_, _XX_X_
+
+        // First, let's get the line of 7 positions centered on our move
+        let mut line = Vec::new();
+        for i in -3..=3 {
+            let new_row = row as isize + i * dx;
+            let new_col = col as isize + i * dy;
+
+            if new_row >= 0
+                && new_row < self.board_size as isize
+                && new_col >= 0
+                && new_col < self.board_size as isize
+            {
+                if new_row as usize == row && new_col as usize == col {
+                    // This is our hypothetical move
+                    line.push(Some(player));
+                } else {
+                    line.push(self.board[new_row as usize][new_col as usize]);
+                }
+            } else {
+                line.push(Some(Player::Max)); // Treat board edges as blocked
+            }
+        }
+
+        // Now check if this line contains a free-three pattern
+        // A free-three must be able to extend to _XXXX_ pattern
+        self.contains_free_three_pattern(&line, player)
+    }
+
+    fn contains_free_three_pattern(&self, line: &[Option<Player>], player: Player) -> bool {
+        if line.len() < 6 {
+            return false;
+        }
+
+        // Check all possible positions for a free-three that could become _XXXX_
+        for start in 0..=(line.len() - 6) {
+            let segment = &line[start..start + 6];
+
+            // Check if this segment can form _XXXX_ pattern
+            if self.can_form_open_four(segment, player) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn can_form_open_four(&self, segment: &[Option<Player>], player: Player) -> bool {
+        if segment.len() != 6 {
+            return false;
+        }
+
+        // Pattern: _XXXX_ (positions 0 and 5 must be empty, positions 1-4 must be player)
+        let mut player_count = 0;
+        let mut player_positions = Vec::new();
+
+        // Check if ends are open
+        if segment[0].is_some() || segment[5].is_some() {
+            return false;
+        }
+
+        // Count player stones in middle 4 positions
+        for i in 1..5 {
+            match segment[i] {
+                Some(p) if p == player => {
+                    player_count += 1;
+                    player_positions.push(i);
+                }
+                Some(_) => return false, // Opponent stone blocks the pattern
+                None => {}               // Empty space
+            }
+        }
+
+        // For a free-three, we need exactly 3 player stones in the middle 4 positions
+        // and they should be able to form a continuous line of 4 with one more move
+        if player_count == 3 {
+            // Check if the 3 stones can form a line of 4 with one empty space
+            let empty_positions: Vec<usize> = (1..5).filter(|&i| segment[i].is_none()).collect();
+
+            if empty_positions.len() == 1 {
+                // All 3 stones are consecutive, this is a free-three
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Check if a move would create a double-three (two free-threes simultaneously)
+    pub fn creates_double_three(&self, row: usize, col: usize, player: Player) -> bool {
+        let directions = [(1, 0), (0, 1), (1, 1), (1, -1)];
+        let mut free_three_count = 0;
+
+        for &direction in &directions {
+            if self.is_free_three(row, col, player, direction) {
+                free_three_count += 1;
+                if free_three_count >= 2 {
+                    return true;
+                }
+            }
+        }
+
+        false
     }
 }
