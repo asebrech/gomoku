@@ -15,7 +15,6 @@ impl Player {
     }
 }
 
-/// Represents the game board and basic board operations
 pub struct Board {
     pub cells: Vec<Vec<Option<Player>>>,
     pub size: usize,
@@ -29,40 +28,32 @@ impl Board {
         }
     }
 
-    /// Check if the board is completely empty
     pub fn is_empty(&self) -> bool {
         self.cells
             .iter()
             .all(|row| row.iter().all(|cell| cell.is_none()))
     }
 
-    /// Get the center position of the board
     pub fn center(&self) -> (usize, usize) {
         (self.size / 2, self.size / 2)
     }
 
-
-    /// Check if a position is empty
     pub fn is_empty_position(&self, row: usize, col: usize) -> bool {
         self.cells[row][col].is_none()
     }
 
-    /// Get the player at a position
     pub fn get_player(&self, row: usize, col: usize) -> Option<Player> {
         self.cells[row][col]
     }
 
-    /// Place a stone at a position
     pub fn place_stone(&mut self, row: usize, col: usize, player: Player) {
         self.cells[row][col] = Some(player);
     }
 
-    /// Remove a stone from a position
     pub fn remove_stone(&mut self, row: usize, col: usize) {
         self.cells[row][col] = None;
     }
 
-    /// Check if a move is adjacent to any existing stone
     pub fn is_adjacent_to_stone(&self, row: usize, col: usize) -> bool {
         let directions = [-1, 0, 1];
 
@@ -90,8 +81,6 @@ impl Board {
         false
     }
 
-
-    /// Generate a hash for the current board state
     pub fn hash(&self) -> u64 {
         let mut hasher = DefaultHasher::new();
         for row in &self.cells {

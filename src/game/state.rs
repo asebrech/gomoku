@@ -4,21 +4,17 @@ use crate::game::captures::CaptureHandler;
 use crate::game::moves::MoveHandler;
 use crate::game::rules::WinChecker;
 
-/// Represents the complete game state
 pub struct GameState {
     pub board: Board,
     pub current_player: Player,
     pub win_condition: usize,
     pub winner: Option<Player>,
-    pub max_captures: usize,  // Number of pairs captured by Max player
-    pub min_captures: usize,  // Number of pairs captured by Min player
-    pub capture_history: Vec<Vec<(usize, usize)>>,  // History of captures for undo
+    pub max_captures: usize,
+    pub min_captures: usize,
+    pub capture_history: Vec<Vec<(usize, usize)>>,
 }
 
 impl GameState {
-    // === CREATION AND INITIALIZATION ===
-    
-    /// Create a new game state
     pub fn new(board_size: usize, win_condition: usize) -> Self {
         GameState {
             board: Board::new(board_size),
@@ -31,23 +27,16 @@ impl GameState {
         }
     }
 
-    // === CORE GAME MECHANICS ===
-    
-    /// Get all possible moves for the current player
     pub fn get_possible_moves(&self) -> Vec<(usize, usize)> {
         MoveHandler::get_possible_moves(&self.board, self.current_player)
     }
 
-    /// Make a move and update the game state
     pub fn make_move(&mut self, mv: (usize, usize)) -> bool {
-        // Place the stone
         self.board.place_stone(mv.0, mv.1, self.current_player);
 
-        // Handle captures
         let captures = CaptureHandler::detect_captures(&self.board, mv.0, mv.1, self.current_player);
         self.execute_captures(captures);
 
-        // Check for wins
         if self.check_for_wins(mv) {
             self.switch_player();
             return true;
@@ -57,32 +46,23 @@ impl GameState {
         true
     }
 
-    /// Undo a move and restore the previous game state
     pub fn undo_move(&mut self, move_: (usize, usize)) {
-        // Switch back to the player who made the move being undone
         self.current_player = self.current_player.opponent();
         
-        // Remove the stone from the board
         self.board.remove_stone(move_.0, move_.1);
         self.winner = None;
         
-        // Restore captured stones if any
         self.restore_captured_stones();
     }
 
-    // === GAME STATE QUERIES ===
-    
-    /// Check if the game is over
     pub fn is_terminal(&self) -> bool {
         self.winner.is_some() || self.get_possible_moves().is_empty()
     }
 
-    /// Get the winner of the game
     pub fn check_winner(&self) -> Option<Player> {
         self.winner
     }
 
-    /// Generate a hash for the current game state
     pub fn hash(&self) -> u64 {
         let mut hasher = DefaultHasher::new();
         self.board.hash().hash(&mut hasher);
@@ -90,29 +70,23 @@ impl GameState {
         hasher.finish()
     }
 
-    // === PRIVATE HELPER METHODS ===
-    
     fn switch_player(&mut self) {
         self.current_player = self.current_player.opponent();
     }
 
     fn check_for_wins(&mut self, mv: (usize, usize)) -> bool {
-        // Check if this move wins by capture (10 stones captured)
         if let Some(winner) = self.check_capture_win() {
             self.winner = Some(winner);
             return true;
         }
 
-        // Check if this move wins by five-in-a-row
         if self.check_win_around(mv) {
-            // Check endgame capture logic: opponent can break this five-in-a-row?
             if !self.can_break_five_by_capture(self.current_player) {
                 self.winner = Some(self.current_player);
                 return true;
             }
         }
 
-        // Check if opponent is about to lose by capture and current player can capture to win
         let opponent = self.current_player.opponent();
         if self.is_about_to_lose_by_capture(opponent) && self.can_capture_to_win(self.current_player) {
             self.winner = Some(self.current_player);
@@ -128,17 +102,14 @@ impl GameState {
             return;
         }
 
-        // Remove captured stones from board
         CaptureHandler::execute_captures(&mut self.board, &captures);
 
-        // Update capture counts (captures come in pairs)
         let pairs_captured = captures.len() / 2;
         match self.current_player {
             Player::Max => self.min_captures += pairs_captured,
             Player::Min => self.max_captures += pairs_captured,
         }
 
-        // Store capture history for undo
         self.capture_history.push(captures);
     }
 
@@ -147,12 +118,10 @@ impl GameState {
             if !last_captures.is_empty() {
                 let opponent = self.current_player.opponent();
                 
-                // Restore the captured stones to the board
                 for &(row, col) in &last_captures {
                     self.board.place_stone(row, col, opponent);
                 }
                 
-                // Update capture counts (subtract the pairs that were captured)
                 let pairs_captured = last_captures.len() / 2;
                 match self.current_player {
                     Player::Max => {
@@ -170,8 +139,6 @@ impl GameState {
         }
     }
 
-    // === WIN CONDITION CHECKS ===
-    
     fn check_win_around(&self, mv: (usize, usize)) -> bool {
         WinChecker::check_win_around(&self.board, mv.0, mv.1, self.win_condition)
     }

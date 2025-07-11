@@ -5,12 +5,10 @@ use crate::{
 };
 use std::io;
 
-/// Main game loop and user interface
 pub fn new_game(board_size: usize, winning_condition: usize, depth: i32) {
     let mut state = GameState::new(board_size, winning_condition);
     let (human, ai) = choose_sides();
 
-    // Main game loop
     loop {
         print_board(&state);
         
@@ -26,8 +24,6 @@ pub fn new_game(board_size: usize, winning_condition: usize, depth: i32) {
         }
     }
 }
-
-// === GAME SETUP ===
 
 fn choose_sides() -> (Player, Player) {
     println!("Do you want to play as X (Max) or O (Min)?");
@@ -49,26 +45,21 @@ fn choose_sides() -> (Player, Player) {
     (human, ai)
 }
 
-// === DISPLAY FUNCTIONS ===
-
 pub fn print_board(state: &GameState) {
     let n = state.board.size;
     let possible_moves = state.get_possible_moves();
 
-    // Print capture counts
     println!("Captures: X = {} pairs, O = {} pairs", state.max_captures, state.min_captures);
     println!();
 
-    // Print column headers
     print!("   ");
     for j in 0..n {
         print!("{:^3}", j);
     }
     println!();
 
-    // Print board rows
     for i in 0..n {
-        print!("{:>2} ", i); // row index
+        print!("{:>2} ", i);
         for j in 0..n {
             match state.board.get_player(i, j) {
                 Some(Player::Max) => print!(" X "),
@@ -95,8 +86,6 @@ fn print_game_result(state: &GameState, human: Player, ai: Player) {
     }
 }
 
-// === INPUT HANDLING ===
-
 fn handle_human_move(state: &mut GameState) {
     loop {
         println!("Your move (row and col, e.g. `7 7`): ");
@@ -117,7 +106,7 @@ fn handle_human_move(state: &mut GameState) {
             }
 
             state.make_move(mv);
-            break; // Move accepted
+            break;
         } else {
             println!("❌ Invalid input format. Type two numbers like `7 7`.");
         }
@@ -134,7 +123,7 @@ fn validate_human_move(state: &GameState, mv: (usize, usize)) -> Option<String> 
 
     let possible_moves = state.get_possible_moves();
     if possible_moves.contains(&mv) {
-        return None; // Valid move
+        return None;
     }
 
     if state.board.get_player(mv.0, mv.1).is_some() {

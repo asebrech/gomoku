@@ -3,20 +3,6 @@ use std::cmp::{max, min};
 
 use super::{heuristic::Heuristic, transposition::TranspositionTable};
 
-/// Minimax algorithm with alpha-beta pruning and transposition table
-/// 
-/// # Arguments
-/// 
-/// * `state` - The current game state
-/// * `depth` - How deep to search (0 = evaluate current position)
-/// * `alpha` - Alpha value for pruning
-/// * `beta` - Beta value for pruning
-/// * `maximizing_player` - True if current player is maximizing
-/// * `tt` - Transposition table for memoization
-/// 
-/// # Returns
-/// 
-/// The evaluation score for the current position
 pub fn minimax(
     state: &mut GameState,
     depth: i32,
