@@ -12,6 +12,9 @@ pub struct GameState {
     pub board_size: usize,
     pub win_condition: usize,
     pub winner: Option<Player>,
+    pub max_captures: usize,  // Number of pairs captured by Max player
+    pub min_captures: usize,  // Number of pairs captured by Min player
+    pub capture_history: Vec<Vec<(usize, usize)>>,  // History of captures for undo
 }
 
 impl GameState {
@@ -22,6 +25,9 @@ impl GameState {
             board_size,
             win_condition,
             winner: None,
+            max_captures: 0,
+            min_captures: 0,
+            capture_history: Vec::new(),
         }
     }
 
@@ -49,8 +55,36 @@ impl GameState {
     pub fn make_move(&mut self, mv: (usize, usize)) -> bool {
         self.board[mv.0][mv.1] = Some(self.current_player);
 
-        // Check if this move wins the game
+        // Check for captures after placing the stone
+        let captures = self.detect_captures(mv.0, mv.1, self.current_player);
+        self.execute_captures(captures);
+
+        // Check if this move wins by capture (10 stones captured)
+        if let Some(winner) = self.check_capture_win() {
+            self.winner = Some(winner);
+            self.current_player = match self.current_player {
+                Player::Max => Player::Min,
+                Player::Min => Player::Max,
+            };
+            return true;
+        }
+
+        // Check if this move wins by five-in-a-row
         if self.check_win_around(mv) {
+            // Check endgame capture logic: opponent can break this five-in-a-row?
+            if !self.can_break_five_by_capture(self.current_player) {
+                self.winner = Some(self.current_player);
+            }
+        }
+
+        // Check if opponent is about to lose by capture (has 4 pairs captured already)
+        // and current player can capture one more pair to win
+        let opponent = match self.current_player {
+            Player::Max => Player::Min,
+            Player::Min => Player::Max,
+        };
+        
+        if self.is_about_to_lose_by_capture(opponent) && self.can_capture_to_win(self.current_player) {
             self.winner = Some(self.current_player);
         }
 
@@ -93,13 +127,45 @@ impl GameState {
     }
 
     pub fn undo_move(&mut self, move_: (usize, usize)) {
-        self.board[move_.0][move_.1] = None;
-        self.winner = None;
+        // First switch back to the player who made the move being undone
         self.current_player = if self.current_player == Player::Max {
             Player::Min
         } else {
             Player::Max
         };
+        
+        // Remove the stone from the board
+        self.board[move_.0][move_.1] = None;
+        self.winner = None;
+        
+        // Restore captured stones if any
+        if let Some(last_captures) = self.capture_history.pop() {
+            if !last_captures.is_empty() {
+                // Restore the captured stones to the board
+                let opponent = match self.current_player {
+                    Player::Max => Player::Min,
+                    Player::Min => Player::Max,
+                };
+                for &(row, col) in &last_captures {
+                    self.board[row][col] = Some(opponent);
+                }
+                
+                // Update capture counts (subtract the pairs that were captured)
+                let pairs_captured = last_captures.len() / 2;
+                match self.current_player {
+                    Player::Max => {
+                        if self.min_captures >= pairs_captured {
+                            self.min_captures -= pairs_captured;
+                        }
+                    }
+                    Player::Min => {
+                        if self.max_captures >= pairs_captured {
+                            self.max_captures -= pairs_captured;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     pub fn is_terminal(&self) -> bool {
@@ -273,6 +339,260 @@ impl GameState {
                 free_three_count += 1;
                 if free_three_count >= 2 {
                     return true;
+                }
+            }
+        }
+
+        false
+    }
+
+    /// Detect captures after placing a stone at the given position
+    /// Returns a vector of positions that should be captured
+    pub fn detect_captures(&self, row: usize, col: usize, player: Player) -> Vec<(usize, usize)> {
+        let mut captures = Vec::new();
+        let directions = [(1, 0), (0, 1), (1, 1), (1, -1)];
+        let opponent = match player {
+            Player::Max => Player::Min,
+            Player::Min => Player::Max,
+        };
+
+        for &(dx, dy) in &directions {
+            // Check in both positive and negative directions
+            for &direction_multiplier in &[1, -1] {
+                let actual_dx = dx * direction_multiplier;
+                let actual_dy = dy * direction_multiplier;
+                
+                // Check pattern: [NEW_STONE] -> opponent -> opponent -> player
+                let pos1_x = row as isize + actual_dx;
+                let pos1_y = col as isize + actual_dy;
+                
+                // Check if first position is in bounds and has opponent stone
+                if pos1_x >= 0 && pos1_y >= 0 && 
+                   pos1_x < self.board_size as isize && pos1_y < self.board_size as isize {
+                    
+                    if self.board[pos1_x as usize][pos1_y as usize] == Some(opponent) {
+                        // Check second position
+                        let pos2_x = pos1_x + actual_dx;
+                        let pos2_y = pos1_y + actual_dy;
+                        
+                        if pos2_x >= 0 && pos2_y >= 0 && 
+                           pos2_x < self.board_size as isize && pos2_y < self.board_size as isize {
+                            
+                            if self.board[pos2_x as usize][pos2_y as usize] == Some(opponent) {
+                                // Check third position (should be our stone)
+                                let pos3_x = pos2_x + actual_dx;
+                                let pos3_y = pos2_y + actual_dy;
+                                
+                                if pos3_x >= 0 && pos3_y >= 0 && 
+                                   pos3_x < self.board_size as isize && pos3_y < self.board_size as isize {
+                                    
+                                    if self.board[pos3_x as usize][pos3_y as usize] == Some(player) {
+                                        // We have a capture pattern: player - opponent - opponent - player
+                                        captures.push((pos1_x as usize, pos1_y as usize));
+                                        captures.push((pos2_x as usize, pos2_y as usize));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        captures
+    }
+
+    /// Execute captures by removing stones from the board and updating capture counts
+    pub fn execute_captures(&mut self, captures: Vec<(usize, usize)>) {
+        if captures.is_empty() {
+            self.capture_history.push(Vec::new());
+            return;
+        }
+
+        // Remove captured stones from board
+        for &(row, col) in &captures {
+            self.board[row][col] = None;
+        }
+
+        // Update capture counts (captures come in pairs)
+        let pairs_captured = captures.len() / 2;
+        match self.current_player {
+            Player::Max => self.min_captures += pairs_captured,
+            Player::Min => self.max_captures += pairs_captured,
+        }
+
+        // Store capture history for undo
+        self.capture_history.push(captures);
+    }
+
+    /// Check if a player has won by capturing 10 stones (5 pairs)
+    pub fn check_capture_win(&self) -> Option<Player> {
+        if self.max_captures >= 5 {
+            Some(Player::Max)
+        } else if self.min_captures >= 5 {
+            Some(Player::Min)
+        } else {
+            None
+        }
+    }
+
+    /// Check if a five-in-a-row can be broken by capture
+    /// This is used for endgame capture logic
+    pub fn can_break_five_by_capture(&self, player: Player) -> bool {
+        let opponent = match player {
+            Player::Max => Player::Min,
+            Player::Min => Player::Max,
+        };
+
+        // Find all five-in-a-row lines for the given player
+        let five_lines = self.find_five_in_a_row_lines(player);
+        
+        for line in five_lines {
+            // Check if opponent can capture any part of this line
+            if self.can_capture_from_line(&line, opponent) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Find all five-in-a-row lines for a player
+    fn find_five_in_a_row_lines(&self, player: Player) -> Vec<Vec<(usize, usize)>> {
+        let mut lines = Vec::new();
+        let directions = [(1, 0), (0, 1), (1, 1), (1, -1)];
+
+        for i in 0..self.board_size {
+            for j in 0..self.board_size {
+                if self.board[i][j] == Some(player) {
+                    for &(dx, dy) in &directions {
+                        let line = self.get_line_from_position(i, j, dx, dy, player);
+                        if line.len() >= 5 {
+                            lines.push(line);
+                        }
+                    }
+                }
+            }
+        }
+
+        lines
+    }
+
+    /// Get a line of consecutive stones from a starting position
+    fn get_line_from_position(&self, start_row: usize, start_col: usize, dx: isize, dy: isize, player: Player) -> Vec<(usize, usize)> {
+        let mut line = Vec::new();
+        
+        // Check if we're at the start of a line (no same-player stone behind us)
+        let prev_x = start_row as isize - dx;
+        let prev_y = start_col as isize - dy;
+        
+        if prev_x >= 0 && prev_y >= 0 && 
+           prev_x < self.board_size as isize && prev_y < self.board_size as isize {
+            if self.board[prev_x as usize][prev_y as usize] == Some(player) {
+                return line; // Not the start of the line
+            }
+        }
+
+        // Collect consecutive stones in the positive direction
+        let mut x = start_row as isize;
+        let mut y = start_col as isize;
+        
+        while x >= 0 && y >= 0 && 
+              x < self.board_size as isize && y < self.board_size as isize &&
+              self.board[x as usize][y as usize] == Some(player) {
+            line.push((x as usize, y as usize));
+            x += dx;
+            y += dy;
+        }
+
+        line
+    }
+
+    /// Check if opponent can capture any stone from a line
+    fn can_capture_from_line(&self, line: &[(usize, usize)], opponent: Player) -> bool {
+        // For each stone in the line, check if it can be captured
+        for &(row, col) in line {
+            if self.can_stone_be_captured(row, col, opponent) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Check if a stone at the given position can be captured by the opponent
+    fn can_stone_be_captured(&self, row: usize, col: usize, opponent: Player) -> bool {
+        let directions = [(1, 0), (0, 1), (1, 1), (1, -1)];
+        let player = self.board[row][col].unwrap();
+
+        for &(dx, dy) in &directions {
+            // Check pattern: opponent - player - player - ?
+            // The '?' position should be empty and capturable
+            
+            // Check backward direction first
+            let back_x = row as isize - dx;
+            let back_y = col as isize - dy;
+            
+            if back_x >= 0 && back_y >= 0 && 
+               back_x < self.board_size as isize && back_y < self.board_size as isize {
+                
+                if self.board[back_x as usize][back_y as usize] == Some(opponent) {
+                    // Check if there's another player stone next to us
+                    let next_x = row as isize + dx;
+                    let next_y = col as isize + dy;
+                    
+                    if next_x >= 0 && next_y >= 0 && 
+                       next_x < self.board_size as isize && next_y < self.board_size as isize {
+                        
+                        if self.board[next_x as usize][next_y as usize] == Some(player) {
+                            // Check if opponent can place a stone to complete capture
+                            let capture_x = next_x + dx;
+                            let capture_y = next_y + dy;
+                            
+                            if capture_x >= 0 && capture_y >= 0 && 
+                               capture_x < self.board_size as isize && capture_y < self.board_size as isize {
+                                
+                                if self.board[capture_x as usize][capture_y as usize].is_none() {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        false
+    }
+
+    /// Check if a player is about to lose by capture (has 4 pairs captured already)
+    pub fn is_about_to_lose_by_capture(&self, player: Player) -> bool {
+        match player {
+            Player::Max => self.max_captures >= 4,
+            Player::Min => self.min_captures >= 4,
+        }
+    }
+
+    /// Check if a player can capture to win (opponent has 4 pairs captured and player can capture one more)
+    pub fn can_capture_to_win(&self, player: Player) -> bool {
+        let opponent = match player {
+            Player::Max => Player::Min,
+            Player::Min => Player::Max,
+        };
+        
+        // Check if opponent has 4 pairs captured
+        if !self.is_about_to_lose_by_capture(opponent) {
+            return false;
+        }
+
+        // Check if current player can make a capture
+        for i in 0..self.board_size {
+            for j in 0..self.board_size {
+                if self.board[i][j].is_none() {
+                    // Simulate placing a stone and check if it creates a capture
+                    let captures = self.detect_captures(i, j, player);
+                    if !captures.is_empty() {
+                        return true;
+                    }
                 }
             }
         }

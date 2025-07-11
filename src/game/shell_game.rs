@@ -8,6 +8,10 @@ pub fn print_board(state: &GameState) {
     let n = state.board.len();
     let possible_moves = state.get_possible_moves();
 
+    // Print capture counts
+    println!("Captures: X = {} pairs, O = {} pairs", state.max_captures, state.min_captures);
+    println!();
+
     // Print column headers
     print!("   ");
     for j in 0..n {

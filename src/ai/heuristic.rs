@@ -12,12 +12,24 @@ impl Heuristic {
             };
         }
 
+        // Check for capture wins
+        if let Some(winner) = state.check_capture_win() {
+            return match winner {
+                Player::Max => 1_000_000,
+                Player::Min => -1_000_000,
+            };
+        }
+
         if state.get_possible_moves().is_empty() {
             return 0; // Draw
         }
 
         let mut total_score = 0;
         let directions = [(1, 0), (0, 1), (1, 1), (1, -1)];
+
+        // Add capture evaluation - give points for captured stones
+        let capture_score = (state.max_captures as i32 - state.min_captures as i32) * 1000;
+        total_score += capture_score;
 
         for i in 0..state.board_size {
             for j in 0..state.board_size {
