@@ -1,4 +1,4 @@
-use crate::game::state::GameState;
+use crate::core::state::GameState;
 use std::cmp::{max, min};
 
 use super::{heuristic::Heuristic, transposition::TranspositionTable};

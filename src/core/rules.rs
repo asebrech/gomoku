@@ -1,4 +1,4 @@
-use crate::game::board::{Board, Player};
+use crate::core::board::{Board, Player};
 
 pub struct WinChecker;
 
@@ -105,7 +105,7 @@ impl WinChecker {
         let five_lines = Self::find_five_in_a_row_lines(board, player, win_condition);
         
         for line in five_lines {
-            if crate::game::captures::CaptureHandler::can_capture_from_line(board, &line, opponent) {
+            if crate::core::captures::CaptureHandler::can_capture_from_line(board, &line, opponent) {
                 return true;
             }
         }
@@ -130,7 +130,7 @@ impl WinChecker {
         for i in 0..board.size {
             for j in 0..board.size {
                 if board.is_empty_position(i, j) {
-                    let captures = crate::game::captures::CaptureHandler::detect_captures(board, i, j, player);
+                    let captures = crate::core::captures::CaptureHandler::detect_captures(board, i, j, player);
                     if !captures.is_empty() {
                         return true;
                     }

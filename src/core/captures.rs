@@ -1,4 +1,4 @@
-use crate::game::board::{Board, Player};
+use crate::core::board::{Board, Player};
 
 pub struct CaptureHandler;
 

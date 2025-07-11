@@ -1,8 +1,8 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
-use crate::game::board::{Board, Player};
-use crate::game::captures::CaptureHandler;
-use crate::game::moves::MoveHandler;
-use crate::game::rules::WinChecker;
+use crate::core::board::{Board, Player};
+use crate::core::captures::CaptureHandler;
+use crate::core::moves::MoveHandler;
+use crate::core::rules::WinChecker;
 
 pub struct GameState {
     pub board: Board,

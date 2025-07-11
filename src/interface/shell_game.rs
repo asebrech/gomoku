@@ -1,7 +1,7 @@
 use crate::{
-    game::state::GameState,
-    game::board::Player,
-    game::utils::find_best_move,
+    core::state::GameState,
+    core::board::Player,
+    interface::utils::find_best_move,
 };
 use std::io;
 
@@ -142,7 +142,7 @@ fn validate_human_move(state: &GameState, mv: (usize, usize)) -> Option<String> 
         return Some("Move must be adjacent to an existing piece.".to_string());
     }
 
-    if crate::game::moves::RuleValidator::creates_double_three(&state.board, mv.0, mv.1, state.current_player) {
+    if crate::core::moves::RuleValidator::creates_double_three(&state.board, mv.0, mv.1, state.current_player) {
         return Some("This move would create a double-three, which is forbidden.".to_string());
     }
 

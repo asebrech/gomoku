@@ -1,5 +1,5 @@
-use crate::game::state::GameState;
-use crate::game::board::Player;
+use crate::core::state::GameState;
+use crate::core::board::Player;
 
 pub struct Heuristic;
 
