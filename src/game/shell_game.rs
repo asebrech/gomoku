@@ -1,6 +1,6 @@
 use crate::{
+    game::game_state::{GameState, Player},
     game::utils::find_best_move,
-    solver::game_state::{GameState, Player},
 };
 use std::io;
 
@@ -96,7 +96,11 @@ pub fn new_game(board_size: usize, winning_condition: usize, depth: i32) {
                     } else if state.board[mv.0][mv.1].is_some() {
                         println!("❌ That cell is already occupied.");
                     } else if state.is_board_empty() {
-                        println!("❌ First move must be at the center ({}, {}).", state.board.len() / 2, state.board.len() / 2);
+                        println!(
+                            "❌ First move must be at the center ({}, {}).",
+                            state.board.len() / 2,
+                            state.board.len() / 2
+                        );
                     } else if !state.is_move_adjacent(mv) {
                         println!("❌ Move must be adjacent to an existing piece.");
                     } else if state.creates_double_three(mv.0, mv.1, state.current_player) {

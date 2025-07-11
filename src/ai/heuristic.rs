@@ -1,4 +1,4 @@
-use super::game_state::{GameState, Player};
+use crate::game::game_state::{GameState, Player};
 
 pub struct Heuristic;
 
