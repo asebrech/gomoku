@@ -1,8 +1,4 @@
-use crate::{
-    core::state::GameState,
-    core::board::Player,
-    interface::utils::find_best_move,
-};
+use crate::{core::board::Player, core::state::GameState, interface::utils::find_best_move};
 use std::io;
 
 pub fn new_game(board_size: usize, winning_condition: usize, depth: i32) {
@@ -11,7 +7,7 @@ pub fn new_game(board_size: usize, winning_condition: usize, depth: i32) {
 
     loop {
         print_board(&state);
-        
+
         if state.is_terminal() {
             if is_human_opponent {
                 print_game_result(&state, human, opponent.unwrap());
@@ -66,7 +62,10 @@ pub fn print_board(state: &GameState) {
     let n = state.board.size;
     let possible_moves = state.get_possible_moves();
 
-    println!("Captures: X = {} pairs, O = {} pairs", state.max_captures, state.min_captures);
+    println!(
+        "Captures: X = {} pairs, O = {} pairs",
+        state.max_captures, state.min_captures
+    );
     println!();
 
     print!("   ");
@@ -122,7 +121,7 @@ fn handle_human_move(state: &mut GameState) {
                 continue;
             }
 
-            state.make_move(mv);
+            state.make_move_with_actions(mv);
             break;
         } else {
             println!("❌ Invalid input format. Type two numbers like `7 7`.");
@@ -159,7 +158,12 @@ fn validate_human_move(state: &GameState, mv: (usize, usize)) -> Option<String> 
         return Some("Move must be adjacent to an existing piece.".to_string());
     }
 
-    if crate::core::moves::RuleValidator::creates_double_three(&state.board, mv.0, mv.1, state.current_player) {
+    if crate::core::moves::RuleValidator::creates_double_three(
+        &state.board,
+        mv.0,
+        mv.1,
+        state.current_player,
+    ) {
         return Some("This move would create a double-three, which is forbidden.".to_string());
     }
 
@@ -170,7 +174,7 @@ fn handle_ai_move(state: &mut GameState, depth: i32) {
     println!("🤖 AI is thinking...");
     if let Some(mv) = find_best_move(state, depth) {
         println!("AI chooses: {:?}", mv);
-        state.make_move(mv);
+        state.make_move_with_actions(mv);
     } else {
         println!("AI has no valid moves.");
     }
