@@ -1,5 +1,7 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 
+use bevy::prelude::*;
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Player {
     Max,
@@ -15,6 +17,7 @@ impl Player {
     }
 }
 
+#[derive(Resource, Component, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Board {
     pub cells: Vec<Vec<Option<Player>>>,
     pub size: usize,

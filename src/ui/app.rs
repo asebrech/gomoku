@@ -6,9 +6,10 @@ use bevy::{
 	color::palettes::css::CRIMSON,
 	prelude::*,
 };
+use gomoku::core::state::GameState;
 
 use crate::ui::display::display::make_visible;
-use crate::ui::screens::game::game_plugin;
+use crate::ui::screens::game::{game_plugin, handle_click_to_place, update_preview_stone};
 use crate::ui::screens::menu::menu_plugin;
 use crate::ui::screens::splash::splash_plugin;
 
@@ -31,13 +32,13 @@ struct ColorScheme {
 
 #[derive(Resource, Debug, Component, PartialEq, Eq, Clone, Copy)]
 pub struct GameSettings {
-	board_size: u32, //default to 19
-	total_capture_to_win: u32, //default to 10
-	minimum_chain_to_win: u32, //5 pallet 
-	ai_depth: u32, //default to 2
-	alpha_beta_enabled: bool, //wether deep checking is enabled or not
-	versus_ai: bool, //if the user is against an AI or multiplayer
-	time_limit: Option<u32> // time limit in seconds, optional
+	pub board_size: usize, //default to 19
+	pub total_capture_to_win: usize, //default to 10
+	pub minimum_chain_to_win: usize, //5 pallet 
+	pub ai_depth: i32, //default to 2
+	pub alpha_beta_enabled: bool, //wether deep checking is enabled or not
+	pub versus_ai: bool, //if the user is against an AI or multiplayer
+	pub time_limit: Option<usize> // time limit in seconds, optional
 }
 
 impl GameSettings {
@@ -111,15 +112,18 @@ impl GomokuApp {
                 }),
                 ..default()
             }),
-            LogDiagnosticsPlugin::default(),
-            FrameTimeDiagnosticsPlugin::default(),
+            //LogDiagnosticsPlugin::default(),
+            //FrameTimeDiagnosticsPlugin::default(),
         ));
 	}
 
 	fn init_resources(&mut self) {
+		let settings = GameSettings::new();
 		self.app
-        .insert_resource(GameSettings::new())
+		.insert_resource(GameState::new(settings.board_size, settings.minimum_chain_to_win))
+        .insert_resource(settings)
         .insert_resource(ColorScheme::new());
+
 	}
 
 	fn init_plugins(&mut self) {
@@ -133,6 +137,14 @@ impl GomokuApp {
                 make_visible,
             ),
         )
+		.add_systems(
+			Update,
+			(
+				update_preview_stone,
+				handle_click_to_place,
+			)
+			.run_if(in_state(AppState::Game)),
+		)
         // Adds the plugins for each state
         .add_plugins((splash_plugin, menu_plugin, game_plugin));
 	}
