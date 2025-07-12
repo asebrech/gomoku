@@ -74,7 +74,7 @@ fn game_setup(
                     BackgroundColor(Color::BLACK),
                 ));
             }
-
+ 
             // Horizontal lines
             for i in 0..game_settings.board_size {
                 builder.spawn((

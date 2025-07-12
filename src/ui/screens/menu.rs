@@ -1,8 +1,8 @@
 
     use bevy::{
         app::AppExit,
-        color::palettes::css::CRIMSON,
-        ecs::{relationship::RelatedSpawnerCommands, spawn::SpawnIter},
+        color::palettes::css::{AZURE, BISQUE, CRIMSON, PURPLE},
+        ecs::relationship::RelatedSpawnerCommands,
         prelude::*,
     };
 
@@ -146,49 +146,72 @@
         menu_state.set(MenuState::Main);
     }
 
-    fn main_menu_setup(mut commands: Commands) {
-        // Common style for all buttons on the screen
-        let button_node = Node {
-            width: Val::Px(300.0),
-            height: Val::Px(65.0),
-            margin: UiRect::all(Val::Px(20.0)),
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            ..default()
-        };
-        let button_text_font = TextFont {
-            font_size: 33.0,
-            ..default()
-        };
+fn main_menu_setup(mut commands: Commands) {
+    // Common style for all buttons on the screen
+    let button_node = Node {
+        width: Val::Px(300.0),
+        height: Val::Px(65.0),
+        margin: UiRect::all(Val::Px(20.0)),
+        justify_content: JustifyContent::Center,
+        align_items: AlignItems::Center,
+        ..default()
+    };
+    let button_text_font = TextFont {
+        font_size: 33.0,
+        ..default()
+    };
 
-		commands.spawn((
-			Node {
-				width: Val::Percent(100.0),
-				height: Val::Percent(100.0),
-				align_items: AlignItems::Center,
-				row_gap: Val::Px(12.0),
-				justify_content: JustifyContent::Center,
-				flex_direction: FlexDirection::Column, // Changed to Row to place nodes side by side
-				..default()
-			},
-			OnMainMenuScreen,
-		))
-		.with_children(|parent| {
-			insert_title_node(parent);
-			insert_load_play_node(parent, button_node, button_text_font);
-		});
-    }
-
-	fn insert_title_node(parent: &mut RelatedSpawnerCommands<'_, ChildOf>) {
-        parent.spawn((
+    commands
+        .spawn((
             Node {
-                width: Val::Percent(100.0), // Adjusted to fit two nodes side by side
+                width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
-                flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                flex_direction: FlexDirection::Column,
                 ..default()
             },
-            BackgroundColor(CRIMSON.into()),
+            OnMainMenuScreen,
+        ))
+        .with_children(|parent| {
+            // Title node
+            insert_title_node(parent);
+
+            // Container for button groups
+            parent
+                .spawn((
+                    Node {
+						width: Val::Percent(100.0),
+						height: Val::Percent(100.0),
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::Center,
+                        justify_content: JustifyContent::Center,
+                        margin: UiRect::all(Val::Px(20.0)),
+                        ..default()
+                    },
+                    BackgroundColor(CRIMSON.into()),
+                ))
+                .with_children(|parent| {
+                    // Load/Play buttons
+                    insert_load_play_node(parent, button_node.clone(), button_text_font.clone());
+                    // Settings/Credits/Quit buttons
+                    insert_settings_credit_quit_buttons(parent, button_node, button_text_font);
+                });
+        });
+}
+
+fn insert_title_node(parent: &mut RelatedSpawnerCommands<'_, ChildOf>) {
+    parent
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                margin: UiRect::all(Val::Px(20.0)),
+                ..default()
+            },
+            BackgroundColor(AZURE.into()),
         ))
         .with_children(|parent| {
             // Game name
@@ -199,88 +222,130 @@
                     ..default()
                 },
                 TextColor(Color::srgb(0.9, 0.9, 0.9)),
-                Node {
-                    margin: UiRect::all(Val::Px(50.0)),
-                    ..default()
-                },
             ));
         });
-	}
+}
 
-	fn insert_load_play_node(parent: &mut RelatedSpawnerCommands<'_, ChildOf>, button_node: Node, button_text_font: TextFont) {
-        parent.spawn((
+fn insert_load_play_node(
+    parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
+    button_node: Node,
+    button_text_font: TextFont,
+) {
+    parent
+        .spawn((
             Node {
-                width: Val::Percent(50.0), // Adjusted to fit two nodes side by side
+                width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                margin: UiRect::bottom(Val::Px(20.0)), // Space between button groups
                 ..default()
             },
-            BackgroundColor(CRIMSON.into()),
+            BackgroundColor(BISQUE.into()),
         ))
         .with_children(|parent| {
-            // Test text
-            parent.spawn((
-                Text::new("test"),
-                TextFont {
-                    font_size: 67.0,
-                    ..default()
-                },
-                TextColor(Color::srgb(0.9, 0.9, 0.9)),
-                Node {
-                    margin: UiRect::all(Val::Px(50.0)),
-                    ..default()
-                },
-            ));
+            // Play button
+            parent
+                .spawn((
+                    Button,
+                    button_node.clone(),
+                    BackgroundColor(NORMAL_BUTTON),
+                    MenuButtonAction::Play,
+                ))
+                .with_children(|parent| {
+                    parent.spawn((
+                        Text::new("New Game"),
+                        button_text_font.clone(),
+                        TextColor(Color::srgb(0.9, 0.9, 0.9)),
+                    ));
+                });
 
-            // Test buttons
-            parent.spawn((
-                Button,
-                button_node.clone(),
-                BackgroundColor(NORMAL_BUTTON),
-                MenuButtonAction::Play,
-            ))
-            .with_children(|parent| {
-                parent.spawn((
-                    Text::new("test New Game"),
-                    button_text_font.clone(),
-                    TextColor(Color::srgb(0.9, 0.9, 0.9)),
-                ));
-            });
+            // Settings button
+            parent
+                .spawn((
+                    Button,
+                    button_node.clone(),
+                    BackgroundColor(NORMAL_BUTTON),
+                    MenuButtonAction::Settings,
+                ))
+                .with_children(|parent| {
+                    parent.spawn((
+                        Text::new("Settings"),
+                        button_text_font.clone(),
+                        TextColor(Color::srgb(0.9, 0.9, 0.9)),
+                    ));
+                });
 
-            parent.spawn((
-                Button,
-                button_node.clone(),
-                BackgroundColor(NORMAL_BUTTON),
-                MenuButtonAction::Settings,
-            ))
-            .with_children(|parent| {
-                parent.spawn((
-                    Text::new("test Settings"),
-                    button_text_font.clone(),
-                    TextColor(Color::srgb(0.9, 0.9, 0.9)),
-                ));
-            });
-
-            parent.spawn((
-                Button,
-                button_node.clone(),
-                BackgroundColor(NORMAL_BUTTON),
-                MenuButtonAction::Quit,
-            ))
-            .with_children(|parent| {
-                parent.spawn((
-                    Text::new("test Quit"),
-                    button_text_font.clone(),
-                    TextColor(Color::srgb(0.9, 0.9, 0.9)),
-                ));
-            });
+            // Quit button
+            parent
+                .spawn((
+                    Button,
+                    button_node.clone(),
+                    BackgroundColor(NORMAL_BUTTON),
+                    MenuButtonAction::Quit,
+                ))
+                .with_children(|parent| {
+                    parent.spawn((
+                        Text::new("Quit"),
+                        button_text_font.clone(),
+                        TextColor(Color::srgb(0.9, 0.9, 0.9)),
+                    ));
+                });
         });
-	}
+}
 
-	fn settings_credit_quit_buttons() {
+fn insert_settings_credit_quit_buttons(
+    parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
+    button_node: Node,
+    button_text_font: TextFont,
+) {
+    parent
+        .spawn((
+            Node {
+                width: Val::Px(400.0), // Constrain width
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                column_gap: Val::Px(20.0), // Space between buttons
+                ..default()
+            },
+            BackgroundColor(PURPLE.into()),
+        ))
+        .with_children(|parent| {
+            // Credits button
+            parent
+                .spawn((
+                    Button,
+                    button_node.clone(),
+                    BackgroundColor(NORMAL_BUTTON),
+                    MenuButtonAction::Play, // Adjust action if needed
+                ))
+                .with_children(|parent| {
+                    parent.spawn((
+                        Text::new("Credits"),
+                        button_text_font.clone(),
+                        TextColor(Color::srgb(0.9, 0.9, 0.9)),
+                    ));
+                });
 
-	}
+            // Quit button
+            parent
+                .spawn((
+                    Button,
+                    button_node.clone(),
+                    BackgroundColor(NORMAL_BUTTON),
+                    MenuButtonAction::Quit,
+                ))
+                .with_children(|parent| {
+                    parent.spawn((
+                        Text::new("Quit"),
+                        button_text_font.clone(),
+                        TextColor(Color::srgb(0.9, 0.9, 0.9)),
+                    ));
+                });
+        });
+}
 
     fn menu_action(
         interaction_query: Query<
