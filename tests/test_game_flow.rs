@@ -90,21 +90,20 @@ fn test_ai_vs_ai_game() {
     assert!(state.is_terminal() || move_count >= max_moves);
 }
 
-// TODO: Add missing game-ending condition test to verify that the game ends when a player completes a line.
-// #[test]
-// fn test_game_ending_conditions() {
-//     // Test line win
-//     let mut state = GameState::new(19, 5);
-//
-//     // Create a winning line
-//     for i in 0..5 {
-//         state.board.place_stone(9, 5 + i, Player::Max);
-//     }
-//     state.make_move((10, 10)); // Trigger win check
-//
-//     assert!(state.is_terminal());
-//     assert_eq!(state.check_winner(), Some(Player::Max));
-// }
+#[test]
+fn test_game_ending_conditions() {
+    let mut state = GameState::new(19, 5);
+
+    for i in 0..4 {
+        state.board.place_stone(9, 5 + i, Player::Max);
+    }
+
+    state.current_player = Player::Max;
+    state.make_move((9, 9)); // This completes the 5-in-a-row at (9, 5-9)
+
+    assert!(state.is_terminal());
+    assert_eq!(state.check_winner(), Some(Player::Max));
+}
 
 #[test]
 fn test_capture_win_condition() {
