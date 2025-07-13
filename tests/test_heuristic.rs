@@ -66,24 +66,24 @@ fn test_heuristic_no_moves_draw() {
     assert_eq!(score, 0); // Draw
 }
 
-// #[test]
-// fn test_heuristic_capture_advantage() {
-//     let mut state = GameState::new(19, 5);
-//
-//     // Give Max capture advantage
-//     state.max_captures = 3;
-//     state.min_captures = 1;
-//
-//     state.board.place_stone(9, 9, Player::Max); // Add some stones to avoid empty board
-//
-//     let score = Heuristic::evaluate(&state);
-//
-//     // Should favor Max due to capture advantage
-//     assert!(score > 0);
-//
-//     // Should include capture bonus (3-1)*1000 = 2000
-//     assert!(score >= 2000);
-// }
+#[test]
+fn test_heuristic_capture_advantage() {
+    let mut state = GameState::new(19, 5);
+
+    // Give Max capture advantage
+    state.max_captures = 3;
+    state.min_captures = 1;
+
+    state.board.place_stone(9, 9, Player::Max); // Add some stones to avoid empty board
+
+    let score = Heuristic::evaluate(&state);
+
+    // Should favor Max due to capture advantage
+    assert!(score > 0);
+
+    // Should include capture bonus (3-1)*1000 = 2000
+    assert!(score >= 2000);
+}
 
 #[test]
 fn test_heuristic_line_evaluation() {

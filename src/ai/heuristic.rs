@@ -31,9 +31,9 @@ impl Heuristic {
         let min_score = Self::evaluate_player(&state.board, Player::Min, state.win_condition);
 
         // Add capture bonus
-        let capture_bonus = (state.max_captures as i32 * 200) - (state.min_captures as i32 * 200);
+        let capture_bonus = (state.max_captures as i32 * 2000) - (state.min_captures as i32 * 2000);
 
-        max_score - min_score //+ capture_bonus
+        max_score - min_score + capture_bonus
     }
 
     fn evaluate_player(board: &Board, player: Player, win_condition: usize) -> i32 {
