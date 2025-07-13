@@ -1,8 +1,11 @@
 use bevy::prelude::*;
-use crate::ui::{app::GameSettings, screens::game::game::{GridCell, OnGameScreen, PreviewDot}};
+use crate::ui::{app::GameSettings, screens::game::game::{GridCell, OnGameScreen}};
 
 #[derive(Component)]
 pub struct BoardRoot;
+
+#[derive(Component)]
+pub struct PreviewDot;
 
 pub struct BoardUtils;
 

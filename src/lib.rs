@@ -26,6 +26,8 @@ pub mod ui {
 		pub mod game {
 			pub mod game;
 			pub mod board;
+			pub mod settings;
+			//pub mod neo_game;
 		}
 		pub mod menu;
 		pub mod splash;
