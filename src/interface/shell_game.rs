@@ -121,7 +121,7 @@ fn handle_human_move(state: &mut GameState) {
                 continue;
             }
 
-            state.make_move_with_actions(mv);
+            state.make_move(mv);
             break;
         } else {
             println!("❌ Invalid input format. Type two numbers like `7 7`.");
@@ -174,7 +174,7 @@ fn handle_ai_move(state: &mut GameState, depth: i32) {
     println!("🤖 AI is thinking...");
     if let Some(mv) = find_best_move(state, depth) {
         println!("AI chooses: {:?}", mv);
-        state.make_move_with_actions(mv);
+        state.make_move(mv);
     } else {
         println!("AI has no valid moves.");
     }

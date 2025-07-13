@@ -34,17 +34,12 @@ impl GameState {
     pub fn make_move(&mut self, mv: (usize, usize)) {
         self.board.place_stone(mv.0, mv.1, self.current_player);
 
-        self.switch_player();
-    }
-
-    pub fn make_move_with_actions(&mut self, mv: (usize, usize)) {
-        self.make_move(mv);
-
         let captures =
-            CaptureHandler::detect_captures(&self.board, mv.0, mv.1, self.current_player.opponent());
+            CaptureHandler::detect_captures(&self.board, mv.0, mv.1, self.current_player);
         self.execute_captures(captures);
 
         self.check_for_wins(mv);
+        self.switch_player();
     }
 
     pub fn undo_move(&mut self, move_: (usize, usize)) {
