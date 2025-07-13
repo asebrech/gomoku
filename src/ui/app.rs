@@ -6,10 +6,10 @@ use bevy::{
 	color::palettes::css::CRIMSON,
 	prelude::*,
 };
-use gomoku::core::state::GameState;
 
+use crate::core::state::GameState;
 use crate::ui::display::display::make_visible;
-use crate::ui::screens::game::{game_plugin, handle_click_to_place, update_preview_stone};
+use crate::ui::screens::game::game::game_plugin;
 use crate::ui::screens::menu::menu_plugin;
 use crate::ui::screens::splash::splash_plugin;
 
@@ -137,14 +137,6 @@ impl GomokuApp {
                 make_visible,
             ),
         )
-		.add_systems(
-			Update,
-			(
-				update_preview_stone,
-				handle_click_to_place,
-			)
-			.run_if(in_state(AppState::Game)),
-		)
         // Adds the plugins for each state
         .add_plugins((splash_plugin, menu_plugin, game_plugin));
 	}

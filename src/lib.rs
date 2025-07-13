@@ -17,3 +17,18 @@ pub mod interface {
     pub mod utils;
 }
 
+pub mod ui {
+	pub mod app;
+	pub mod display {
+		pub mod display;
+	}
+	pub mod screens {
+		pub mod game {
+			pub mod game;
+			pub mod board;
+		}
+		pub mod menu;
+		pub mod splash;
+		pub mod utils;
+	}
+}

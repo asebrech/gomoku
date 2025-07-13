@@ -1,5 +1,4 @@
-use crate::ui::app::GomokuApp;
-mod ui;
+use gomoku::ui::app::GomokuApp;
 
 fn main() {
 	let mut gomoku = GomokuApp::new();
