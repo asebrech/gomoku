@@ -13,11 +13,25 @@ impl Heuristic {
             };
         }
 
+        // Check for capture win conditions
+        if state.max_captures >= 5 {
+            return 1_000_000;
+        }
+
+        if state.min_captures >= 5 {
+            return -1_000_000;
+        }
+
+        // If the board is full and no winner, it's a draw
+        if state.board.cells.iter().all(|row| row.iter().all(|&cell| cell.is_some())) {
+            return 0;
+        }
+
         let max_score = Self::evaluate_player(&state.board, Player::Max, state.win_condition);
         let min_score = Self::evaluate_player(&state.board, Player::Min, state.win_condition);
 
-        // // Add capture bonus
-        // let capture_bonus = (state.max_captures as i32 * 200) - (state.min_captures as i32 * 200);
+        // Add capture bonus
+        let capture_bonus = (state.max_captures as i32 * 200) - (state.min_captures as i32 * 200);
 
         max_score - min_score //+ capture_bonus
     }
