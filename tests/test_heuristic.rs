@@ -100,24 +100,23 @@ fn test_heuristic_line_evaluation() {
     assert!(score > 0);
 }
 
-// TODO: Add a test to check heuristic evaluation of blocked lines and ensure scoring reflects that blocked lines are less valuable than open lines.
-// #[test]
-// fn test_heuristic_blocked_line() {
-//     let mut state = GameState::new(19, 5);
-//
-//     // Create a line of 3 stones for Max, blocked on both sides
-//     state.board.place_stone(9, 6, Player::Min); // Block left
-//     state.board.place_stone(9, 7, Player::Max);
-//     state.board.place_stone(9, 8, Player::Max);
-//     state.board.place_stone(9, 9, Player::Max);
-//     state.board.place_stone(9, 10, Player::Min); // Block right
-//
-//     let score = Heuristic::evaluate(&state);
-//
-//     // Should be less favorable than open line
-//     // Since blocked lines get score 0, other factors determine the score
-//     assert!(score != 0); // Not zero due to other evaluations
-// }
+#[test]
+fn test_heuristic_blocked_line() {
+    let mut state = GameState::new(19, 5);
+
+    // Create a line of 3 stones for Max, blocked on both sides
+    state.board.place_stone(9, 6, Player::Min); // Block left
+    state.board.place_stone(9, 7, Player::Max);
+    state.board.place_stone(9, 8, Player::Max);
+    state.board.place_stone(9, 9, Player::Max);
+    state.board.place_stone(9, 10, Player::Min); // Block right
+
+    let score = Heuristic::evaluate(&state);
+
+    // Should be less favorable than open line
+    // Since blocked lines get score 0, other factors determine the score
+    assert!(score != 0); // Not zero due to other evaluations
+}
 
 #[test]
 fn test_heuristic_open_line_vs_blocked() {

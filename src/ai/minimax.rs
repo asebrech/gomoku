@@ -22,9 +22,12 @@ pub fn minimax(
         return score;
     }
 
+    let mut moves = state.get_possible_moves();
+    Heuristic::order_moves(state, &mut moves);
+
     if maximizing_player {
         let mut value = i32::MIN;
-        for move_ in state.get_possible_moves() {
+        for move_ in moves {
             state.make_move(move_);
             value = max(value, minimax(state, depth - 1, alpha, beta, false, tt));
             state.undo_move(move_);
@@ -37,7 +40,7 @@ pub fn minimax(
         value
     } else {
         let mut value = i32::MAX;
-        for move_ in state.get_possible_moves() {
+        for move_ in moves {
             state.make_move(move_);
             value = min(value, minimax(state, depth - 1, alpha, beta, true, tt));
             state.undo_move(move_);

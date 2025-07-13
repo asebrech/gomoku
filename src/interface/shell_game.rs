@@ -1,31 +1,39 @@
-use crate::{
-    core::state::GameState,
-    core::board::Player,
-    interface::utils::find_best_move,
-};
+use crate::{core::board::Player, core::state::GameState, interface::utils::find_best_move};
 use std::io;
 
 pub fn new_game(board_size: usize, winning_condition: usize, depth: i32) {
     let mut state = GameState::new(board_size, winning_condition);
-    let (human, ai) = choose_sides();
+    let (human, opponent, is_human_opponent) = choose_sides();
 
     loop {
         print_board(&state);
-        
+
         if state.is_terminal() {
-            print_game_result(&state, human, ai);
+            if is_human_opponent {
+                print_game_result(&state, human, opponent.unwrap());
+            } else {
+                print_game_result(&state, human, Player::Min);
+            }
             break;
         }
 
         if state.current_player == human {
             handle_human_move(&mut state);
+        } else if is_human_opponent {
+            handle_human_move(&mut state); // Alternate human player
         } else {
             handle_ai_move(&mut state, depth);
         }
     }
 }
 
-fn choose_sides() -> (Player, Player) {
+pub fn choose_sides() -> (Player, Option<Player>, bool) {
+    println!("Do you want to play against another human? (y/n)");
+    let mut mode_input = String::new();
+    io::stdin().read_line(&mut mode_input).unwrap();
+    let mode_input = mode_input.trim().to_lowercase();
+    let is_human_opponent = mode_input == "y";
+
     println!("Do you want to play as X (Max) or O (Min)?");
     let mut input = String::new();
     io::stdin().read_line(&mut input).unwrap();
@@ -36,20 +44,28 @@ fn choose_sides() -> (Player, Player) {
     } else {
         Player::Min
     };
-    let ai = if human == Player::Max {
-        Player::Min
+
+    let opponent = if is_human_opponent {
+        Some(if human == Player::Max {
+            Player::Min
+        } else {
+            Player::Max
+        })
     } else {
-        Player::Max
+        None
     };
 
-    (human, ai)
+    (human, opponent, is_human_opponent)
 }
 
 pub fn print_board(state: &GameState) {
     let n = state.board.size;
     let possible_moves = state.get_possible_moves();
 
-    println!("Captures: X = {} pairs, O = {} pairs", state.max_captures, state.min_captures);
+    println!(
+        "Captures: X = {} pairs, O = {} pairs",
+        state.max_captures, state.min_captures
+    );
     println!();
 
     print!("   ");
@@ -142,7 +158,12 @@ fn validate_human_move(state: &GameState, mv: (usize, usize)) -> Option<String> 
         return Some("Move must be adjacent to an existing piece.".to_string());
     }
 
-    if crate::core::moves::RuleValidator::creates_double_three(&state.board, mv.0, mv.1, state.current_player) {
+    if crate::core::moves::RuleValidator::creates_double_three(
+        &state.board,
+        mv.0,
+        mv.1,
+        state.current_player,
+    ) {
         return Some("This move would create a double-three, which is forbidden.".to_string());
     }
 
