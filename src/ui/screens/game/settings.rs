@@ -58,20 +58,8 @@ pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &
                 spawn_setting_row(builder, "Alpha-Beta", alpha_beta);
 
                 // AI Time Taken
-                spawn_setting_row(builder, "AI Time", "0.00s");
-                builder.spawn((
-                    Text::new("AI Time: 0.00s"),
-                    TextFont {
-                        font_size: 16.0,
-                        ..default()
-                    },
-                    TextColor(Color::WHITE),
-                    AITimeText,
-                    Node {
-                        margin: UiRect::top(Val::Px(8.0)),
-                        ..default()
-                    },
-                ));
+                //spawn_setting_row(builder, "AI Time", "0.00s");
+				spawn_timer_row(builder, "AI Time", "");
             }
 
 
@@ -119,5 +107,48 @@ fn spawn_setting_row(builder: &mut ChildSpawnerCommands, label: &str, value: &st
                 },
                 TextColor(Color::WHITE),
             ));
+        });
+}
+
+fn spawn_timer_row(builder: &mut ChildSpawnerCommands, label: &str, value: &str) {
+    builder
+        .spawn((
+            Node {
+                display: Display::Flex,
+                flex_direction: FlexDirection::Row,
+                justify_content: JustifyContent::SpaceBetween,
+                align_items: AlignItems::Center,
+                width: Val::Percent(100.0),
+                padding: UiRect::all(Val::Px(8.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.08, 0.08, 0.08)),
+            BorderRadius::all(Val::Px(4.0)),
+        ))
+        .with_children(|builder| {
+            // Label
+            builder.spawn((
+                Text::new(label),
+                TextFont {
+                    font_size: 16.0,
+                    ..default()
+                },
+                TextColor(Color::srgb(0.8, 0.8, 0.8)),
+            ));
+
+            // Value
+				builder.spawn((
+                    Text::new(" 0.00s"),
+                    TextFont {
+                        font_size: 16.0,
+                        ..default()
+                    },
+                    TextColor(Color::WHITE),
+                    AITimeText,
+                    Node {
+                        margin: UiRect::top(Val::Px(8.0)),
+                        ..default()
+                    },
+                ));
         });
 }

@@ -101,7 +101,7 @@ pub fn update_available_placement(
 
     let possible_moves = game_state.get_possible_moves();
 	println!("{:?}", possible_moves);
-    info!("Updating stone preview... {} cells", parents.iter().len());
+    info!("Updating stone preview...");
     for (entity, children, cell) in parents.iter() {
         if possible_moves.contains(&(cell.x, cell.y)) {
             for &child in children {
@@ -164,9 +164,6 @@ pub fn place_stone(
                 ));
             });
         }
-
-		println!("Move played !");
-
         move_played.write(MovePlayed);
     }
 }
@@ -186,7 +183,6 @@ pub fn handle_player_placement(
             if *interaction == Interaction::Pressed
                 && game_state.board.get_player(cell.x, cell.y).is_none()
             {
-                println!("Writing stone placement");
                 stone_placement.write(StonePlacement {
                     x: cell.x,
                     y: cell.y,
@@ -226,7 +222,6 @@ pub fn process_next_round(
             let placement = find_best_move(&mut game_state, settings.ai_depth);
             let elapsed_time = start_time.elapsed().as_millis();
             ai_time.millis = elapsed_time;
-            info!("AI took {:.0}ms to compute move", elapsed_time);
             update_ai_time.write(UpdateAITimeDisplay);
 
             if let Some((x, y)) = placement {
@@ -249,8 +244,7 @@ pub fn update_ai_time_display(
     for _ in events.read() {
         info!("Updating AI time display: {:.0}ms", ai_time.millis);
         for mut text in query.iter_mut() {
-			text.0 = format!("AI Time: {:.0}ms", ai_time.millis);
-			print!("{}", format!("AI Time: {:.0}ms", ai_time.millis));
+			text.0 = format!("{:.0}ms", ai_time.millis);
         }
     }
 }
