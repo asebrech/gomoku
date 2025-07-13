@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use bevy::prelude::*;
 use crate::{core::{board::Player, state::GameState}, interface::utils::find_best_move, ui::{app::{AppState, GameSettings}, screens::{game::{self, board::{BoardRoot, BoardUtils, PreviewDot}, settings::spawn_settings_panel}, utils::despawn_screen}}};
 
@@ -35,9 +37,11 @@ pub struct GridCell {
 
 pub fn game_plugin(app: &mut App) {
     app.init_resource::<GameStatus>()
+        .init_resource::<AITimeTaken>()
         .add_event::<GameEnded>()
         .add_event::<StonePlacement>()
         .add_event::<MovePlayed>()
+        .add_event::<UpdateAITimeDisplay>()
         .add_systems(OnEnter(AppState::Game), (setup_game_ui, update_available_placement).chain())
         .add_systems(
             Update,
@@ -47,6 +51,7 @@ pub fn game_plugin(app: &mut App) {
                 process_next_round.run_if(on_event::<MovePlayed>),
                 update_available_placement.run_if(on_event::<MovePlayed>),
                 toggle_pause,
+                update_ai_time_display.run_if(on_event::<UpdateAITimeDisplay>),
             ).run_if(in_state(AppState::Game)),
         )
         .add_systems(OnExit(AppState::Game), despawn_screen::<OnGameScreen>);
@@ -198,6 +203,8 @@ pub fn process_next_round(
     settings: Res<GameSettings>,
     mut game_state: ResMut<GameState>,
     mut game_status: ResMut<GameStatus>,
+    mut ai_time: ResMut<AITimeTaken>,
+    mut update_ai_time: EventWriter<UpdateAITimeDisplay>,
 ) {
     for _ in move_played.read() {
         if game_state.is_terminal() {
@@ -215,7 +222,13 @@ pub fn process_next_round(
             info!("Awaiting user click");
             *game_status = GameStatus::AwaitingUserInput;
         } else {
+            let start_time = Instant::now();
             let placement = find_best_move(&mut game_state, settings.ai_depth);
+            let elapsed_time = start_time.elapsed().as_millis();
+            ai_time.millis = elapsed_time;
+            info!("AI took {:.0}ms to compute move", elapsed_time);
+            update_ai_time.write(UpdateAITimeDisplay);
+
             if let Some((x, y)) = placement {
                 stone_placement.write(StonePlacement { x, y });
                 *game_status = GameStatus::AwaitingUserInput;
@@ -227,6 +240,34 @@ pub fn process_next_round(
         }
     }
 }
+
+pub fn update_ai_time_display(
+    mut query: Query<&mut Text, With<AITimeText>>,
+    ai_time: Res<AITimeTaken>,
+    mut events: EventReader<UpdateAITimeDisplay>,
+) {
+    for _ in events.read() {
+        info!("Updating AI time display: {:.0}ms", ai_time.millis);
+        for mut text in query.iter_mut() {
+			text.0 = format!("AI Time: {:.0}ms", ai_time.millis);
+			print!("{}", format!("AI Time: {:.0}ms", ai_time.millis));
+        }
+    }
+}
+
+#[derive(Component)]
+pub struct AITimeText;
+
+// Resource to store AI computation time
+#[derive(Resource, Default)]
+pub struct AITimeTaken {
+    pub millis: u128,
+}
+
+// Event to trigger AI time display update
+#[derive(Event)]
+pub struct UpdateAITimeDisplay;
+
 
 pub fn toggle_pause(
     mut game_status: ResMut<GameStatus>,

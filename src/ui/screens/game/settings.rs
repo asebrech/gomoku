@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::ui::app::GameSettings;
+use crate::ui::{app::GameSettings, screens::game::game::AITimeText};
 
 #[derive(Component)]
 pub struct GameSettingsPanel;
@@ -56,7 +56,24 @@ pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &
                 
                 let alpha_beta = if game_settings.alpha_beta_enabled { "Enabled" } else { "Disabled" };
                 spawn_setting_row(builder, "Alpha-Beta", alpha_beta);
+
+                // AI Time Taken
+                spawn_setting_row(builder, "AI Time", "0.00s");
+                builder.spawn((
+                    Text::new("AI Time: 0.00s"),
+                    TextFont {
+                        font_size: 16.0,
+                        ..default()
+                    },
+                    TextColor(Color::WHITE),
+                    AITimeText,
+                    Node {
+                        margin: UiRect::top(Val::Px(8.0)),
+                        ..default()
+                    },
+                ));
             }
+
 
             // Time Limit
             let time_limit = match game_settings.time_limit {
