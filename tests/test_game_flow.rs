@@ -166,27 +166,6 @@ fn test_complex_capture_scenario() {
     assert_eq!(state.capture_history[0].len(), 2);
 }
 
-// TODO: Add a test for double-three prevention rules, ensuring moves that create double-threes are disallowed.
-// #[test]
-// fn test_double_three_prevention() {
-//     let mut state = GameState::new(19, 5);
-//
-//     // Set up potential double three
-//     state.board.place_stone(9, 7, Player::Max);
-//     state.board.place_stone(9, 8, Player::Max);
-//     state.board.place_stone(9, 10, Player::Max);
-//     state.board.place_stone(7, 9, Player::Max);
-//     state.board.place_stone(8, 9, Player::Max);
-//     state.board.place_stone(10, 9, Player::Max);
-//     state.current_player = Player::Max;
-//
-//     // Get possible moves
-//     let moves = state.get_possible_moves();
-//
-//     // Should not include the double three move
-//     assert!(!moves.contains(&(9, 9)));
-// }
-
 #[test]
 fn test_game_state_consistency() {
     let mut state = GameState::new(19, 5);
