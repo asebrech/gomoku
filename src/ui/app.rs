@@ -49,7 +49,7 @@ impl GameSettings {
 			minimum_chain_to_win: 5,
 			ai_depth: 4,
 			alpha_beta_enabled: true,
-			versus_ai: true,
+			versus_ai: false,
 			time_limit: None
 		}
 	}
