@@ -100,7 +100,6 @@ pub fn update_available_placement(
     for _ in ev_board_update.read() {}
 
     let possible_moves = game_state.get_possible_moves();
-	println!("{:?}", possible_moves);
     info!("Updating stone preview...");
     for (entity, children, cell) in parents.iter() {
         if possible_moves.contains(&(cell.x, cell.y)) {
@@ -214,7 +213,7 @@ pub fn process_next_round(
             }
             return;
         }
-        if game_state.current_player == Player::Max {
+        if game_state.current_player == Player::Max || !settings.versus_ai {
             info!("Awaiting user click");
             *game_status = GameStatus::AwaitingUserInput;
         } else {
