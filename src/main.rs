@@ -1,5 +1,8 @@
-use gomoku::interface::shell_game::new_game;
+use gomoku::ui::app::GomokuApp;
 
 fn main() {
-    new_game(8, 4, 4);
+	let mut gomoku = GomokuApp::new();
+	gomoku.init();
+	gomoku.start();
 }
+

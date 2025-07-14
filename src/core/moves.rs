@@ -25,7 +25,6 @@ impl MoveHandler {
         
         moves
     }
-
 }
 
 pub struct RuleValidator;
