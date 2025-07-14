@@ -1,268 +1,180 @@
 use crate::core::board::{Board, Player};
 use crate::core::state::GameState;
+use crate::ai::patterns::get_pattern_table;
 
 pub struct Heuristic;
 
 impl Heuristic {
     pub fn evaluate(state: &GameState) -> i32 {
-        // Check for terminal states first
+        // Check terminal states first
         if let Some(winner) = state.check_winner() {
             return match winner {
-                Player::Max => 1000000,
-                Player::Min => -1000000,
+                Player::Max => 1_000_000,
+                Player::Min => -1_000_000,
             };
         }
 
-        // Check for capture win conditions
-        if state.max_captures >= 5 {
-            return 1_000_000;
-        }
+        // Check capture wins
+        if state.max_captures >= 5 { return 1_000_000; }
+        if state.min_captures >= 5 { return -1_000_000; }
 
-        if state.min_captures >= 5 {
-            return -1_000_000;
-        }
+        // Use pattern-based evaluation
+        let pattern_table = get_pattern_table();
+        let mut score = 0;
 
-        // If the board is full and no winner, it's a draw
-        if state.board.cells.iter().all(|row| row.iter().all(|&cell| cell.is_some())) {
-            return 0;
-        }
+        // Evaluate all lines using pattern lookup
+        score += Self::evaluate_all_lines(&state.board, pattern_table);
 
-        let max_score = Self::evaluate_player(&state.board, Player::Max, state.win_condition);
-        let min_score = Self::evaluate_player(&state.board, Player::Min, state.win_condition);
+        // Add capture bonus (increased from 2000 to 5000)
+        score += (state.max_captures as i32 - state.min_captures as i32) * 5000;
 
-        // Add capture bonus
-        let capture_bonus = (state.max_captures as i32 * 2000) - (state.min_captures as i32 * 2000);
+        // Add capture opportunity bonus
+        score += Self::evaluate_capture_opportunities(state);
 
-        max_score - min_score + capture_bonus
+        score
     }
 
-    fn evaluate_player(board: &Board, player: Player, win_condition: usize) -> i32 {
-        let mut score = 0;
+    fn evaluate_all_lines(board: &Board, pattern_table: &crate::ai::patterns::PatternTable) -> i32 {
+        let mut total_score = 0;
         let directions = [(1, 0), (0, 1), (1, 1), (1, -1)];
 
-        // Count patterns for this player
-        let mut five_in_row = 0;
-        let mut live_four = 0;
-        let mut live_three = 0;
-        let mut dead_four = 0;
-        let mut dead_three = 0;
-        let mut live_two = 0;
-
-        for row in 0..board.size {
-            for col in 0..board.size {
-                if board.get_player(row, col) == Some(player) {
-                    for &(dx, dy) in &directions {
-                        let pattern =
-                            Self::analyze_line(board, row, col, dx, dy, player, win_condition);
-
-                        match pattern {
-                            5 => five_in_row += 1,
-                            4 => {
-                                if Self::is_live_pattern(board, row, col, dx, dy, player, 4) {
-                                    live_four += 1;
-                                } else {
-                                    dead_four += 1;
-                                }
-                            }
-                            3 => {
-                                if Self::is_live_pattern(board, row, col, dx, dy, player, 3) {
-                                    live_three += 1;
-                                } else {
-                                    dead_three += 1;
-                                }
-                            }
-                            2 => {
-                                if Self::is_live_pattern(board, row, col, dx, dy, player, 2) {
-                                    live_two += 1;
-                                }
-                            }
-                            _ => {}
-                        }
+        for &(dx, dy) in &directions {
+            for start_row in 0..board.size {
+                for start_col in 0..board.size {
+                    if Self::is_valid_line_start(start_row, start_col, dx, dy, board.size) {
+                        let pattern = Self::extract_line_pattern(board, start_row, start_col, dx, dy);
+                        total_score += pattern_table.lookup_pattern(pattern);
                     }
                 }
             }
         }
 
-        // Avoid double counting by dividing by pattern length
-        five_in_row /= 5;
-        live_four /= 4;
-        dead_four /= 4;
-        live_three /= 3;
-        dead_three /= 3;
-        live_two /= 2;
-
-        // Apply scoring rules from pseudocode
-        if five_in_row > 0 {
-            score += 100000;
-        }
-
-        if live_four == 1 {
-            score += 15000;
-        } else if live_four > 1 {
-            score += 20000; // Multiple live fours is even better
-        }
-
-        if live_three >= 2 || dead_four >= 2 || (dead_four >= 1 && live_three >= 1) {
-            score += 10000;
-        }
-
-        if dead_four > 0 {
-            score += 1000 * dead_four;
-        }
-
-        // Additional scoring for other patterns
-        score += live_three * 500;
-        score += dead_three * 100;
-        score += live_two * 50;
-
-        score
+        total_score
     }
 
-    fn analyze_line(
-        board: &Board,
-        row: usize,
-        col: usize,
-        dx: isize,
-        dy: isize,
-        player: Player,
-        win_condition: usize,
-    ) -> usize {
-        let mut count = 0;
-        let mut r = row as isize;
-        let mut c = col as isize;
-
-        // Count consecutive pieces in positive direction
-        while r >= 0 && r < board.size as isize && c >= 0 && c < board.size as isize {
-            if board.get_player(r as usize, c as usize) == Some(player) {
-                count += 1;
-                r += dx;
-                c += dy;
-            } else {
-                break;
-            }
-        }
-
-        // Count consecutive pieces in negative direction
-        r = row as isize - dx;
-        c = col as isize - dy;
-        while r >= 0 && r < board.size as isize && c >= 0 && c < board.size as isize {
-            if board.get_player(r as usize, c as usize) == Some(player) {
-                count += 1;
-                r -= dx;
-                c -= dy;
-            } else {
-                break;
-            }
-        }
-
-        count.min(win_condition)
+    fn is_valid_line_start(row: usize, col: usize, dx: isize, dy: isize, size: usize) -> bool {
+        let end_row = row as isize + 4 * dx;
+        let end_col = col as isize + 4 * dy;
+        
+        end_row >= 0 && end_row < size as isize && 
+        end_col >= 0 && end_col < size as isize
     }
 
-    fn is_live_pattern(
-        board: &Board,
-        row: usize,
-        col: usize,
-        dx: isize,
-        dy: isize,
-        player: Player,
-        pattern_length: usize,
-    ) -> bool {
-        // Check if pattern has open ends
-        let mut start_r = row as isize;
-        let mut start_c = col as isize;
+    fn extract_line_pattern(board: &Board, start_row: usize, start_col: usize, dx: isize, dy: isize) -> u32 {
+        let mut pattern = 0;
+        let mut multiplier = 1;
 
-        // Find start of pattern
-        while start_r >= 0
-            && start_r < board.size as isize
-            && start_c >= 0
-            && start_c < board.size as isize
-            && board.get_player(start_r as usize, start_c as usize) == Some(player)
-        {
-            start_r -= dx;
-            start_c -= dy;
+        for i in 0..5 {
+            let row = (start_row as isize + i * dx) as usize;
+            let col = (start_col as isize + i * dy) as usize;
+            
+            let value = match board.get_player(row, col) {
+                Some(Player::Max) => 1,
+                Some(Player::Min) => 2,
+                None => 0,
+            };
+            
+            pattern += value * multiplier;
+            multiplier *= 3;
         }
 
-        // Find end of pattern
-        let mut end_r = row as isize;
-        let mut end_c = col as isize;
-        while end_r >= 0
-            && end_r < board.size as isize
-            && end_c >= 0
-            && end_c < board.size as isize
-            && board.get_player(end_r as usize, end_c as usize) == Some(player)
-        {
-            end_r += dx;
-            end_c += dy;
-        }
-
-        // Check if both ends are empty (live pattern)
-        let start_empty = start_r >= 0
-            && start_r < board.size as isize
-            && start_c >= 0
-            && start_c < board.size as isize
-            && board
-                .get_player(start_r as usize, start_c as usize)
-                .is_none();
-
-        let end_empty = end_r >= 0
-            && end_r < board.size as isize
-            && end_c >= 0
-            && end_c < board.size as isize
-            && board.get_player(end_r as usize, end_c as usize).is_none();
-
-        start_empty && end_empty
+        pattern
     }
 
     pub fn order_moves(state: &GameState, moves: &mut Vec<(usize, usize)>) {
-        // Simple move ordering: prioritize center moves and moves near existing pieces
-        let center = state.board.size / 2;
-
-        moves.sort_by(|&a, &b| {
-            let dist_a = Self::move_priority(state, a, center);
-            let dist_b = Self::move_priority(state, b, center);
-            dist_b.cmp(&dist_a) // Higher priority first
+        moves.sort_by_cached_key(|&(row, col)| {
+            -(Self::move_priority(state, row, col) as i32)
         });
     }
 
-    fn move_priority(state: &GameState, mv: (usize, usize), center: usize) -> i32 {
-        let (row, col) = mv;
+    fn move_priority(state: &GameState, row: usize, col: usize) -> usize {
+        use crate::core::captures::CaptureHandler;
+        
         let mut priority = 0;
+        let center = state.board.size / 2;
 
-        // Prefer moves closer to center
-        let center_dist = ((row as isize - center as isize).abs()
-            + (col as isize - center as isize).abs()) as i32;
-        priority += 100 - center_dist;
+        // Check for capture opportunities (highest priority)
+        let captures = CaptureHandler::detect_captures(&state.board, row, col, state.current_player);
+        if !captures.is_empty() {
+            let capture_count = captures.len() / 2;
+            priority += capture_count * 10000; // Very high priority for captures
+            
+            // Extra priority if this leads to capture win
+            let current_captures = match state.current_player {
+                Player::Max => state.max_captures,
+                Player::Min => state.min_captures,
+            };
+            
+            if current_captures + capture_count >= 5 {
+                priority += 100000; // Extremely high priority for capture wins
+            }
+        }
 
-        // Prefer moves near existing pieces
+        // Distance from center (inverse priority)
+        let center_dist = ((row as isize - center as isize).abs() + 
+                          (col as isize - center as isize).abs()) as usize;
+        priority += (20 - center_dist.min(20)) * 10;
+
+        // Count adjacent stones
         let directions = [
-            (-1, -1),
-            (-1, 0),
-            (-1, 1),
-            (0, -1),
-            (0, 1),
-            (1, -1),
-            (1, 0),
-            (1, 1),
+            (-1, -1), (-1, 0), (-1, 1),
+            (0, -1),           (0, 1),
+            (1, -1),  (1, 0),  (1, 1),
         ];
+
         for &(dx, dy) in &directions {
             let new_row = row as isize + dx;
             let new_col = col as isize + dy;
-
-            if new_row >= 0
-                && new_row < state.board.size as isize
-                && new_col >= 0
-                && new_col < state.board.size as isize
-            {
-                if state
-                    .board
-                    .get_player(new_row as usize, new_col as usize)
-                    .is_some()
-                {
+            
+            if new_row >= 0 && new_row < state.board.size as isize &&
+               new_col >= 0 && new_col < state.board.size as isize {
+                if state.board.get_player(new_row as usize, new_col as usize).is_some() {
                     priority += 50;
                 }
             }
         }
 
         priority
+    }
+
+    fn evaluate_capture_opportunities(state: &GameState) -> i32 {
+        use crate::core::captures::CaptureHandler;
+        
+        let mut score = 0;
+        
+        // Get possible moves and evaluate capture opportunities for both players
+        let moves = state.get_possible_moves();
+        
+        // Evaluate capture opportunities for Max player
+        for &(row, col) in &moves {
+            let max_captures = CaptureHandler::detect_captures(&state.board, row, col, Player::Max);
+            if !max_captures.is_empty() {
+                let capture_count = max_captures.len() / 2;
+                let mut capture_bonus = capture_count as i32 * 3000; // Increased bonus
+                
+                // Extra bonus if this would lead to a capture win
+                if state.max_captures + capture_count >= 5 {
+                    capture_bonus += 900_000;
+                }
+                
+                score += capture_bonus;
+            }
+            
+            // Evaluate capture opportunities for Min player (subtract from score)
+            let min_captures = CaptureHandler::detect_captures(&state.board, row, col, Player::Min);
+            if !min_captures.is_empty() {
+                let capture_count = min_captures.len() / 2;
+                let mut capture_penalty = capture_count as i32 * 3000;
+                
+                // Extra penalty if this would lead to a capture win for Min
+                if state.min_captures + capture_count >= 5 {
+                    capture_penalty += 900_000;
+                }
+                
+                score -= capture_penalty;
+            }
+        }
+        
+        score
     }
 }

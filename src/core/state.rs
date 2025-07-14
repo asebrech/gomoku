@@ -45,26 +45,50 @@ impl GameState {
     }
 
     pub fn undo_move(&mut self, move_: (usize, usize)) {
+        // Switch player back first
         self.current_player = self.current_player.opponent();
 
+        // Remove the stone that was placed
         self.board.remove_stone(move_.0, move_.1);
+        
+        // Clear winner status
         self.winner = None;
 
+        // Restore captured stones
         self.restore_captured_stones();
     }
 
     pub fn is_terminal(&self) -> bool {
-        self.winner.is_some() || self.get_possible_moves().is_empty()
+        // Check if there's already a winner
+        if self.winner.is_some() {
+            return true;
+        }
+        
+        // Check if someone won by captures
+        if self.max_captures >= 5 || self.min_captures >= 5 {
+            return true;
+        }
+        
+        // Check if no moves are available
+        self.get_possible_moves().is_empty()
     }
 
     pub fn check_winner(&self) -> Option<Player> {
-        self.winner
+        // If winner is already set, return it
+        if let Some(winner) = self.winner {
+            return Some(winner);
+        }
+        
+        // Check capture win
+        self.check_capture_win()
     }
 
     pub fn hash(&self) -> u64 {
         let mut hasher = DefaultHasher::new();
         self.board.hash().hash(&mut hasher);
         self.current_player.hash(&mut hasher);
+        self.max_captures.hash(&mut hasher);
+        self.min_captures.hash(&mut hasher);
         hasher.finish()
     }
 
@@ -96,8 +120,8 @@ impl GameState {
 
         let pairs_captured = captures.len() / 2;
         match self.current_player {
-            Player::Max => self.min_captures += pairs_captured,
-            Player::Min => self.max_captures += pairs_captured,
+            Player::Max => self.max_captures += pairs_captured,
+            Player::Min => self.min_captures += pairs_captured,
         }
 
         self.capture_history.push(captures);
@@ -115,13 +139,13 @@ impl GameState {
                 let pairs_captured = last_captures.len() / 2;
                 match self.current_player {
                     Player::Max => {
-                        if self.min_captures >= pairs_captured {
-                            self.min_captures -= pairs_captured;
+                        if self.max_captures >= pairs_captured {
+                            self.max_captures -= pairs_captured;
                         }
                     }
                     Player::Min => {
-                        if self.max_captures >= pairs_captured {
-                            self.max_captures -= pairs_captured;
+                        if self.min_captures >= pairs_captured {
+                            self.min_captures -= pairs_captured;
                         }
                     }
                 }

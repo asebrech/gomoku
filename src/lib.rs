@@ -2,6 +2,8 @@ pub mod ai {
     pub mod heuristic;
     pub mod minimax;
     pub mod transposition;
+	pub mod search;
+	pub mod patterns;
 }
 
 pub mod core {

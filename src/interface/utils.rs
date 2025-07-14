@@ -1,35 +1,21 @@
-use crate::ai::{minimax::minimax, transposition::TranspositionTable};
+use crate::ai::search::iterative_deepening_search;
 use crate::core::state::GameState;
-use crate::core::board::Player;
+use std::time::Duration;
 
-pub fn find_best_move(state: &mut GameState, depth: i32) -> Option<(usize, usize)> {
-    let mut best_move = None;
-    let mut best_score = if state.current_player == Player::Max {
-        i32::MIN
-    } else {
-        i32::MAX
-    };
-    let mut tt = TranspositionTable::new();
-
-    for mv in state.get_possible_moves() {
-        state.make_move(mv);
-        let score = minimax(
-            state,
-            depth - 1,
-            i32::MIN,
-            i32::MAX,
-            state.current_player == Player::Min,
-            &mut tt,
-        );
-        state.undo_move(mv);
-
-        if (state.current_player == Player::Max && score > best_score)
-            || (state.current_player == Player::Min && score < best_score)
-        {
-            best_score = score;
-            best_move = Some(mv);
-        }
+/// Find the best move for the current player in the given game state.
+/// Returns None if the game is terminal (won/draw) or no valid moves exist.
+pub fn find_best_move(state: &mut GameState, max_depth: i32) -> Option<(usize, usize)> {
+    // Check if game is terminal first
+    if state.is_terminal() {
+        return None;
     }
-
-    best_move
+    
+    // Check if there are any possible moves
+    let possible_moves = state.get_possible_moves();
+    if possible_moves.is_empty() {
+        return None;
+    }
+    
+    let max_time = Duration::from_millis(450); // Leave 50ms buffer
+    iterative_deepening_search(state, max_time, max_depth)
 }
