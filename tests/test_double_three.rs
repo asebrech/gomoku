@@ -2,141 +2,113 @@ use gomoku::core::board::{Board, Player};
 use gomoku::core::moves::{MoveHandler, RuleValidator};
 use gomoku::core::state::GameState;
 
-// Schema:
-// Horizontal: (row 9)
-//  . . . . . . . X X _ X . . . . . . .
-//  (col 7)      (col 8) (col 9) (col 10)
-// Vertical: (col 9)
-//  . . . . . . .
-//  X           (row 7)
-//  X           (row 8)
-//  _           (row 9)
-//  X           (row 10)
-// Placing at (9,9) creates double three (horizontal & vertical)
-// TODO :
-// #[test]
-// fn test_double_three_detection() {
-//     let mut board = Board::new(19);
-//
-//     // Set up a scenario where placing at (9,9) would create double three
-//     // Pattern 1: horizontal three
-//     board.place_stone(9, 7, Player::Max);
-//     board.place_stone(9, 8, Player::Max);
-//     // (9, 9) would complete horizontal three
-//     board.place_stone(9, 10, Player::Max);
-//
-//     // Pattern 2: vertical three
-//     board.place_stone(7, 9, Player::Max);
-//     board.place_stone(8, 9, Player::Max);
-//     // (9, 9) would complete vertical three
-//     board.place_stone(10, 9, Player::Max);
-//
-//     // This should detect double three
-//     assert!(RuleValidator::creates_double_three(
-//         &board,
-//         9,
-//         9,
-//         Player::Max
-//     ));
-// }
+/// Test that placing at (9,9) creates a double three:
+/// two simultaneous free three lines — horizontal and vertical.
+///
+/// Horizontal (row 9): _ X _ X X _
+/// Vertical (col 9):   _ X _ X X _
+#[test]
+fn test_double_three_detection() {
+    let mut board = Board::new(19);
 
-// Schema:
-// Horizontal: (row 9)
-//  . . . . . . . _ X X X _ . . . . . .
-//                (7)(8)(9)(10)(11)
-// Free three pattern (_ X X X _), tests both ends
-// TODO :
-// #[test]
-// fn test_free_three_detection() {
-//     let mut board = Board::new(19);
-//
-//     // Set up a free three pattern: _ X X X _
-//     board.place_stone(9, 8, Player::Max);
-//     board.place_stone(9, 9, Player::Max);
-//     board.place_stone(9, 10, Player::Max);
-//
-//     // Check if placing at (9, 7) or (9, 11) would create a free three
-//     assert!(RuleValidator::is_free_three(
-//         &board,
-//         9,
-//         7,
-//         Player::Max,
-//         (0, 1)
-//     ));
-//     assert!(RuleValidator::is_free_three(
-//         &board,
-//         9,
-//         11,
-//         Player::Max,
-//         (0, 1)
-//     ));
-// }
+    // Horizontal free three parts (cols 8 and 10)
+    board.place_stone(9, 8, Player::Max);
+    board.place_stone(9, 10, Player::Max);
 
-// TODO :
-// #[test]
-// fn test_double_three_prevention() {
-//     let mut state = GameState::new(19, 5);
-//
-//     // Set up potential double three
-//     state.board.place_stone(9, 7, Player::Max);
-//     state.board.place_stone(9, 8, Player::Max);
-//     state.board.place_stone(9, 10, Player::Max);
-//     state.board.place_stone(7, 9, Player::Max);
-//     state.board.place_stone(8, 9, Player::Max);
-//     state.board.place_stone(10, 9, Player::Max);
-//     state.current_player = Player::Max;
-//
-//     // Get possible moves
-//     let moves = state.get_possible_moves();
-//
-//     // Should not include the double three move
-//     assert!(!moves.contains(&(9, 9)));
-// }
+    // Vertical free three parts (rows 8 and 10)
+    board.place_stone(8, 9, Player::Max);
+    board.place_stone(10, 9, Player::Max);
 
-// Schema:
-// Horizontal: (row 9)
-//  . . . . . . . X X _ X . . . . . . .
-//                (7)(8)(9)(10)
-// Vertical: (col 9)
-//   X (7)
-//   X (8)
-//   _ (9)
-//   X (10)
-// MoveHandler should not propose (9, 9) due to double three
-// TODO :
-// #[test]
-// fn test_moves_exclude_double_three() {
-//     let mut board = Board::new(19);
-//
-//     // Set up potential double three scenario
-//     board.place_stone(9, 7, Player::Max);
-//     board.place_stone(9, 8, Player::Max);
-//     board.place_stone(9, 10, Player::Max);
-//     board.place_stone(7, 9, Player::Max);
-//     board.place_stone(8, 9, Player::Max);
-//     board.place_stone(10, 9, Player::Max);
-//
-//     let moves = MoveHandler::get_possible_moves(&board, Player::Max);
-//
-//     // Should not include the double three move
-//     assert!(!moves.contains(&(9, 9)));
-// }
+    // Placing at (9,9) creates two free threes → double three detected
+    assert!(RuleValidator::creates_double_three(
+        &board,
+        9,
+        9,
+        Player::Max
+    ));
+}
 
-// Schema:
-// Horizontal: (row 9)
-//  . . . . . . . X X _ X . . . . . . .
-//                (col 7)(col 8)(col 9)(col 10)
-// Only one horizontal three, no vertical pattern
+/// Test detection of a single free three horizontally:
+/// Placing at (9,9) completes pattern _ X X X _
+#[test]
+fn test_free_three_detection() {
+    let mut board = Board::new(19);
+
+    board.place_stone(9, 8, Player::Max);
+    board.place_stone(9, 10, Player::Max);
+
+    assert!(RuleValidator::is_free_three(
+        &board,
+        9,
+        9,
+        Player::Max,
+        (0, 1)
+    ));
+}
+
+/// Test that a blocked three (blocked by opponent stone) is NOT detected as free three
+///
+/// Pattern: O X X X _
+#[test]
+fn test_not_free_three_when_blocked() {
+    let mut board = Board::new(19);
+
+    board.place_stone(9, 7, Player::Min); // Blocking stone
+    board.place_stone(9, 8, Player::Max);
+    board.place_stone(9, 10, Player::Max);
+
+    assert!(!RuleValidator::is_free_three(
+        &board,
+        9,
+        9,
+        Player::Max,
+        (0, 1)
+    ));
+}
+
+/// Test that possible moves exclude those that create a double three
+#[test]
+fn test_double_three_prevention() {
+    let mut state = GameState::new(19, 5);
+
+    state.board.place_stone(9, 8, Player::Max);
+    state.board.place_stone(9, 10, Player::Max);
+    state.board.place_stone(8, 9, Player::Max);
+    state.board.place_stone(10, 9, Player::Max);
+
+    state.current_player = Player::Max;
+
+    let moves = state.get_possible_moves();
+
+    // Move at (9,9) would create double three → must be excluded
+    assert!(!moves.contains(&(9, 9)));
+}
+
+/// Test that MoveHandler excludes moves that cause double three
+#[test]
+fn test_moves_exclude_double_three() {
+    let mut board = Board::new(19);
+
+    board.place_stone(9, 8, Player::Max);
+    board.place_stone(9, 10, Player::Max);
+    board.place_stone(8, 9, Player::Max);
+    board.place_stone(10, 9, Player::Max);
+
+    let moves = MoveHandler::get_possible_moves(&board, Player::Max);
+
+    assert!(!moves.contains(&(9, 9)));
+}
+
+/// Test that placing a stone creating only one free three is NOT double three
 #[test]
 fn test_no_double_three_single_pattern() {
     let mut board = Board::new(19);
 
-    // Set up only one three pattern
     board.place_stone(9, 7, Player::Max);
     board.place_stone(9, 8, Player::Max);
     board.place_stone(9, 10, Player::Max);
 
-    // This should not detect double three (only one pattern)
+    // Only one free three → no double three detected
     assert!(!RuleValidator::creates_double_three(
         &board,
         9,
@@ -145,22 +117,16 @@ fn test_no_double_three_single_pattern() {
     ));
 }
 
-// Schema:
-// Horizontal: (row 9)
-//  . . . . . . . O X X X _ . . . . . .
-//                (7)(8)(9)(10)(11)
-// Blocked at left end (O), should not be free three
+/// Test that a blocked three (by opponent stone) is not detected as free three
 #[test]
 fn test_blocked_three_not_free() {
     let mut board = Board::new(19);
 
-    // Set up a blocked three pattern: O X X X _
     board.place_stone(9, 7, Player::Min); // Blocking stone
     board.place_stone(9, 8, Player::Max);
     board.place_stone(9, 9, Player::Max);
     board.place_stone(9, 10, Player::Max);
 
-    // This should not be detected as a free three
     assert!(!RuleValidator::is_free_three(
         &board,
         9,
@@ -170,28 +136,19 @@ fn test_blocked_three_not_free() {
     ));
 }
 
-// Schema:
-// Intersecting stones bottom right:
-// (rows 9,10), (cols 9,10)
-//  . . . . . . X X
-//  . . . . . . X X
-//   (9, 9)(9,10)
-//   (10,9)(10,10)
-// Tests multiple placements, ensures no move creates double three
+/// Test complex scenario where multiple stones are placed;
+/// ensures get_possible_moves returns moves that don't create double three
 #[test]
 fn test_complex_double_three_scenario() {
     let mut board = Board::new(19);
 
-    // Create a more complex board state
     board.place_stone(9, 9, Player::Max);
     board.place_stone(9, 10, Player::Max);
     board.place_stone(10, 9, Player::Max);
     board.place_stone(10, 10, Player::Max);
 
-    // Test various positions for double three
     let moves = MoveHandler::get_possible_moves(&board, Player::Max);
 
-    // Should include valid moves that don't create double three
     assert!(!moves.is_empty());
 
     for &(row, col) in &moves {
