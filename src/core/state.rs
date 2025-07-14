@@ -3,7 +3,9 @@ use crate::core::captures::CaptureHandler;
 use crate::core::moves::MoveHandler;
 use crate::core::rules::WinChecker;
 use std::hash::{DefaultHasher, Hash, Hasher};
+use bevy::prelude::*;
 
+#[derive(Resource, Component, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct GameState {
     pub board: Board,
     pub current_player: Player,
