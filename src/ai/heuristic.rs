@@ -93,7 +93,23 @@ impl Heuristic {
         let mut priority = 0;
         let center = state.board.size / 2;
 
-        // Check for capture opportunities (highest priority)
+        // Check for blocking opponent's winning move (HIGHEST priority)
+        // We need to check if the opponent would win if they played at this position
+        let mut temp_state = state.clone();
+        temp_state.current_player = state.current_player.opponent();
+        temp_state.make_move((row, col));
+        if temp_state.check_winner() == Some(state.current_player.opponent()) {
+            priority += 10_000_000; // Extremely high priority for blocking moves
+        }
+
+        // Check for immediate winning move (second highest priority)
+        let mut temp_state = state.clone();
+        temp_state.make_move((row, col));
+        if temp_state.check_winner() == Some(state.current_player) {
+            priority += 1_000_000; // High priority for winning moves
+        }
+
+        // Check for capture opportunities (third highest priority)
         let captures = CaptureHandler::detect_captures(&state.board, row, col, state.current_player);
         if !captures.is_empty() {
             let capture_count = captures.len() / 2;
