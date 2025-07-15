@@ -1,11 +1,7 @@
-use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::prelude::*;
 
 use bevy::window::{PresentMode, WindowTheme};
-use bevy::{
-	color::palettes::css::CRIMSON,
-	prelude::*,
-};
+use bevy::color::palettes::css::CRIMSON;
 
 use crate::core::state::GameState;
 use crate::ui::display::display::make_visible;
