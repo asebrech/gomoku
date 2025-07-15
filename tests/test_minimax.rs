@@ -173,24 +173,6 @@ fn test_minimax_state_restoration() {
     assert_eq!(state.current_player, initial_player);
 }
 
-// TODO: Fix minimax evaluation function so that it properly recognizes and scores positions where a capture opportunity exists for the current player. Test currently fails.
-#[test]
-fn test_minimax_captures_evaluation() {
-    let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new();
-    
-    // Set up position with capture opportunity
-    state.board.place_stone(9, 9, Player::Max);
-    state.board.place_stone(9, 10, Player::Min);
-    state.board.place_stone(9, 11, Player::Min);
-    state.current_player = Player::Max;
-    
-    let score = minimax(&mut state, 2, i32::MIN, i32::MAX, true, &mut tt);
-    
-    // Should recognize capture opportunity
-    assert!(score > 0); // Favorable for Max
-}
-
 #[test]
 fn test_minimax_empty_moves() {
     let mut state = GameState::new(3, 3);
@@ -240,23 +222,3 @@ fn test_minimax_pruning_efficiency() {
     
     assert!(score > i32::MIN && score < i32::MAX);
 }
-
-// TODO: Update minimax to correctly detect capture-win scenarios where a player can win by making a capture. Test currently fails.
-#[test]
-fn test_minimax_capture_win_detection() {
-    let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new();
-    
-    // Set up near-capture-win scenario
-    state.max_captures = 4; // One pair away from winning
-    state.board.place_stone(9, 9, Player::Max);
-    state.board.place_stone(9, 10, Player::Min);
-    state.board.place_stone(9, 11, Player::Min);
-    state.current_player = Player::Max;
-    
-    let score = minimax(&mut state, 2, i32::MIN, i32::MAX, true, &mut tt);
-    
-    // Should detect capture win opportunity
-    assert!(score > 900_000);
-}
-

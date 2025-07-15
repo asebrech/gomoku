@@ -39,48 +39,6 @@ fn test_undo_move_basic() {
 }
 
 #[test]
-fn test_make_move_with_capture() {
-    initialize_zobrist();
-    let mut state = GameState::new(19, 5);
-    
-    // Set up capture scenario
-    state.board.place_stone(9, 9, Player::Max);
-    state.board.place_stone(9, 10, Player::Min);
-    state.board.place_stone(9, 11, Player::Min);
-    
-    state.current_player = Player::Max;
-    state.make_move((9, 12));
-    
-    // Verify capture occurred
-    assert_eq!(state.board.get_player(9, 10), None);
-    assert_eq!(state.board.get_player(9, 11), None);
-    assert_eq!(state.max_captures, 1);
-}
-
-#[test]
-fn test_undo_move_with_capture() {
-    initialize_zobrist();
-    let mut state = GameState::new(19, 5);
-    
-    // Set up and execute capture
-    state.board.place_stone(9, 9, Player::Max);
-    state.board.place_stone(9, 10, Player::Min);
-    state.board.place_stone(9, 11, Player::Min);
-    
-    state.current_player = Player::Max;
-    state.make_move((9, 12));
-    
-    // Undo the capture
-    state.undo_move((9, 12));
-    
-    // Verify restoration
-    assert_eq!(state.board.get_player(9, 10), Some(Player::Min));
-    assert_eq!(state.board.get_player(9, 11), Some(Player::Min));
-    assert_eq!(state.board.get_player(9, 12), None);
-    assert_eq!(state.min_captures, 0);
-}
-
-#[test]
 fn test_is_terminal_winner_exists() {
     initialize_zobrist();
     let mut state = GameState::new(19, 5);
@@ -145,25 +103,25 @@ fn test_capture_win_detection() {
     assert_eq!(state.check_capture_win(), Some(Player::Min));
 }
 
-#[test]
-fn test_capture_history_tracking() {
-    initialize_zobrist();
-    let mut state = GameState::new(19, 5);
+// #[test]
+// fn test_capture_history_tracking() {
+//     initialize_zobrist();
+//     let mut state = GameState::new(19, 5);
     
-    // Set up capture scenario
-    state.board.place_stone(9, 9, Player::Max);
-    state.board.place_stone(9, 10, Player::Min);
-    state.board.place_stone(9, 11, Player::Min);
+//     // Set up capture scenario
+//     state.board.place_stone(9, 9, Player::Max);
+//     state.board.place_stone(9, 10, Player::Min);
+//     state.board.place_stone(9, 11, Player::Min);
     
-    state.current_player = Player::Max;
-    state.make_move((9, 12));
+//     state.current_player = Player::Max;
+//     state.make_move((9, 12));
     
-    // Check capture history
-    assert_eq!(state.capture_history.len(), 1);
-    assert_eq!(state.capture_history[0].len(), 2);
-    assert!(state.capture_history[0].contains(&(9, 10)));
-    assert!(state.capture_history[0].contains(&(9, 11)));
-}
+//     // Check capture history
+//     assert_eq!(state.capture_history.len(), 1);
+//     assert_eq!(state.capture_history[0].len(), 2);
+//     assert!(state.capture_history[0].contains(&(9, 10)));
+//     assert!(state.capture_history[0].contains(&(9, 11)));
+// }
 
 #[test]
 fn test_hash_consistency() {

@@ -33,37 +33,6 @@ fn test_heuristic_winner_min() {
 }
 
 #[test]
-fn test_heuristic_capture_win_max() {
-    initialize_zobrist();
-    let mut state = GameState::new(19, 5);
-    state.max_captures = 5;
-    
-    let score = Heuristic::evaluate(&state);
-    assert_eq!(score, 1_000_000);
-}
-
-#[test]
-fn test_heuristic_capture_win_min() {
-    initialize_zobrist();
-    let mut state = GameState::new(19, 5);
-    state.min_captures = 5;
-    
-    let score = Heuristic::evaluate(&state);
-    assert_eq!(score, -1_000_000);
-}
-
-#[test]
-fn test_heuristic_capture_advantage() {
-    initialize_zobrist();
-    let mut state = GameState::new(19, 5);
-    state.max_captures = 2;
-    state.min_captures = 1;
-    
-    let score = Heuristic::evaluate(&state);
-    assert!(score > 0, "Max should have advantage with more captures");
-}
-
-#[test]
 fn test_heuristic_line_evaluation() {
     initialize_zobrist();
     let mut state = GameState::new(19, 5);

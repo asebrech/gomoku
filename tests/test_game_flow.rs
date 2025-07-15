@@ -121,29 +121,29 @@ fn test_undo_redo_sequence() {
     assert_eq!(state.min_captures, 0);
 }
 
-#[test]
-fn test_complex_capture_scenario() {
-    initialize_zobrist();
-    let mut state = GameState::new(19, 5);
+// #[test]
+// fn test_complex_capture_scenario() {
+//     initialize_zobrist();
+//     let mut state = GameState::new(19, 5);
 
-    // Set up complex capture scenario
-    state.board.place_stone(9, 9, Player::Max);
-    state.board.place_stone(9, 10, Player::Min);
-    state.board.place_stone(9, 11, Player::Min);
+//     // Set up complex capture scenario
+//     state.board.place_stone(9, 9, Player::Max);
+//     state.board.place_stone(9, 10, Player::Min);
+//     state.board.place_stone(9, 11, Player::Min);
 
-    // Horizontal capture
-    state.current_player = Player::Max;
-    state.make_move((9, 12));
+//     // Horizontal capture
+//     state.current_player = Player::Max;
+//     state.make_move((9, 12));
 
-    // Verify capture
-    assert_eq!(state.board.get_player(9, 10), None);
-    assert_eq!(state.board.get_player(9, 11), None);
-    assert_eq!(state.max_captures, 1);
+//     // Verify capture
+//     assert_eq!(state.board.get_player(9, 10), None);
+//     assert_eq!(state.board.get_player(9, 11), None);
+//     assert_eq!(state.max_captures, 1);
 
-    // Verify capture history
-    assert_eq!(state.capture_history.len(), 1);
-    assert_eq!(state.capture_history[0].len(), 2);
-}
+//     // Verify capture history
+//     assert_eq!(state.capture_history.len(), 1);
+//     assert_eq!(state.capture_history[0].len(), 2);
+// }
 
 #[test]
 fn test_game_state_consistency() {

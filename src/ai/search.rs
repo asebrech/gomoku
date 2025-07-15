@@ -1,40 +1,78 @@
-use crate::ai::{minimax::minimax, transposition::TranspositionTable};
+use crate::ai::{/*minimax::minimax,*/ heuristic::Heuristic/*, transposition::TranspositionTable*/};
 use crate::core::state::GameState;
 use crate::core::board::Player;
-use std::time::{Duration, Instant};
+// use std::time::{Duration, Instant};
+
+// Simple minimax without transposition table
+fn simple_minimax(
+    state: &mut GameState,
+    depth: i32,
+    mut alpha: i32,
+    mut beta: i32,
+    maximizing_player: bool,
+) -> i32 {
+    if depth == 0 || state.is_terminal() {
+        return Heuristic::evaluate(state);
+    }
+
+    let moves = state.get_possible_moves();
+    if moves.is_empty() {
+        return Heuristic::evaluate(state);
+    }
+
+    if maximizing_player {
+        let mut max_eval = i32::MIN;
+        for mv in moves {
+            state.make_move(mv);
+            let eval = simple_minimax(state, depth - 1, alpha, beta, false);
+            state.undo_move(mv);
+            max_eval = max_eval.max(eval);
+            alpha = alpha.max(eval);
+            if beta <= alpha {
+                break; // Alpha-beta pruning
+            }
+        }
+        max_eval
+    } else {
+        let mut min_eval = i32::MAX;
+        for mv in moves {
+            state.make_move(mv);
+            let eval = simple_minimax(state, depth - 1, alpha, beta, true);
+            state.undo_move(mv);
+            min_eval = min_eval.min(eval);
+            beta = beta.min(eval);
+            if beta <= alpha {
+                break; // Alpha-beta pruning
+            }
+        }
+        min_eval
+    }
+}
 
 pub fn iterative_deepening_search(
     state: &mut GameState,
-    max_time: Duration,
     max_depth: i32,
 ) -> Option<(usize, usize)> {
-    let start_time = Instant::now();
-    let mut tt = TranspositionTable::new();
     let mut best_move = None;
     let mut depth = 1;
 
-    while depth <= max_depth && start_time.elapsed() < max_time {
-        let remaining_time = max_time - start_time.elapsed();
-        
-        if let Some(move_) = search_with_timeout(state, depth, remaining_time, &mut tt) {
+    while depth <= max_depth {
+        if let Some(move_) = search_at_depth(state, depth) {
             best_move = Some(move_);
             depth += 1;
         } else {
-			println!("No valid moves found at depth {}", depth);
-            break; // Time exceeded
+            println!("No valid moves found at depth {}", depth);
+            break;
         }
     }
 
     best_move
 }
 
-fn search_with_timeout(
+fn search_at_depth(
     state: &mut GameState,
     depth: i32,
-    timeout: Duration,
-    tt: &mut TranspositionTable,
 ) -> Option<(usize, usize)> {
-    let start_time = Instant::now();
     let mut best_move = None;
     let mut best_score = if state.current_player == Player::Max {
         i32::MIN
@@ -46,18 +84,13 @@ fn search_with_timeout(
     crate::ai::heuristic::Heuristic::order_moves(state, &mut moves);
 
     for mv in moves {
-        if start_time.elapsed() >= timeout {
-            break;
-        }
-
         state.make_move(mv);
-        let score = minimax(
+        let score = simple_minimax(
             state,
             depth - 1,
             i32::MIN,
             i32::MAX,
             state.current_player == Player::Min,
-            tt,
         );
         state.undo_move(mv);
 

@@ -47,7 +47,7 @@ impl GameSettings {
 			board_size: 19,
 			total_capture_to_win: 10,
 			minimum_chain_to_win: 5,
-			ai_depth: 10,
+			ai_depth: 3,
 			alpha_beta_enabled: true,
 			versus_ai: true,
 			time_limit: None

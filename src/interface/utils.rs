@@ -1,6 +1,6 @@
 use crate::ai::search::iterative_deepening_search;
 use crate::core::state::GameState;
-use std::time::Duration;
+// use std::time::Duration;
 
 /// Find the best move for the current player in the given game state.
 /// Returns None if the game is terminal (won/draw) or no valid moves exist.
@@ -16,6 +16,6 @@ pub fn find_best_move(state: &mut GameState, max_depth: i32) -> Option<(usize, u
         return None;
     }
     
-    let max_time = Duration::from_millis(450); // Leave 50ms buffer
-    iterative_deepening_search(state, max_time, max_depth)
+    // No time limit, just search to max_depth
+    iterative_deepening_search(state, max_depth)
 }
