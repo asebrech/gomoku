@@ -9,18 +9,18 @@ pub fn minimax(
     mut alpha: i32,
     mut beta: i32,
     maximizing_player: bool,
-    //tt: &mut TranspositionTable,
+    transposition_table: &mut TranspositionTable,
 ) -> i32 {
     if depth == 0 || state.is_terminal() {
         let eval = Heuristic::evaluate(state);
-        //tt.store(state.hash(), eval);
+        transposition_table.store(state.hash(), eval);
         return eval;
     }
 
-    /*let key = state.hash();
-    if let Some(score) = tt.lookup(key) {
+    let key = state.hash();
+    if let Some(score) = transposition_table.lookup(key) {
         return score;
-    }*/
+    }
 
     let mut moves = state.get_possible_moves();
     Heuristic::order_moves(state, &mut moves);
@@ -29,27 +29,27 @@ pub fn minimax(
         let mut value = i32::MIN;
         for move_ in moves {
             state.make_move(move_);
-            value = max(value, minimax(state, depth - 1, alpha, beta, false));
+            value = max(value, minimax(state, depth - 1, alpha, beta, false, transposition_table));
             state.undo_move(move_);
             if value >= beta {
                 break;
             }
             alpha = max(alpha, value);
         }
-        //tt.store(key, value);
+        transposition_table.store(key, value);
         value
     } else {
         let mut value = i32::MAX;
         for move_ in moves {
             state.make_move(move_);
-            value = min(value, minimax(state, depth - 1, alpha, beta, true));
+            value = min(value, minimax(state, depth - 1, alpha, beta, true, transposition_table));
             state.undo_move(move_);
             if value <= alpha {
                 break;
             }
             beta = min(beta, value);
         }
-        //tt.store(key, value);
+        transposition_table.store(key, value);
         value
     }
 }

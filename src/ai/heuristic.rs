@@ -58,21 +58,21 @@ impl Heuristic {
                         match pattern {
                             5 => five_in_row += 1,
                             4 => {
-                                if Self::is_live_pattern(board, row, col, dx, dy, player, 4) {
+                                if Self::is_live_pattern(board, row, col, dx, dy, player) {
                                     live_four += 1;
                                 } else {
                                     dead_four += 1;
                                 }
                             }
                             3 => {
-                                if Self::is_live_pattern(board, row, col, dx, dy, player, 3) {
+                                if Self::is_live_pattern(board, row, col, dx, dy, player) {
                                     live_three += 1;
                                 } else {
                                     dead_three += 1;
                                 }
                             }
                             2 => {
-                                if Self::is_live_pattern(board, row, col, dx, dy, player, 2) {
+                                if Self::is_live_pattern(board, row, col, dx, dy, player) {
                                     live_two += 1;
                                 }
                             }
@@ -164,8 +164,7 @@ impl Heuristic {
         col: usize,
         dx: isize,
         dy: isize,
-        player: Player,
-        pattern_length: usize,
+        player: Player
     ) -> bool {
         // Check if pattern has open ends
         let mut start_r = row as isize;
