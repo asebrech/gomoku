@@ -202,34 +202,44 @@ pub fn process_next_round(
     mut update_ai_time: EventWriter<UpdateAITimeDisplay>,
 ) {
     for _ in move_played.read() {
+        // Check for game end first
         if game_state.is_terminal() {
             let winner = game_state.check_winner();
             game_event.write(GameEnded { winner });
             *game_status = GameStatus::GameOver;
-            if winner.is_some() {
-                println!("End game ! Winner is {:?}", winner);
-            } else {
-                println!("An error occurred, game is terminal but no winner is found, the game is a draw.");
+            
+            match winner {
+                Some(player) => println!("Game Over! Winner: {:?}", player),
+                None => println!("Game Over! It's a draw."),
             }
             return;
         }
-        if game_state.current_player == Player::Max || !settings.versus_ai {
+
+        // Handle next player's turn
+        if game_state.current_player == Player::Max || (game_state.current_player == Player::Min && !settings.versus_ai) {
             info!("Awaiting user click");
             *game_status = GameStatus::AwaitingUserInput;
-        } else {
+        } else if settings.versus_ai {
+            // AI's turn
             let start_time = Instant::now();
-            let placement = find_best_move(&mut game_state, settings.ai_depth);
-            let elapsed_time = start_time.elapsed().as_millis();
-            ai_time.millis = elapsed_time;
-            update_ai_time.write(UpdateAITimeDisplay);
+            
+            // Only call find_best_move if game is not terminal
+            if !game_state.is_terminal() {
+                let placement = find_best_move(&mut game_state, settings.ai_depth);
+                let elapsed_time = start_time.elapsed().as_millis();
+                ai_time.millis = elapsed_time;
+                update_ai_time.write(UpdateAITimeDisplay);
 
-            if let Some((x, y)) = placement {
-                stone_placement.write(StonePlacement { x, y });
-                *game_status = GameStatus::AwaitingUserInput;
-            } else {
-                game_event.write(GameEnded { winner: Some(Player::Max) });
-                println!("Error occurred while finding best move");
-                *game_status = GameStatus::GameOver;
+                if let Some((x, y)) = placement {
+                    stone_placement.write(StonePlacement { x, y });
+                    *game_status = GameStatus::AwaitingUserInput;
+                } else {
+                    // AI has no moves but game isn't terminal - this shouldn't happen
+                    // But if it does, it means the game is likely a draw
+                    println!("AI has no valid moves available");
+                    game_event.write(GameEnded { winner: None });
+                    *game_status = GameStatus::GameOver;
+                }
             }
         }
     }

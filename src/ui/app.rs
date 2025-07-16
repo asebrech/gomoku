@@ -1,11 +1,7 @@
-use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::prelude::*;
 
 use bevy::window::{PresentMode, WindowTheme};
-use bevy::{
-	color::palettes::css::CRIMSON,
-	prelude::*,
-};
+use bevy::color::palettes::css::CRIMSON;
 
 use crate::core::state::GameState;
 use crate::ui::display::display::make_visible;
@@ -47,9 +43,9 @@ impl GameSettings {
 			board_size: 19,
 			total_capture_to_win: 10,
 			minimum_chain_to_win: 5,
-			ai_depth: 4,
+			ai_depth: 3,
 			alpha_beta_enabled: true,
-			versus_ai: false,
+			versus_ai: true,
 			time_limit: None
 		}
 	}
@@ -146,7 +142,3 @@ impl GomokuApp {
 		self.app.run();
 	}
 }
-
-
-
-
