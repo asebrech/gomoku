@@ -19,7 +19,7 @@ pub fn find_best_move(state: &mut GameState, depth: i32) -> Option<(usize, usize
             i32::MIN,
             i32::MAX,
             state.current_player == Player::Min,
-            &mut tt,
+            //&mut tt,
         );
         state.undo_move(mv);
 
