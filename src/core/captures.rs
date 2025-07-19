@@ -26,7 +26,7 @@ impl CaptureHandler {
                     && pos1_x < board.size as isize
                     && pos1_y < board.size as isize
                 {
-                    if board.cells[pos1_x as usize][pos1_y as usize] == Some(opponent) {
+                    if board.get_player(pos1_x as usize, pos1_y as usize) == Some(opponent) {
                         let pos2_x = pos1_x + actual_dx;
                         let pos2_y = pos1_y + actual_dy;
 
@@ -35,7 +35,7 @@ impl CaptureHandler {
                             && pos2_x < board.size as isize
                             && pos2_y < board.size as isize
                         {
-                            if board.cells[pos2_x as usize][pos2_y as usize] == Some(opponent) {
+                            if board.get_player(pos2_x as usize, pos2_y as usize) == Some(opponent) {
                                 let pos3_x = pos2_x + actual_dx;
                                 let pos3_y = pos2_y + actual_dy;
 
@@ -44,7 +44,7 @@ impl CaptureHandler {
                                     && pos3_x < board.size as isize
                                     && pos3_y < board.size as isize
                                 {
-                                    if board.cells[pos3_x as usize][pos3_y as usize] == Some(player)
+                                    if board.get_player(pos3_x as usize, pos3_y as usize) == Some(player)
                                     {
                                         captures.push((pos1_x as usize, pos1_y as usize));
                                         captures.push((pos2_x as usize, pos2_y as usize));

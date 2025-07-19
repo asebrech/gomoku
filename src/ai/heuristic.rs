@@ -23,7 +23,7 @@ impl Heuristic {
         }
 
         // If the board is full and no winner, it's a draw
-        if state.board.cells.iter().all(|row| row.iter().all(|&cell| cell.is_some())) {
+        if state.board.is_full() {
             return 0;
         }
 
