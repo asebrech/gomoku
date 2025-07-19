@@ -2,8 +2,8 @@ use crate::core::board::{Board, Player};
 use crate::core::captures::CaptureHandler;
 use crate::core::moves::MoveHandler;
 use crate::core::rules::WinChecker;
-use std::hash::{DefaultHasher, Hash, Hasher};
 use bevy::prelude::*;
+use std::hash::{DefaultHasher, Hash, Hasher};
 
 #[derive(Resource, Component, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct GameState {
@@ -36,9 +36,9 @@ impl GameState {
     pub fn make_move(&mut self, mv: (usize, usize)) {
         self.board.place_stone(mv.0, mv.1, self.current_player);
 
-        /*let captures =
+        let captures =
             CaptureHandler::detect_captures(&self.board, mv.0, mv.1, self.current_player);
-        self.execute_captures(captures);*/
+        self.execute_captures(captures);
 
         self.check_for_wins(mv);
         self.switch_player();
@@ -50,7 +50,7 @@ impl GameState {
         self.board.remove_stone(move_.0, move_.1);
         self.winner = None;
 
-        //self.restore_captured_stones();
+        self.restore_captured_stones();
     }
 
     pub fn is_terminal(&self) -> bool {
