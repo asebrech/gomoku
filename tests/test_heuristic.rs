@@ -17,7 +17,7 @@ fn test_heuristic_winner_max() {
     state.winner = Some(Player::Max);
 
     let score = Heuristic::evaluate(&state, 1);
-    assert_eq!(score, 1_000_000);
+    assert_eq!(score, 1_000_001);
 }
 
 #[test]
@@ -26,7 +26,7 @@ fn test_heuristic_winner_min() {
     state.winner = Some(Player::Min);
 
     let score = Heuristic::evaluate(&state, 1);
-    assert_eq!(score, -1_000_000);
+    assert_eq!(score, -1_000_001);
 }
 
 #[test]
@@ -35,7 +35,7 @@ fn test_heuristic_capture_win_max() {
     state.max_captures = 5; // 5 pairs captured = win
 
     let score = Heuristic::evaluate(&state, 1);
-    assert_eq!(score, 1_000_000);
+    assert_eq!(score, 1_000_001);
 }
 
 #[test]
@@ -44,7 +44,7 @@ fn test_heuristic_capture_win_min() {
     state.min_captures = 5; // 5 pairs captured = win
 
     let score = Heuristic::evaluate(&state, 1);
-    assert_eq!(score, -1_000_000);
+    assert_eq!(score, -1_000_001);
 }
 
 #[test]

@@ -8,22 +8,27 @@ impl Heuristic {
         // Check for terminal states first
         if let Some(winner) = state.check_winner() {
             return match winner {
-                Player::Max => 1000000 * depth,
-                Player::Min => -1000000 * depth,
+                Player::Max => 1000000 + depth,
+                Player::Min => -1000000 - depth,
             };
         }
 
         // Check for capture win conditions
         if state.max_captures >= 5 {
-            return 1_000_000 * depth;
+            return 1_000_000 + depth;
         }
 
         if state.min_captures >= 5 {
-            return -1_000_000 * depth;
+            return -1_000_000 - depth;
         }
 
         // If the board is full and no winner, it's a draw
-        if state.board.cells.iter().all(|row| row.iter().all(|&cell| cell.is_some())) {
+        if state
+            .board
+            .cells
+            .iter()
+            .all(|row| row.iter().all(|&cell| cell.is_some()))
+        {
             return 0;
         }
 
@@ -33,7 +38,7 @@ impl Heuristic {
         // Add capture bonus
         let capture_bonus = (state.max_captures as i32 * 2000) - (state.min_captures as i32 * 2000);
 
-max_score - min_score + capture_bonus	
+        max_score - min_score + capture_bonus
     }
 
     fn evaluate_player(board: &Board, player: Player, win_condition: usize) -> i32 {
