@@ -5,7 +5,7 @@ use gomoku::core::state::GameState;
 #[test]
 fn test_heuristic_empty_board() {
     let state = GameState::new(19, 5);
-    let score = Heuristic::evaluate(&state);
+    let score = Heuristic::evaluate(&state, 1);
 
     // Empty board should have neutral score
     assert_eq!(score, 0);
@@ -16,7 +16,7 @@ fn test_heuristic_winner_max() {
     let mut state = GameState::new(19, 5);
     state.winner = Some(Player::Max);
 
-    let score = Heuristic::evaluate(&state);
+    let score = Heuristic::evaluate(&state, 1);
     assert_eq!(score, 1_000_000);
 }
 
@@ -25,7 +25,7 @@ fn test_heuristic_winner_min() {
     let mut state = GameState::new(19, 5);
     state.winner = Some(Player::Min);
 
-    let score = Heuristic::evaluate(&state);
+    let score = Heuristic::evaluate(&state, 1);
     assert_eq!(score, -1_000_000);
 }
 
@@ -34,7 +34,7 @@ fn test_heuristic_capture_win_max() {
     let mut state = GameState::new(19, 5);
     state.max_captures = 5; // 5 pairs captured = win
 
-    let score = Heuristic::evaluate(&state);
+    let score = Heuristic::evaluate(&state, 1);
     assert_eq!(score, 1_000_000);
 }
 
@@ -43,7 +43,7 @@ fn test_heuristic_capture_win_min() {
     let mut state = GameState::new(19, 5);
     state.min_captures = 5; // 5 pairs captured = win
 
-    let score = Heuristic::evaluate(&state);
+    let score = Heuristic::evaluate(&state, 1);
     assert_eq!(score, -1_000_000);
 }
 
@@ -62,7 +62,7 @@ fn test_heuristic_no_moves_draw() {
     state.board.place_stone(2, 1, Player::Min);
     state.board.place_stone(2, 2, Player::Max);
 
-    let score = Heuristic::evaluate(&state);
+    let score = Heuristic::evaluate(&state, 1);
     assert_eq!(score, 0); // Draw
 }
 
@@ -76,7 +76,7 @@ fn test_heuristic_capture_advantage() {
 
     state.board.place_stone(9, 9, Player::Max); // Add some stones to avoid empty board
 
-    let score = Heuristic::evaluate(&state);
+    let score = Heuristic::evaluate(&state, 1);
 
     // Should favor Max due to capture advantage
     assert!(score > 0);
@@ -94,7 +94,7 @@ fn test_heuristic_line_evaluation() {
     state.board.place_stone(9, 8, Player::Max);
     state.board.place_stone(9, 9, Player::Max);
 
-    let score = Heuristic::evaluate(&state);
+    let score = Heuristic::evaluate(&state, 1);
 
     // Should be positive (favoring Max)
     assert!(score > 0);
@@ -111,7 +111,7 @@ fn test_heuristic_blocked_line() {
     state.board.place_stone(9, 9, Player::Max);
     state.board.place_stone(9, 10, Player::Min); // Block right
 
-    let score = Heuristic::evaluate(&state);
+    let score = Heuristic::evaluate(&state, 1);
 
     // Should be less favorable than open line
     // Since blocked lines get score 0, other factors determine the score
@@ -134,8 +134,8 @@ fn test_heuristic_open_line_vs_blocked() {
     state2.board.place_stone(9, 8, Player::Max);
     state2.board.place_stone(9, 9, Player::Max);
 
-    let score1 = Heuristic::evaluate(&state1);
-    let score2 = Heuristic::evaluate(&state2);
+    let score1 = Heuristic::evaluate(&state1, 1);
+    let score2 = Heuristic::evaluate(&state2, 1);
 
     // Open line should be better than semi-open
     assert!(score1 > score2);
@@ -150,7 +150,7 @@ fn test_heuristic_opponent_advantage() {
     state.board.place_stone(9, 8, Player::Min);
     state.board.place_stone(9, 9, Player::Min);
 
-    let score = Heuristic::evaluate(&state);
+    let score = Heuristic::evaluate(&state, 1);
 
     // Should be negative (favoring Min)
     assert!(score < 0);
@@ -166,7 +166,7 @@ fn test_heuristic_multiple_directions() {
     state.board.place_stone(8, 9, Player::Max); // Vertical
     state.board.place_stone(8, 8, Player::Max); // Diagonal
 
-    let score = Heuristic::evaluate(&state);
+    let score = Heuristic::evaluate(&state, 1);
 
     // Should be strongly positive due to multiple threats
     assert!(score > 100);
@@ -181,7 +181,7 @@ fn test_heuristic_winning_line_excluded() {
         state.board.place_stone(9, 5 + i, Player::Max);
     }
 
-    let score = Heuristic::evaluate(&state);
+    let score = Heuristic::evaluate(&state, 1);
 
     // Winning lines should not contribute to line evaluation
     // Score should be based on other factors
@@ -209,9 +209,9 @@ fn test_heuristic_different_line_lengths() {
     state4.board.place_stone(9, 8, Player::Max);
     state4.board.place_stone(9, 9, Player::Max);
 
-    let score2 = Heuristic::evaluate(&state2);
-    let score3 = Heuristic::evaluate(&state3);
-    let score4 = Heuristic::evaluate(&state4);
+    let score2 = Heuristic::evaluate(&state2, 1);
+    let score3 = Heuristic::evaluate(&state3, 1);
+    let score4 = Heuristic::evaluate(&state4, 1);
 
     // Longer lines should be more valuable
     assert!(score2 < score3);
@@ -227,7 +227,7 @@ fn test_heuristic_edge_cases() {
     state.board.place_stone(0, 1, Player::Max);
     state.board.place_stone(0, 2, Player::Max);
 
-    let score = Heuristic::evaluate(&state);
+    let score = Heuristic::evaluate(&state, 1);
 
     // Should handle edge cases without crashing
     assert!(score != 0);
@@ -247,8 +247,8 @@ fn test_heuristic_symmetry() {
     state_min.board.place_stone(9, 8, Player::Min);
     state_min.board.place_stone(9, 9, Player::Min);
 
-    let score_max = Heuristic::evaluate(&state_max);
-    let score_min = Heuristic::evaluate(&state_min);
+    let score_max = Heuristic::evaluate(&state_max, 1);
+    let score_min = Heuristic::evaluate(&state_min, 1);
 
     // Should be symmetric (opposite signs)
     assert_eq!(score_max, -score_min);

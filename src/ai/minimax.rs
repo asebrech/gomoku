@@ -12,7 +12,7 @@ pub fn minimax(
     //tt: &mut TranspositionTable,
 ) -> i32 {
     if depth == 0 || state.is_terminal() {
-        let eval = Heuristic::evaluate(state);
+        let eval = Heuristic::evaluate(state, depth);
         //tt.store(state.hash(), eval);
         return eval;
     }
