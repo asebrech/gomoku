@@ -1,29 +1,25 @@
 use crate::core::board::{Board, Player};
 
+const DIRECTIONS: [(isize, isize); 4] = [(0, 1), (1, 0), (1, 1), (1, -1)];
+const FREE_THREE_LENGTH: usize = 3;
+const MAX_SEARCH_DISTANCE: isize = 4;
+
 pub struct MoveHandler;
 
 impl MoveHandler {
     pub fn get_possible_moves(board: &Board, player: Player) -> Vec<(usize, usize)> {
-        let mut moves = Vec::new();
-        
-        for i in 0..board.size {
-            for j in 0..board.size {
-                if board.is_empty_position(i, j) {
-                    if board.is_empty() {
-                        let center = board.center();
-                        if (i, j) == center {
-                            moves.push((i, j));
-                        }
-                    } else if board.is_adjacent_to_stone(i, j) {
-                        if !RuleValidator::creates_double_three(board, i, j, player) {
-                            moves.push((i, j));
-                        }
-                    }
-                }
-            }
+        if board.is_empty() {
+            return vec![board.center()];
         }
-        
-        moves
+
+        (0..board.size)
+            .flat_map(|i| (0..board.size).map(move |j| (i, j)))
+            .filter(|&(i, j)| {
+                board.is_empty_position(i, j)
+                    && board.is_adjacent_to_stone(i, j)
+                    && !RuleValidator::creates_double_three(board, i, j, player)
+            })
+            .collect()
     }
 }
 
@@ -31,89 +27,90 @@ pub struct RuleValidator;
 
 impl RuleValidator {
     pub fn creates_double_three(board: &Board, row: usize, col: usize, player: Player) -> bool {
-        let directions = [(1, 0), (0, 1), (1, 1), (1, -1)];
-        let mut free_three_count = 0;
-
-        for &direction in &directions {
-            if Self::is_free_three(board, row, col, player, direction) {
-                free_three_count += 1;
-                if free_three_count >= 2 {
-                    return true;
-                }
-            }
-        }
-
-        false
+        DIRECTIONS
+            .iter()
+            .filter(|&&dir| Self::is_free_three_in_direction(board, row, col, player, dir))
+            .count()
+            >= 2
     }
 
-    pub fn is_free_three(board: &Board, row: usize, col: usize, player: Player, direction: (isize, isize)) -> bool {
-        let (dx, dy) = direction;
+    fn is_free_three_in_direction(
+        board: &Board,
+        row: usize,
+        col: usize,
+        player: Player,
+        (dr, dc): (isize, isize),
+    ) -> bool {
+        let (stones, left_open, right_open) = Self::analyze_line(board, row, col, player, dr, dc);
 
-        let mut line = Vec::new();
-        for i in -3..=3 {
-            let new_row = row as isize + i * dx;
-            let new_col = col as isize + i * dy;
-
-            if new_row >= 0 && new_row < board.size as isize && 
-               new_col >= 0 && new_col < board.size as isize {
-                if new_row as usize == row && new_col as usize == col {
-                    line.push(Some(player));
-                } else {
-                    line.push(board.get_player(new_row as usize, new_col as usize));
-                }
-            } else {
-                line.push(Some(Player::Max));
-            }
-        }
-
-        Self::contains_free_three_pattern(&line, player)
+        stones == FREE_THREE_LENGTH && Self::can_form_open_four(left_open, right_open)
     }
 
-    fn contains_free_three_pattern(line: &[Option<Player>], player: Player) -> bool {
-        if line.len() < 6 {
-            return false;
-        }
+    fn analyze_line(
+        board: &Board,
+        row: usize,
+        col: usize,
+        player: Player,
+        dr: isize,
+        dc: isize,
+    ) -> (usize, bool, bool) {
+        let left_info = Self::scan_direction(board, row, col, player, -dr, -dc);
+        let right_info = Self::scan_direction(board, row, col, player, dr, dc);
 
-        for start in 0..=(line.len() - 6) {
-            let segment = &line[start..start + 6];
-            if Self::can_form_open_four(segment, player) {
-                return true;
-            }
-        }
+        let total_stones = 1 + left_info.0 + right_info.0; // +1 for the current stone
+        let left_open = left_info.1;
+        let right_open = right_info.1;
 
-        false
+        (total_stones, left_open, right_open)
     }
 
-    fn can_form_open_four(segment: &[Option<Player>], player: Player) -> bool {
-        if segment.len() != 6 {
-            return false;
-        }
+    fn scan_direction(
+        board: &Board,
+        row: usize,
+        col: usize,
+        player: Player,
+        dr: isize,
+        dc: isize,
+    ) -> (usize, bool) {
+        let mut stones = 0;
+        let mut empty_found = false;
+        let mut is_open = false;
 
-        let mut player_count = 0;
+        for i in 1..=MAX_SEARCH_DISTANCE {
+            let (new_row, new_col) = (row as isize + dr * i, col as isize + dc * i);
 
-        if segment[0].is_some() || segment[5].is_some() {
-            return false;
-        }
+            if !Self::is_valid_pos(board, new_row, new_col) {
+                break;
+            }
 
-        for i in 1..5 {
-            match segment[i] {
+            match board.get_player(new_row as usize, new_col as usize) {
                 Some(p) if p == player => {
-                    player_count += 1;
+                    if empty_found {
+                        break; // Gap in stones
+                    }
+                    stones += 1;
                 }
-                Some(_) => return false,
-                None => {}
+                None => {
+                    if !empty_found && stones > 0 {
+                        is_open = true;
+                    }
+                    empty_found = true;
+                    if stones > 0 {
+                        break; // Only care about first empty space after stones
+                    }
+                }
+                Some(_) => break, // Opponent stone blocks
             }
         }
 
-        if player_count == 3 {
-            let empty_positions: Vec<usize> = (1..5).filter(|&i| segment[i].is_none()).collect();
+        (stones, is_open)
+    }
 
-            if empty_positions.len() == 1 {
-                return true;
-            }
-        }
+    fn can_form_open_four(left_open: bool, right_open: bool) -> bool {
+        left_open || right_open
+    }
 
-        false
+    fn is_valid_pos(board: &Board, row: isize, col: isize) -> bool {
+        (0..board.size as isize).contains(&row) && (0..board.size as isize).contains(&col)
     }
 }
-
