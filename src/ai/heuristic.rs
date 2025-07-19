@@ -12,7 +12,15 @@ const DEAD_FOUR_SCORE: i32 = 1_000;
 const LIVE_THREE_SCORE: i32 = 500;
 const DEAD_THREE_SCORE: i32 = 100;
 const LIVE_TWO_SCORE: i32 = 50;
-const CAPTURE_BONUS_MULTIPLIER: i32 = 2_000;
+const CAPTURE_BONUS_MULTIPLIER: i32 = 1_000;
+
+// Advanced pattern scoring constants
+const SPLIT_FOUR_SCORE: i32 = 25_000;
+const JUMP_FOUR_SCORE: i32 = 12_000;
+const FORK_ATTACK_SCORE: i32 = 18_000;
+const COMPLEX_JUMP_THREE_SCORE: i32 = 3_000;
+const SIMPLE_JUMP_THREE_SCORE: i32 = 1_500;
+const BROKEN_THREE_SCORE: i32 = 800;
 
 const DIRECTIONS: [(isize, isize); 4] = [(1, 0), (0, 1), (1, 1), (1, -1)];
 const ALL_DIRECTIONS: [(isize, isize); 8] = [
@@ -55,6 +63,34 @@ struct PatternInfo {
     is_live: bool,
 }
 
+// Advanced pattern types
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum AdvancedPatternType {
+    ConsecutiveLive(u8),
+    ConsecutiveDead(u8),
+    JumpPattern(u8, u8),  // (total_stones, gaps)
+    SplitPattern(u8, u8), // (left_side, right_side)
+    ForkPattern,          // Creates multiple threats
+    ComplexThreat,        // Combination patterns
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct AdvancedPattern {
+    pattern_type: AdvancedPatternType,
+    threat_level: u8, // 1-10 scale
+    forcing: bool,    // Does this force opponent response?
+    direction: (isize, isize),
+    positions: [(usize, usize); 6], // Key positions in pattern
+    position_count: u8,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum SequenceElement {
+    Stone(usize, usize),
+    Gap(usize, usize),
+    Blocked,
+}
+
 impl Heuristic {
     pub fn evaluate(state: &GameState, depth: i32) -> i32 {
         if let Some(terminal_score) = Self::evaluate_terminal_states(state, depth) {
@@ -65,10 +101,17 @@ impl Heuristic {
             return 0;
         }
 
+        // Basic pattern analysis (existing)
         let (max_counts, min_counts) =
             Self::analyze_both_players(&state.board, state.win_condition);
 
-        // Early termination for winning patterns
+        // Advanced pattern analysis (new)
+        let max_advanced_patterns =
+            Self::detect_advanced_patterns(&state.board, Player::Max, state.win_condition);
+        let min_advanced_patterns =
+            Self::detect_advanced_patterns(&state.board, Player::Min, state.win_condition);
+
+        // Early termination for critical patterns
         if max_counts.five_in_row > 0 || max_counts.live_four > 1 {
             return WINNING_SCORE + depth;
         }
@@ -76,13 +119,506 @@ impl Heuristic {
             return -WINNING_SCORE - depth;
         }
 
-        let max_score = Self::calculate_pattern_score(max_counts);
-        let min_score = Self::calculate_pattern_score(min_counts);
+        // Check for advanced winning patterns
+        if Self::has_critical_advanced_pattern(&max_advanced_patterns) {
+            return WINNING_SCORE + depth;
+        }
+        if Self::has_critical_advanced_pattern(&min_advanced_patterns) {
+            return -WINNING_SCORE - depth;
+        }
+
+        let max_basic_score = Self::calculate_pattern_score(max_counts);
+        let min_basic_score = Self::calculate_pattern_score(min_counts);
+        let max_advanced_score = Self::calculate_advanced_pattern_score(&max_advanced_patterns);
+        let min_advanced_score = Self::calculate_advanced_pattern_score(&min_advanced_patterns);
         let capture_bonus = Self::calculate_capture_bonus(state);
 
-        max_score - min_score + capture_bonus
+        (max_basic_score + max_advanced_score) - (min_basic_score + min_advanced_score)
+            + capture_bonus
     }
 
+    // Advanced Pattern Detection System
+    fn detect_advanced_patterns(
+        board: &Board,
+        player: Player,
+        win_condition: usize,
+    ) -> Vec<AdvancedPattern> {
+        let mut patterns = Vec::new();
+
+        // Detect each type of advanced pattern
+        patterns.extend(Self::detect_jump_patterns(board, player, win_condition));
+        patterns.extend(Self::detect_split_patterns(board, player, win_condition));
+        patterns.extend(Self::detect_fork_patterns(board, player));
+        patterns.extend(Self::detect_complex_threats(board, player));
+
+        // Remove duplicates and sort by threat level
+        patterns.sort_by(|a, b| b.threat_level.cmp(&a.threat_level));
+        patterns
+    }
+
+    fn detect_jump_patterns(
+        board: &Board,
+        player: Player,
+        win_condition: usize,
+    ) -> Vec<AdvancedPattern> {
+        let mut patterns = Vec::new();
+
+        for row in 0..board.size {
+            for col in 0..board.size {
+                if board.get_player(row, col) == Some(player) {
+                    for &(dx, dy) in &DIRECTIONS {
+                        if let Some(pattern) = Self::analyze_jump_sequence(
+                            board,
+                            row,
+                            col,
+                            dx,
+                            dy,
+                            player,
+                            win_condition,
+                        ) {
+                            patterns.push(pattern);
+                        }
+                    }
+                }
+            }
+        }
+
+        patterns
+    }
+
+    fn analyze_jump_sequence(
+        board: &Board,
+        start_row: usize,
+        start_col: usize,
+        dx: isize,
+        dy: isize,
+        player: Player,
+        win_condition: usize,
+    ) -> Option<AdvancedPattern> {
+        let mut sequence = Vec::new();
+        let mut current_row = start_row as isize;
+        let mut current_col = start_col as isize;
+        let mut gap_count = 0;
+        let mut stone_count = 0;
+
+        // Analyze sequence up to win_condition + 2 positions
+        for _i in 0..=(win_condition + 2) {
+            if !Self::is_valid_position(board, current_row, current_col) {
+                break;
+            }
+
+            match board.get_player(current_row as usize, current_col as usize) {
+                Some(p) if p == player => {
+                    sequence.push(SequenceElement::Stone(
+                        current_row as usize,
+                        current_col as usize,
+                    ));
+                    stone_count += 1;
+                }
+                None => {
+                    if gap_count < 2 {
+                        // Only consider patterns with max 2 gaps
+                        sequence.push(SequenceElement::Gap(
+                            current_row as usize,
+                            current_col as usize,
+                        ));
+                        gap_count += 1;
+                    } else {
+                        break;
+                    }
+                }
+                _ => {
+                    sequence.push(SequenceElement::Blocked);
+                    break; // Opponent stone, end sequence
+                }
+            }
+
+            current_row += dx;
+            current_col += dy;
+        }
+
+        // Evaluate if this forms a meaningful jump pattern
+        Self::evaluate_jump_sequence(sequence, stone_count, gap_count, dx, dy)
+    }
+
+    fn evaluate_jump_sequence(
+        sequence: Vec<SequenceElement>,
+        stone_count: usize,
+        gap_count: usize,
+        dx: isize,
+        dy: isize,
+    ) -> Option<AdvancedPattern> {
+        if sequence.len() < 3 || gap_count == 0 || stone_count < 2 {
+            return None;
+        }
+
+        let positions = Self::extract_positions_from_sequence(&sequence);
+        let pattern = match (stone_count, gap_count, sequence.len()) {
+            // Jump four patterns (very dangerous)
+            (4, 1, 5) => AdvancedPattern {
+                pattern_type: AdvancedPatternType::JumpPattern(4, 1),
+                threat_level: 9,
+                forcing: true,
+                direction: (dx, dy),
+                positions,
+                position_count: sequence.len() as u8,
+            },
+            // Jump three patterns
+            (3, 1, 4) => AdvancedPattern {
+                pattern_type: AdvancedPatternType::JumpPattern(3, 1),
+                threat_level: 6,
+                forcing: false,
+                direction: (dx, dy),
+                positions,
+                position_count: sequence.len() as u8,
+            },
+            // Broken three (3 stones, 2 gaps in 5 positions)
+            (3, 2, 5) => AdvancedPattern {
+                pattern_type: AdvancedPatternType::JumpPattern(3, 2),
+                threat_level: 4,
+                forcing: false,
+                direction: (dx, dy),
+                positions,
+                position_count: sequence.len() as u8,
+            },
+            _ => return None,
+        };
+
+        Some(pattern)
+    }
+
+    fn detect_split_patterns(
+        board: &Board,
+        player: Player,
+        _win_condition: usize,
+    ) -> Vec<AdvancedPattern> {
+        let mut patterns = Vec::new();
+
+        for row in 0..board.size {
+            for col in 0..board.size {
+                if board.get_player(row, col) == Some(player) {
+                    for &(dx, dy) in &DIRECTIONS {
+                        patterns.extend(Self::find_split_fours(board, row, col, dx, dy, player));
+                    }
+                }
+            }
+        }
+
+        patterns
+    }
+
+    fn find_split_fours(
+        board: &Board,
+        start_row: usize,
+        start_col: usize,
+        dx: isize,
+        dy: isize,
+        player: Player,
+    ) -> Vec<AdvancedPattern> {
+        let mut patterns = Vec::new();
+
+        // Check for XX_XX pattern (split four)
+        if Self::matches_pattern(
+            board,
+            start_row,
+            start_col,
+            dx,
+            dy,
+            player,
+            &[Some(player), Some(player), None, Some(player), Some(player)],
+        ) {
+            let positions = Self::get_pattern_positions(start_row, start_col, dx, dy, 5);
+            patterns.push(AdvancedPattern {
+                pattern_type: AdvancedPatternType::SplitPattern(2, 2),
+                threat_level: 10, // Extremely dangerous!
+                forcing: true,
+                direction: (dx, dy),
+                positions,
+                position_count: 5,
+            });
+        }
+
+        // Check for XXX_X pattern
+        if Self::matches_pattern(
+            board,
+            start_row,
+            start_col,
+            dx,
+            dy,
+            player,
+            &[Some(player), Some(player), Some(player), None, Some(player)],
+        ) {
+            let positions = Self::get_pattern_positions(start_row, start_col, dx, dy, 5);
+            patterns.push(AdvancedPattern {
+                pattern_type: AdvancedPatternType::SplitPattern(3, 1),
+                threat_level: 9,
+                forcing: true,
+                direction: (dx, dy),
+                positions,
+                position_count: 5,
+            });
+        }
+
+        // Check for X_XXX pattern
+        if Self::matches_pattern(
+            board,
+            start_row,
+            start_col,
+            dx,
+            dy,
+            player,
+            &[Some(player), None, Some(player), Some(player), Some(player)],
+        ) {
+            let positions = Self::get_pattern_positions(start_row, start_col, dx, dy, 5);
+            patterns.push(AdvancedPattern {
+                pattern_type: AdvancedPatternType::SplitPattern(1, 3),
+                threat_level: 9,
+                forcing: true,
+                direction: (dx, dy),
+                positions,
+                position_count: 5,
+            });
+        }
+
+        patterns
+    }
+
+    fn detect_fork_patterns(board: &Board, player: Player) -> Vec<AdvancedPattern> {
+        let mut fork_patterns = Vec::new();
+
+        for row in 0..board.size {
+            for col in 0..board.size {
+                if board.get_player(row, col).is_none() {
+                    // Check if placing a stone here creates multiple threats
+                    let threat_count = Self::count_threats_from_position(board, row, col, player);
+
+                    if threat_count >= 2 {
+                        let mut positions = [(0, 0); 6];
+                        positions[0] = (row, col);
+
+                        fork_patterns.push(AdvancedPattern {
+                            pattern_type: AdvancedPatternType::ForkPattern,
+                            threat_level: 10,
+                            forcing: true,
+                            direction: (0, 0), // Forks don't have a single direction
+                            positions,
+                            position_count: 1,
+                        });
+                    }
+                }
+            }
+        }
+
+        fork_patterns
+    }
+
+    fn detect_complex_threats(board: &Board, player: Player) -> Vec<AdvancedPattern> {
+        let mut complex_patterns = Vec::new();
+
+        // Look for combinations of patterns that create complex threats
+        for row in 0..board.size {
+            for col in 0..board.size {
+                if board.get_player(row, col).is_none() {
+                    if Self::creates_complex_threat(board, row, col, player) {
+                        let mut positions = [(0, 0); 6];
+                        positions[0] = (row, col);
+
+                        complex_patterns.push(AdvancedPattern {
+                            pattern_type: AdvancedPatternType::ComplexThreat,
+                            threat_level: 7,
+                            forcing: false,
+                            direction: (0, 0),
+                            positions,
+                            position_count: 1,
+                        });
+                    }
+                }
+            }
+        }
+
+        complex_patterns
+    }
+
+    // Helper functions for advanced pattern detection
+    fn matches_pattern(
+        board: &Board,
+        start_row: usize,
+        start_col: usize,
+        dx: isize,
+        dy: isize,
+        _player: Player,
+        pattern: &[Option<Player>],
+    ) -> bool {
+        for (i, &expected) in pattern.iter().enumerate() {
+            let row = start_row as isize + i as isize * dx;
+            let col = start_col as isize + i as isize * dy;
+
+            if !Self::is_valid_position(board, row, col) {
+                return false;
+            }
+
+            let actual = board.get_player(row as usize, col as usize);
+            if actual != expected {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn get_pattern_positions(
+        start_row: usize,
+        start_col: usize,
+        dx: isize,
+        dy: isize,
+        length: usize,
+    ) -> [(usize, usize); 6] {
+        let mut positions = [(0, 0); 6];
+        for i in 0..length.min(6) {
+            let row = (start_row as isize + i as isize * dx) as usize;
+            let col = (start_col as isize + i as isize * dy) as usize;
+            positions[i] = (row, col);
+        }
+        positions
+    }
+
+    fn extract_positions_from_sequence(sequence: &[SequenceElement]) -> [(usize, usize); 6] {
+        let mut positions = [(0, 0); 6];
+        let mut pos_idx = 0;
+
+        for element in sequence {
+            if pos_idx >= 6 {
+                break;
+            }
+            match element {
+                SequenceElement::Stone(row, col) | SequenceElement::Gap(row, col) => {
+                    positions[pos_idx] = (*row, *col);
+                    pos_idx += 1;
+                }
+                SequenceElement::Blocked => break,
+            }
+        }
+        positions
+    }
+
+    fn count_threats_from_position(board: &Board, row: usize, col: usize, player: Player) -> u8 {
+        let mut threat_count = 0;
+
+        for &(dx, dy) in &DIRECTIONS {
+            // Simulate placing stone and check for immediate threats
+            let consecutive = Self::simulate_move_consecutive(board, row, col, dx, dy, player);
+
+            if consecutive >= 4 {
+                threat_count += 1;
+            } else if consecutive == 3 {
+                // Check if this creates a live three (open on both ends)
+                if Self::would_create_live_three(board, row, col, dx, dy, player) {
+                    threat_count += 1;
+                }
+            }
+        }
+
+        threat_count
+    }
+
+    fn would_create_live_three(
+        board: &Board,
+        row: usize,
+        col: usize,
+        dx: isize,
+        dy: isize,
+        player: Player,
+    ) -> bool {
+        // Find the extent of the three that would be created
+        let backwards = Self::count_direction(board, row, col, -dx, -dy, player);
+        let forwards = Self::count_direction(board, row, col, dx, dy, player);
+
+        if backwards + forwards + 1 != 3 {
+            return false;
+        }
+
+        // Check if both ends are open
+        let start_row = row as isize - (backwards as isize) * dx - dx;
+        let start_col = col as isize - (backwards as isize) * dy - dy;
+        let end_row = row as isize + (forwards as isize) * dx + dx;
+        let end_col = col as isize + (forwards as isize) * dy + dy;
+
+        Self::is_position_empty(board, start_row, start_col)
+            && Self::is_position_empty(board, end_row, end_col)
+    }
+
+    fn creates_complex_threat(board: &Board, row: usize, col: usize, player: Player) -> bool {
+        let mut live_threes = 0;
+        let mut dead_fours = 0;
+
+        for &(dx, dy) in &DIRECTIONS {
+            let consecutive = Self::simulate_move_consecutive(board, row, col, dx, dy, player);
+
+            match consecutive {
+                4 => dead_fours += 1,
+                3 => {
+                    if Self::would_create_live_three(board, row, col, dx, dy, player) {
+                        live_threes += 1;
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        // Complex threat: multiple live threes or combination of dead four + live three
+        live_threes >= 2 || (dead_fours >= 1 && live_threes >= 1)
+    }
+
+    fn has_critical_advanced_pattern(patterns: &[AdvancedPattern]) -> bool {
+        patterns.iter().any(|p| {
+            p.threat_level >= 9
+                && matches!(
+                    p.pattern_type,
+                    AdvancedPatternType::SplitPattern(_, _) | AdvancedPatternType::ForkPattern
+                )
+        })
+    }
+
+    fn calculate_advanced_pattern_score(patterns: &[AdvancedPattern]) -> i32 {
+        let mut score = 0;
+
+        for pattern in patterns {
+            let base_score = match pattern.pattern_type {
+                AdvancedPatternType::JumpPattern(stones, gaps) => {
+                    match (stones, gaps) {
+                        (4, 1) => JUMP_FOUR_SCORE,          // Very dangerous jump four
+                        (3, 1) => COMPLEX_JUMP_THREE_SCORE, // Dangerous jump three
+                        (3, 2) => SIMPLE_JUMP_THREE_SCORE,  // Simple broken three
+                        _ => BROKEN_THREE_SCORE,            // Other patterns
+                    }
+                }
+                AdvancedPatternType::SplitPattern(left, right) => {
+                    match (left, right) {
+                        (2, 2) => SPLIT_FOUR_SCORE,         // Split four - game winning
+                        (3, 1) | (1, 3) => JUMP_FOUR_SCORE, // Almost as dangerous
+                        _ => COMPLEX_JUMP_THREE_SCORE,      // Other split patterns
+                    }
+                }
+                AdvancedPatternType::ForkPattern => FORK_ATTACK_SCORE, // Fork attack - decisive
+                AdvancedPatternType::ComplexThreat => COMPLEX_JUMP_THREE_SCORE, // Complex threats
+                _ => 1000,
+            };
+
+            // Apply multipliers
+            let threat_multiplier = if pattern.forcing { 150 } else { 100 };
+            let level_bonus = (pattern.threat_level as i32) * 50;
+
+            score += (base_score * threat_multiplier / 100) + level_bonus;
+        }
+
+        score
+    }
+
+    #[inline(always)]
+    fn is_valid_position(board: &Board, row: isize, col: isize) -> bool {
+        row >= 0 && row < board.size as isize && col >= 0 && col < board.size as isize
+    }
+
+    // Original functions (unchanged)
     fn analyze_both_players(board: &Board, win_condition: usize) -> (PatternCounts, PatternCounts) {
         let mut max_counts = PatternCounts::new();
         let mut min_counts = PatternCounts::new();
@@ -339,7 +875,64 @@ impl Heuristic {
         priority += Self::calculate_threat_priority(&state.board, row, col);
         priority += Self::calculate_adjacency_bonus(&state.board, row, col);
 
+        // Add advanced pattern priority
+        priority += Self::calculate_advanced_move_priority(&state.board, row, col);
+
         priority
+    }
+
+    fn calculate_advanced_move_priority(board: &Board, row: usize, col: usize) -> i32 {
+        let mut priority = 0;
+
+        // Check if this move creates advanced patterns
+        for &player in &[Player::Max, Player::Min] {
+            let multiplier = if player == Player::Max { 1 } else { -1 };
+
+            // Check for potential fork creation
+            let threat_count = Self::count_threats_from_position(board, row, col, player);
+            if threat_count >= 2 {
+                priority += multiplier * 5000;
+            }
+
+            // Check for potential split four creation
+            for &(dx, dy) in &DIRECTIONS {
+                if Self::would_create_split_four(board, row, col, dx, dy, player) {
+                    priority += multiplier * 4000;
+                }
+            }
+        }
+
+        priority
+    }
+
+    fn would_create_split_four(
+        board: &Board,
+        row: usize,
+        col: usize,
+        dx: isize,
+        dy: isize,
+        player: Player,
+    ) -> bool {
+        // Check if placing stone creates a split four pattern
+        let backwards = Self::count_direction(board, row, col, -dx, -dy, player);
+        let forwards = Self::count_direction(board, row, col, dx, dy, player);
+
+        // Look for patterns that would create XX_XX or similar
+        if backwards + forwards + 1 == 4 {
+            // Check if there's a gap that would make this a split four
+            let gap_row = row as isize + dx;
+            let gap_col = col as isize + dy;
+            if Self::is_position_empty(board, gap_row, gap_col) {
+                let after_gap_row = gap_row + dx;
+                let after_gap_col = gap_col + dy;
+                if Self::is_valid_position(board, after_gap_row, after_gap_col) {
+                    return board.get_player(after_gap_row as usize, after_gap_col as usize)
+                        == Some(player);
+                }
+            }
+        }
+
+        false
     }
 
     fn calculate_threat_priority(board: &Board, row: usize, col: usize) -> i32 {
