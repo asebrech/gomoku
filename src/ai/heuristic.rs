@@ -3,7 +3,7 @@ use crate::core::state::GameState;
 
 pub struct Heuristic;
 
-const WINNING_SCORE: i32 = 1_000_000;
+pub const WINNING_SCORE: i32 = 1_000_000;
 const FIVE_IN_ROW_SCORE: i32 = 100_000;
 const LIVE_FOUR_SINGLE_SCORE: i32 = 15_000;
 const LIVE_FOUR_MULTIPLE_SCORE: i32 = 20_000;
@@ -76,12 +76,12 @@ pub enum AdvancedPatternType {
 
 #[derive(Debug, Clone, Copy)]
 pub struct AdvancedPattern {
-    pattern_type: AdvancedPatternType,
-    threat_level: u8, // 1-10 scale
-    forcing: bool,    // Does this force opponent response?
-    direction: (isize, isize),
-    positions: [(usize, usize); 6], // Key positions in pattern
-    position_count: u8,
+    pub pattern_type: AdvancedPatternType,
+    pub threat_level: u8, // 1-10 scale
+    pub forcing: bool,    // Does this force opponent response?
+    pub direction: (isize, isize),
+    pub positions: [(usize, usize); 6], // Key positions in pattern
+    pub position_count: u8,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -156,7 +156,7 @@ impl Heuristic {
         patterns
     }
 
-    fn detect_jump_patterns(
+    pub fn detect_jump_patterns(
         board: &Board,
         player: Player,
         win_condition: usize,
@@ -195,11 +195,16 @@ impl Heuristic {
         player: Player,
         win_condition: usize,
     ) -> Option<AdvancedPattern> {
+        // First, find the actual start of the pattern
+        let (pattern_start_row, pattern_start_col) =
+            Self::find_pattern_start(board, start_row, start_col, dx, dy, player);
+
         let mut sequence = Vec::new();
-        let mut current_row = start_row as isize;
-        let mut current_col = start_col as isize;
+        let mut current_row = pattern_start_row as isize;
+        let mut current_col = pattern_start_col as isize;
         let mut gap_count = 0;
         let mut stone_count = 0;
+        let mut consecutive_gaps = 0;
 
         // Analyze sequence up to win_condition + 2 positions
         for _i in 0..=(win_condition + 2) {
@@ -214,15 +219,17 @@ impl Heuristic {
                         current_col as usize,
                     ));
                     stone_count += 1;
+                    consecutive_gaps = 0; // Reset consecutive gap counter
                 }
                 None => {
-                    if gap_count < 2 {
-                        // Only consider patterns with max 2 gaps
+                    if gap_count < 2 && consecutive_gaps < 2 {
+                        // Only consider patterns with max 2 gaps and limit consecutive gaps
                         sequence.push(SequenceElement::Gap(
                             current_row as usize,
                             current_col as usize,
                         ));
                         gap_count += 1;
+                        consecutive_gaps += 1;
                     } else {
                         break;
                     }
@@ -241,6 +248,29 @@ impl Heuristic {
         Self::evaluate_jump_sequence(sequence, stone_count, gap_count, dx, dy)
     }
 
+    fn is_meaningful_pattern(
+        sequence: &[SequenceElement],
+        stone_count: usize,
+        gap_count: usize,
+    ) -> bool {
+        // Must have minimum stones and reasonable gap ratio
+        if stone_count < 2 || gap_count == 0 {
+            return false;
+        }
+
+        // Don't allow too many gaps relative to stones
+        if gap_count > stone_count {
+            return false;
+        }
+
+        // Ensure sequence isn't too sparse
+        if sequence.len() > stone_count + gap_count + 1 {
+            return false;
+        }
+
+        true
+    }
+
     fn evaluate_jump_sequence(
         sequence: Vec<SequenceElement>,
         stone_count: usize,
@@ -248,7 +278,7 @@ impl Heuristic {
         dx: isize,
         dy: isize,
     ) -> Option<AdvancedPattern> {
-        if sequence.len() < 3 || gap_count == 0 || stone_count < 2 {
+        if !Self::is_meaningful_pattern(&sequence, stone_count, gap_count) {
             return None;
         }
 
@@ -287,7 +317,7 @@ impl Heuristic {
         Some(pattern)
     }
 
-    fn detect_split_patterns(
+    pub fn detect_split_patterns(
         board: &Board,
         player: Player,
         _win_condition: usize,
@@ -383,7 +413,7 @@ impl Heuristic {
         patterns
     }
 
-    fn detect_fork_patterns(board: &Board, player: Player) -> Vec<AdvancedPattern> {
+    pub fn detect_fork_patterns(board: &Board, player: Player) -> Vec<AdvancedPattern> {
         let mut fork_patterns = Vec::new();
 
         for row in 0..board.size {
@@ -412,7 +442,7 @@ impl Heuristic {
         fork_patterns
     }
 
-    fn detect_complex_threats(board: &Board, player: Player) -> Vec<AdvancedPattern> {
+    pub fn detect_complex_threats(board: &Board, player: Player) -> Vec<AdvancedPattern> {
         let mut complex_patterns = Vec::new();
 
         // Look for combinations of patterns that create complex threats
@@ -500,7 +530,12 @@ impl Heuristic {
         positions
     }
 
-    fn count_threats_from_position(board: &Board, row: usize, col: usize, player: Player) -> u8 {
+    pub fn count_threats_from_position(
+        board: &Board,
+        row: usize,
+        col: usize,
+        player: Player,
+    ) -> u8 {
         let mut threat_count = 0;
 
         for &(dx, dy) in &DIRECTIONS {
@@ -508,11 +543,19 @@ impl Heuristic {
             let consecutive = Self::simulate_move_consecutive(board, row, col, dx, dy, player);
 
             if consecutive >= 4 {
+                // Only count as threat if it would create 4+ in a row
                 threat_count += 1;
             } else if consecutive == 3 {
-                // Check if this creates a live three (open on both ends)
+                // Only count live threes that are actually open on both ends
                 if Self::would_create_live_three(board, row, col, dx, dy, player) {
-                    threat_count += 1;
+                    // Additional check: ensure the three is actually significant
+                    let backwards = Self::count_direction(board, row, col, -dx, -dy, player);
+                    let forwards = Self::count_direction(board, row, col, dx, dy, player);
+
+                    // Only count if it forms a substantial threat
+                    if backwards + forwards >= 2 {
+                        threat_count += 1;
+                    }
                 }
             }
         }
@@ -546,7 +589,7 @@ impl Heuristic {
             && Self::is_position_empty(board, end_row, end_col)
     }
 
-    fn creates_complex_threat(board: &Board, row: usize, col: usize, player: Player) -> bool {
+    pub fn creates_complex_threat(board: &Board, row: usize, col: usize, player: Player) -> bool {
         let mut live_threes = 0;
         let mut dead_fours = 0;
 
@@ -578,7 +621,7 @@ impl Heuristic {
         })
     }
 
-    fn calculate_advanced_pattern_score(patterns: &[AdvancedPattern]) -> i32 {
+    pub fn calculate_advanced_pattern_score(patterns: &[AdvancedPattern]) -> i32 {
         let mut score = 0;
 
         for pattern in patterns {
