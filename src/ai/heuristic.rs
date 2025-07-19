@@ -1,5 +1,6 @@
 use crate::core::board::{Board, Player};
 use crate::core::state::GameState;
+use std::collections::HashSet;
 
 pub struct Heuristic;
 
@@ -162,6 +163,7 @@ impl Heuristic {
         win_condition: usize,
     ) -> Vec<AdvancedPattern> {
         let mut patterns = Vec::new();
+        let mut seen = HashSet::new();
 
         for row in 0..board.size {
             for col in 0..board.size {
@@ -176,7 +178,14 @@ impl Heuristic {
                             player,
                             win_condition,
                         ) {
-                            patterns.push(pattern);
+                            // Create a unique signature: sorted positions + direction
+                            let mut sig: Vec<_> =
+                                pattern.positions[0..pattern.position_count as usize].to_vec();
+                            sig.sort();
+                            let signature = (sig, pattern.direction);
+                            if seen.insert(signature) {
+                                patterns.push(pattern);
+                            }
                         }
                     }
                 }
@@ -205,8 +214,9 @@ impl Heuristic {
         let mut gap_count = 0;
         let mut stone_count = 0;
         let mut consecutive_gaps = 0;
+        let mut last_was_stone = false;
 
-        // Analyze sequence up to win_condition + 2 positions
+        // Analyze sequence up to win_condition + 2 positions, but stop after last stone if no more gaps needed
         for _i in 0..=(win_condition + 2) {
             if !Self::is_valid_position(board, current_row, current_col) {
                 break;
@@ -219,17 +229,19 @@ impl Heuristic {
                         current_col as usize,
                     ));
                     stone_count += 1;
-                    consecutive_gaps = 0; // Reset consecutive gap counter
+                    consecutive_gaps = 0;
+                    last_was_stone = true;
                 }
                 None => {
-                    if gap_count < 2 && consecutive_gaps < 2 {
-                        // Only consider patterns with max 2 gaps and limit consecutive gaps
+                    if gap_count < 2 && consecutive_gaps < 2 && last_was_stone {
+                        // Only add gaps if after a stone and within limits
                         sequence.push(SequenceElement::Gap(
                             current_row as usize,
                             current_col as usize,
                         ));
                         gap_count += 1;
                         consecutive_gaps += 1;
+                        last_was_stone = false;
                     } else {
                         break;
                     }
@@ -242,6 +254,17 @@ impl Heuristic {
 
             current_row += dx;
             current_col += dy;
+        }
+
+        // Trim trailing gaps
+        while let Some(SequenceElement::Gap(_, _)) = sequence.last() {
+            sequence.pop();
+            gap_count -= 1;
+        }
+
+        // If sequence ends with Blocked, ignore it in length
+        if let Some(SequenceElement::Blocked) = sequence.last() {
+            sequence.pop();
         }
 
         // Evaluate if this forms a meaningful jump pattern
@@ -283,7 +306,8 @@ impl Heuristic {
         }
 
         let positions = Self::extract_positions_from_sequence(&sequence);
-        let pattern = match (stone_count, gap_count, sequence.len()) {
+        let seq_len = sequence.len();
+        let pattern = match (stone_count, gap_count, seq_len) {
             // Jump four patterns (very dangerous)
             (4, 1, 5) => AdvancedPattern {
                 pattern_type: AdvancedPatternType::JumpPattern(4, 1),
@@ -291,7 +315,7 @@ impl Heuristic {
                 forcing: true,
                 direction: (dx, dy),
                 positions,
-                position_count: sequence.len() as u8,
+                position_count: seq_len as u8,
             },
             // Jump three patterns
             (3, 1, 4) => AdvancedPattern {
@@ -300,7 +324,7 @@ impl Heuristic {
                 forcing: false,
                 direction: (dx, dy),
                 positions,
-                position_count: sequence.len() as u8,
+                position_count: seq_len as u8,
             },
             // Broken three (3 stones, 2 gaps in 5 positions)
             (3, 2, 5) => AdvancedPattern {
@@ -309,7 +333,16 @@ impl Heuristic {
                 forcing: false,
                 direction: (dx, dy),
                 positions,
-                position_count: sequence.len() as u8,
+                position_count: seq_len as u8,
+            },
+            // Handle cases where sequence was blocked but matches a pattern
+            _ if stone_count >= 3 && gap_count <= 2 && seq_len <= 5 => AdvancedPattern {
+                pattern_type: AdvancedPatternType::JumpPattern(stone_count as u8, gap_count as u8),
+                threat_level: (stone_count as u8 * 2).min(9),
+                forcing: gap_count < 2,
+                direction: (dx, dy),
+                positions,
+                position_count: seq_len as u8,
             },
             _ => return None,
         };
