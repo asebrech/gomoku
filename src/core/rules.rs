@@ -12,7 +12,7 @@ impl WinChecker {
 
             let mut x = row as isize + dx as isize;
             let mut y = col as isize + dy as isize;
-            while x >= 0 && y >= 0 && x < board.size as isize && y < board.size as isize {
+            while x >= 0 && y >= 0 && x < board.size() as isize && y < board.size() as isize {
                 if board.get_player(x as usize, y as usize) == Some(player) {
                     count += 1;
                     x += dx as isize;
@@ -24,7 +24,7 @@ impl WinChecker {
 
             let mut x = row as isize - dx as isize;
             let mut y = col as isize - dy as isize;
-            while x >= 0 && y >= 0 && x < board.size as isize && y < board.size as isize {
+            while x >= 0 && y >= 0 && x < board.size() as isize && y < board.size() as isize {
                 if board.get_player(x as usize, y as usize) == Some(player) {
                     count += 1;
                     x -= dx as isize;

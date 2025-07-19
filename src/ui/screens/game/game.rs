@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use bevy::prelude::*;
-use crate::{core::{board::Player, state::GameState}, interface::utils::find_best_move, ui::{app::{AppState, GameSettings}, screens::{game::{self, board::{BoardRoot, BoardUtils, PreviewDot}, settings::spawn_settings_panel}, utils::despawn_screen}}};
+use crate::{ai::transposition::TranspositionTable, core::{board::Player, state::GameState}, interface::utils::find_best_move, ui::{app::{AppState, GameSettings}, screens::{game::{board::{BoardRoot, BoardUtils, PreviewDot}, settings::spawn_settings_panel}, utils::despawn_screen}}};
 
 // Game status resource
 #[derive(Resource, Default)]
@@ -42,7 +42,7 @@ pub fn game_plugin(app: &mut App) {
         .add_event::<StonePlacement>()
         .add_event::<MovePlayed>()
         .add_event::<UpdateAITimeDisplay>()
-        .add_systems(OnEnter(AppState::Game), (setup_game_ui, update_available_placement).chain())
+        .add_systems(OnEnter(AppState::Game), (setup_game_ui, setup_transposition_table, update_available_placement).chain())
         .add_systems(
             Update,
             (
@@ -89,10 +89,16 @@ fn setup_game_ui(mut commands: Commands, game_settings: Res<GameSettings>) {
         });
 }
 
+fn setup_transposition_table(mut commands: Commands, game_settings: Res<GameSettings>) {
+    // Initialize the transposition table with the board size from settings
+    let tt = TranspositionTable::new(game_settings.board_size, game_settings.board_size);
+    commands.insert_resource(tt);
+}
+
 pub fn update_available_placement(
     mut commands: Commands,
     mut ev_board_update: EventReader<MovePlayed>,
-    game_state: Res<GameState>,
+    mut game_state: ResMut<GameState>,
     parents: Query<(Entity, &Children, &GridCell), With<GridCell>>,
     mut dots: Query<(&mut BackgroundColor, &mut Visibility), With<PreviewDot>>,
 ) {
@@ -200,6 +206,7 @@ pub fn process_next_round(
     mut game_status: ResMut<GameStatus>,
     mut ai_time: ResMut<AITimeTaken>,
     mut update_ai_time: EventWriter<UpdateAITimeDisplay>,
+    mut tt: ResMut<TranspositionTable>,
 ) {
     for _ in move_played.read() {
         // Check for game end first
@@ -225,7 +232,7 @@ pub fn process_next_round(
             
             // Only call find_best_move if game is not terminal
             if !game_state.is_terminal() {
-                let placement = find_best_move(&mut game_state, settings.ai_depth);
+                let placement = find_best_move(&mut game_state, settings.ai_depth, &mut tt);
                 let elapsed_time = start_time.elapsed().as_millis();
                 ai_time.millis = elapsed_time;
                 update_ai_time.write(UpdateAITimeDisplay);

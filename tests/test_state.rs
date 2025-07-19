@@ -5,7 +5,7 @@ use gomoku::core::state::GameState;
 fn test_game_state_creation() {
     let state = GameState::new(19, 5);
 
-    assert_eq!(state.board.size, 19);
+    assert_eq!(state.board.size(), 19);
     assert_eq!(state.win_condition, 5);
     assert_eq!(state.current_player, Player::Max);
     assert_eq!(state.winner, None);
@@ -17,7 +17,7 @@ fn test_game_state_creation() {
 
 #[test]
 fn test_first_move_only_center() {
-    let state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5);
     let moves = state.get_possible_moves();
 
     assert_eq!(moves.len(), 1);
@@ -161,12 +161,8 @@ fn test_hash_consistency() {
 fn test_capture_win_detection() {
     let mut state = GameState::new(19, 5);
 
-    // Set captures to winning amount
+    // Set captures to winning amount (5 pairs)
     state.max_captures = 5;
-
-    // Make any move to trigger win check
-    state.board.place_stone(9, 9, Player::Max);
-    state.current_player = Player::Max;
 
     // Should detect capture win
     assert_eq!(state.check_capture_win(), Some(Player::Max));
@@ -212,11 +208,11 @@ fn test_winning_by_line() {
 
 #[test]
 fn test_game_state_different_sizes() {
-    let state15 = GameState::new(15, 5);
-    let state19 = GameState::new(19, 5);
+    let mut state15 = GameState::new(15, 5);
+    let mut state19 = GameState::new(19, 5);
 
-    assert_eq!(state15.board.size, 15);
-    assert_eq!(state19.board.size, 19);
+    assert_eq!(state15.board.size(), 15);
+    assert_eq!(state19.board.size(), 19);
 
     // Different sized boards should have different starting moves
     let moves15 = state15.get_possible_moves();

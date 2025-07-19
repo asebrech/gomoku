@@ -140,7 +140,7 @@ fn test_win_different_conditions() {
 fn test_edge_case_wins() {
     let mut board = Board::new(19);
 
-    // Test win at board edge
+    // Test win at board edge - horizontal line
     for i in 0..5 {
         board.place_stone(0, i, Player::Max);
     }
@@ -148,11 +148,11 @@ fn test_edge_case_wins() {
     assert!(WinChecker::check_win_around(&board, 0, 0, 5));
     assert!(WinChecker::check_win_around(&board, 0, 4, 5));
 
-    // Test win at board corner
-    for i in 0..5 {
+    // Test win at board corner - vertical line (use different row to avoid conflict)
+    for i in 1..6 {  // Changed from 0..5 to 1..6 to avoid (0,0) conflict
         board.place_stone(i, 0, Player::Min);
     }
 
-    assert!(WinChecker::check_win_around(&board, 0, 0, 5));
-    assert!(WinChecker::check_win_around(&board, 4, 0, 5));
+    assert!(WinChecker::check_win_around(&board, 1, 0, 5));
+    assert!(WinChecker::check_win_around(&board, 5, 0, 5));
 }

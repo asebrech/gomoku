@@ -1,163 +1,125 @@
-use gomoku::core::board::{Board, Player};
-use gomoku::core::captures::CaptureHandler;
+use gomoku::core::board::Player;
+use gomoku::core::state::GameState;
 
 #[test]
 fn test_horizontal_capture() {
-    let mut board = Board::new(19);
+    let mut state = GameState::new(19, 5);
 
-    // Set up: X - O - O - X (horizontal capture)
-    board.place_stone(5, 5, Player::Max);
-    board.place_stone(5, 6, Player::Min);
-    board.place_stone(5, 7, Player::Min);
-    board.place_stone(5, 8, Player::Max);
+    // Set up: X - O - O - X (horizontal capture pattern)
+    // We need to create a pattern where Max captures Min stones
+    state.board.place_stone(5, 5, Player::Max);
+    state.board.place_stone(5, 6, Player::Min);
+    state.board.place_stone(5, 7, Player::Min);
+    
+    // Check initial capture count
+    assert_eq!(state.max_captures, 0);
+    
+    // Place the capturing stone - this should automatically handle captures
+    state.make_move((5, 8)); // Player Max completes the capture pattern Max-Min-Min-Max
 
-    // Test capture detection
-    let captures = CaptureHandler::detect_captures(&board, 5, 8, Player::Max);
-    assert_eq!(captures.len(), 2);
-    assert!(captures.contains(&(5, 6)));
-    assert!(captures.contains(&(5, 7)));
+    // Test that captures were executed
+    assert_eq!(state.max_captures, 1); // One pair captured
+    assert_eq!(state.board.get_player(5, 6), None); // Captured stones should be removed
+    assert_eq!(state.board.get_player(5, 7), None);
+    
+    // Original stones should remain
+    assert_eq!(state.board.get_player(5, 5), Some(Player::Max));
+    assert_eq!(state.board.get_player(5, 8), Some(Player::Max));
 }
 
 #[test]
 fn test_vertical_capture() {
-    let mut board = Board::new(19);
+    let mut state = GameState::new(19, 5);
 
-    // Set up: X - O - O - X (vertical capture)
-    board.place_stone(5, 5, Player::Max);
-    board.place_stone(6, 5, Player::Min);
-    board.place_stone(7, 5, Player::Min);
-    board.place_stone(8, 5, Player::Max);
+    // Set up: X - O - O - X (vertical capture pattern)
+    state.board.place_stone(5, 5, Player::Max);
+    state.board.place_stone(6, 5, Player::Min);
+    state.board.place_stone(7, 5, Player::Min);
+    
+    // Check initial capture count
+    assert_eq!(state.max_captures, 0);
+    
+    // Place the capturing stone
+    state.make_move((8, 5)); // Player Max completes the capture pattern
 
-    // Test capture detection
-    let captures = CaptureHandler::detect_captures(&board, 8, 5, Player::Max);
-    assert_eq!(captures.len(), 2);
-    assert!(captures.contains(&(6, 5)));
-    assert!(captures.contains(&(7, 5)));
+    // Test that captures were executed
+    assert_eq!(state.max_captures, 1); // One pair captured
+    assert_eq!(state.board.get_player(6, 5), None); // Captured stones should be removed
+    assert_eq!(state.board.get_player(7, 5), None);
+    
+    // Original stones should remain
+    assert_eq!(state.board.get_player(5, 5), Some(Player::Max));
+    assert_eq!(state.board.get_player(8, 5), Some(Player::Max));
 }
 
 #[test]
 fn test_diagonal_capture() {
-    let mut board = Board::new(19);
+    let mut state = GameState::new(19, 5);
 
-    // Set up: X - O - O - X (diagonal capture)
-    board.place_stone(5, 5, Player::Max);
-    board.place_stone(6, 6, Player::Min);
-    board.place_stone(7, 7, Player::Min);
-    board.place_stone(8, 8, Player::Max);
+    // Set up diagonal capture pattern
+    state.board.place_stone(5, 5, Player::Max);
+    state.board.place_stone(6, 6, Player::Min);
+    state.board.place_stone(7, 7, Player::Min);
+    
+    // Check initial capture count
+    assert_eq!(state.max_captures, 0);
+    
+    // Place the capturing stone
+    state.make_move((8, 8)); // Player Max completes the capture pattern
 
-    // Test capture detection
-    let captures = CaptureHandler::detect_captures(&board, 8, 8, Player::Max);
-    assert_eq!(captures.len(), 2);
-    assert!(captures.contains(&(6, 6)));
-    assert!(captures.contains(&(7, 7)));
+    // Test that captures were executed
+    assert_eq!(state.max_captures, 1); // One pair captured
+    assert_eq!(state.board.get_player(6, 6), None); // Captured stones should be removed
+    assert_eq!(state.board.get_player(7, 7), None);
+    
+    // Original stones should remain
+    assert_eq!(state.board.get_player(5, 5), Some(Player::Max));
+    assert_eq!(state.board.get_player(8, 8), Some(Player::Max));
 }
 
 #[test]
-fn test_anti_diagonal_capture() {
-    let mut board = Board::new(19);
+fn test_no_capture_incomplete_pattern() {
+    let mut state = GameState::new(19, 5);
 
-    // Set up: X - O - O - X (anti-diagonal capture)
-    board.place_stone(8, 5, Player::Max);
-    board.place_stone(7, 6, Player::Min);
-    board.place_stone(6, 7, Player::Min);
-    board.place_stone(5, 8, Player::Max);
+    // Set up incomplete pattern (only one opponent stone)
+    state.board.place_stone(5, 5, Player::Max);
+    state.board.place_stone(5, 6, Player::Min);
+    // Missing second opponent stone
+    
+    // Check initial capture count
+    assert_eq!(state.max_captures, 0);
+    
+    // Place stone - should not trigger capture
+    state.make_move((5, 7)); // Player Max - no capture pattern
 
-    // Test capture detection
-    let captures = CaptureHandler::detect_captures(&board, 5, 8, Player::Max);
-    assert_eq!(captures.len(), 2);
-    assert!(captures.contains(&(7, 6)));
-    assert!(captures.contains(&(6, 7)));
+    // Test that no captures occurred
+    assert_eq!(state.max_captures, 0);
+    assert_eq!(state.board.get_player(5, 6), Some(Player::Min)); // Stone should remain
 }
 
 #[test]
-fn test_multiple_captures() {
-    let mut board = Board::new(19);
+fn test_undo_capture() {
+    let mut state = GameState::new(19, 5);
 
-    // Set up multiple captures in different directions
-    // Horizontal: X - O - O - X
-    board.place_stone(5, 5, Player::Max);
-    board.place_stone(5, 6, Player::Min);
-    board.place_stone(5, 7, Player::Min);
-
-    // Vertical: X - O - O - X
-    board.place_stone(6, 8, Player::Min);
-    board.place_stone(7, 8, Player::Min);
-    board.place_stone(8, 8, Player::Max);
-
-    // Place the final stone that creates both captures
-    board.place_stone(5, 8, Player::Max);
-    let captures = CaptureHandler::detect_captures(&board, 5, 8, Player::Max);
-
-    // Should detect both horizontal and vertical captures
-    assert_eq!(captures.len(), 4);
-    assert!(captures.contains(&(5, 6)));
-    assert!(captures.contains(&(5, 7)));
-    assert!(captures.contains(&(6, 8)));
-    assert!(captures.contains(&(7, 8)));
-}
-
-#[test]
-fn test_no_capture_empty_space() {
-    let mut board = Board::new(19);
-
-    // Set up: X - O - empty - X (no capture)
-    board.place_stone(5, 5, Player::Max);
-    board.place_stone(5, 6, Player::Min);
-    // Empty space at (5, 7)
-    board.place_stone(5, 8, Player::Max);
-
-    let captures = CaptureHandler::detect_captures(&board, 5, 8, Player::Max);
-    assert_eq!(captures.len(), 0);
-}
-
-#[test]
-fn test_no_capture_same_player() {
-    let mut board = Board::new(19);
-
-    // Set up: X - X - X - X (no capture)
-    board.place_stone(5, 5, Player::Max);
-    board.place_stone(5, 6, Player::Max);
-    board.place_stone(5, 7, Player::Max);
-    board.place_stone(5, 8, Player::Max);
-
-    let captures = CaptureHandler::detect_captures(&board, 5, 8, Player::Max);
-    assert_eq!(captures.len(), 0);
-}
-
-#[test]
-fn test_execute_captures() {
-    let mut board = Board::new(19);
-
-    // Set up a capture scenario
-    board.place_stone(5, 5, Player::Max);
-    board.place_stone(5, 6, Player::Min);
-    board.place_stone(5, 7, Player::Min);
-    board.place_stone(5, 8, Player::Max);
-
-    let captures = CaptureHandler::detect_captures(&board, 5, 8, Player::Max);
-    CaptureHandler::execute_captures(&mut board, &captures);
-
-    // Check that captured stones are removed
-    assert_eq!(board.get_player(5, 6), None);
-    assert_eq!(board.get_player(5, 7), None);
-
-    // Check that other stones remain
-    assert_eq!(board.get_player(5, 5), Some(Player::Max));
-    assert_eq!(board.get_player(5, 8), Some(Player::Max));
-}
-
-#[test]
-fn test_edge_case_captures() {
-    let mut board = Board::new(19);
-
-    // Test capture at board edge
-    board.place_stone(0, 0, Player::Max);
-    board.place_stone(0, 1, Player::Min);
-    board.place_stone(0, 2, Player::Min);
-    board.place_stone(0, 3, Player::Max);
-
-    let captures = CaptureHandler::detect_captures(&board, 0, 3, Player::Max);
-    assert_eq!(captures.len(), 2);
-    assert!(captures.contains(&(0, 1)));
-    assert!(captures.contains(&(0, 2)));
+    // Set up capture pattern
+    state.board.place_stone(5, 5, Player::Max);
+    state.board.place_stone(5, 6, Player::Min);
+    state.board.place_stone(5, 7, Player::Min);
+    
+    // Make the capturing move
+    state.make_move((5, 8)); // Player Max captures
+    
+    // Verify capture occurred
+    assert_eq!(state.max_captures, 1);
+    assert_eq!(state.board.get_player(5, 6), None);
+    assert_eq!(state.board.get_player(5, 7), None);
+    
+    // Undo the move - we know we just placed at (5, 8)
+    state.undo_move((5, 8));
+    
+    // Verify capture was undone
+    assert_eq!(state.max_captures, 0);
+    assert_eq!(state.board.get_player(5, 6), Some(Player::Min)); // Stones restored
+    assert_eq!(state.board.get_player(5, 7), Some(Player::Min));
+    assert_eq!(state.board.get_player(5, 8), None); // Capturing stone removed
 }

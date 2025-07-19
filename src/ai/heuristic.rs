@@ -61,35 +61,53 @@ impl Heuristic {
             return terminal_score;
         }
 
-        if Self::is_board_full(&state.board) {
-            return 0;
+		if state.board.is_board_full() {
+			return 0; // Draw
+		}
+
+        // FAST HEURISTIC: Only evaluate around placed stones instead of full board scan
+        Self::fast_evaluate(state, depth)
+    }
+
+    // Much faster heuristic that only looks at meaningful positions
+    fn fast_evaluate(state: &GameState, _depth: i32) -> i32 {
+        let mut score = 0;
+        
+        // Simple material count + positional bonus
+        let center = state.board.size() / 2;
+        
+        // Quick scan - much faster than full pattern analysis
+        for row in 0..state.board.size() {
+            for col in 0..state.board.size() {
+                if let Some(player) = state.board.get_player(row, col) {
+                    let distance_from_center = ((row as i32 - center as i32).abs() + (col as i32 - center as i32).abs()) as i32;
+                    let positional_bonus = 10 - distance_from_center.min(10);
+                    
+                    match player {
+                        Player::Max => {
+                            score += 10 + positional_bonus;
+                        },
+                        Player::Min => {
+                            score -= 10 + positional_bonus;
+                        }
+                    }
+                }
+            }
         }
-
-        let (max_counts, min_counts) =
-            Self::analyze_both_players(&state.board, state.win_condition);
-
-        // Early termination for winning patterns
-        if max_counts.five_in_row > 0 || max_counts.live_four > 1 {
-            return WINNING_SCORE + depth;
-        }
-        if min_counts.five_in_row > 0 || min_counts.live_four > 1 {
-            return -WINNING_SCORE - depth;
-        }
-
-        let max_score = Self::calculate_pattern_score(max_counts);
-        let min_score = Self::calculate_pattern_score(min_counts);
-        let capture_bonus = Self::calculate_capture_bonus(state);
-
-        max_score - min_score + capture_bonus
+        
+        // Add capture bonus
+        score += (state.max_captures as i32 - state.min_captures as i32) * 50;
+        
+        score
     }
 
     fn analyze_both_players(board: &Board, win_condition: usize) -> (PatternCounts, PatternCounts) {
         let mut max_counts = PatternCounts::new();
         let mut min_counts = PatternCounts::new();
-        let mut analyzed = vec![vec![0u8; board.size]; board.size];
+        let mut analyzed = vec![vec![0u8; board.size()]; board.size()];
 
-        for row in 0..board.size {
-            for col in 0..board.size {
+        for row in 0..board.size() {
+            for col in 0..board.size() {
                 if let Some(player) = board.get_player(row, col) {
                     for (dir_idx, &(dx, dy)) in DIRECTIONS.iter().enumerate() {
                         let bit_mask = 1u8 << dir_idx;
@@ -177,8 +195,8 @@ impl Heuristic {
         let mut count = 0;
         let mut current_row = row as isize;
         let mut current_col = col as isize;
-        let max_row = board.size as isize;
-        let max_col = board.size as isize;
+        let max_row = board.size() as isize;
+        let max_col = board.size() as isize;
 
         while current_row >= 0 && current_row < max_row && current_col >= 0 && current_col < max_col
         {
@@ -209,9 +227,9 @@ impl Heuristic {
             let prev_col = current_col - dy;
 
             if prev_row >= 0
-                && prev_row < board.size as isize
+                && prev_row < board.size() as isize
                 && prev_col >= 0
-                && prev_col < board.size as isize
+                && prev_col < board.size() as isize
                 && board.get_player(prev_row as usize, prev_col as usize) == Some(player)
             {
                 current_row = prev_row;
@@ -246,9 +264,9 @@ impl Heuristic {
     #[inline(always)]
     fn is_position_empty(board: &Board, row: isize, col: isize) -> bool {
         row >= 0
-            && row < board.size as isize
+            && row < board.size() as isize
             && col >= 0
-            && col < board.size as isize
+            && col < board.size() as isize
             && board.get_player(row as usize, col as usize).is_none()
     }
 
@@ -325,7 +343,7 @@ impl Heuristic {
     }
 
     pub fn order_moves(state: &GameState, moves: &mut Vec<(usize, usize)>) {
-        let center = state.board.size / 2;
+        let center = state.board.size() / 2;
         moves.sort_unstable_by_key(|&mv| -Self::calculate_move_priority(state, mv, center));
     }
 
@@ -388,9 +406,9 @@ impl Heuristic {
         let mut current_col = col as isize + dy;
 
         while current_row >= 0
-            && current_row < board.size as isize
+            && current_row < board.size() as isize
             && current_col >= 0
-            && current_col < board.size as isize
+            && current_col < board.size() as isize
             && board.get_player(current_row as usize, current_col as usize) == Some(player)
         {
             count += 1;
@@ -406,9 +424,9 @@ impl Heuristic {
             let new_row = row as isize + dx;
             let new_col = col as isize + dy;
             if new_row >= 0
-                && new_row < board.size as isize
+                && new_row < board.size() as isize
                 && new_col >= 0
-                && new_col < board.size as isize
+                && new_col < board.size() as isize
                 && board
                     .get_player(new_row as usize, new_col as usize)
                     .is_some()
@@ -433,13 +451,6 @@ impl Heuristic {
             return Some(-WINNING_SCORE - depth);
         }
         None
-    }
-
-    fn is_board_full(board: &Board) -> bool {
-        board
-            .cells
-            .iter()
-            .all(|row| row.iter().all(|&cell| cell.is_some()))
     }
 
     fn calculate_capture_bonus(state: &GameState) -> i32 {

@@ -3,7 +3,7 @@ use gomoku::core::board::{Board, Player};
 #[test]
 fn test_board_creation() {
     let board = Board::new(19);
-    assert_eq!(board.size, 19);
+    assert_eq!(board.size(), 19);
     assert!(board.is_empty());
     
     for i in 0..19 {
