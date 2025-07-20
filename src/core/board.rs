@@ -61,6 +61,14 @@ impl Board {
         (bits[array_idx] & (1u64 << bit_idx)) != 0
     }
 
+    pub fn get_occupied(&self) -> Vec<u64> {
+        self.max_bits
+            .iter()
+            .zip(&self.min_bits)
+            .map(|(&a, &b)| a | b)
+            .collect()
+    }
+
     pub fn is_empty(&self) -> bool {
         self.max_bits.iter().all(|&b| b == 0) && self.min_bits.iter().all(|&b| b == 0)
     }
@@ -70,11 +78,17 @@ impl Board {
     }
 
     pub fn is_empty_position(&self, row: usize, col: usize) -> bool {
+        if row >= self.size || col >= self.size {
+            return false;
+        }
         let idx = self.index(row, col);
         !Self::is_bit_set(&self.max_bits, idx) && !Self::is_bit_set(&self.min_bits, idx)
     }
 
     pub fn get_player(&self, row: usize, col: usize) -> Option<Player> {
+        if row >= self.size || col >= self.size {
+            return None;
+        }
         let idx = self.index(row, col);
         if Self::is_bit_set(&self.max_bits, idx) {
             Some(Player::Max)
@@ -86,6 +100,9 @@ impl Board {
     }
 
     pub fn place_stone(&mut self, row: usize, col: usize, player: Player) {
+        if row >= self.size || col >= self.size {
+            return;
+        }
         let idx = self.index(row, col);
         match player {
             Player::Max => Self::set_bit(&mut self.max_bits, idx),
@@ -94,12 +111,19 @@ impl Board {
     }
 
     pub fn remove_stone(&mut self, row: usize, col: usize) {
+        if row >= self.size || col >= self.size {
+            return;
+        }
         let idx = self.index(row, col);
         Self::clear_bit(&mut self.max_bits, idx);
         Self::clear_bit(&mut self.min_bits, idx);
     }
 
     pub fn is_adjacent_to_stone(&self, row: usize, col: usize) -> bool {
+        if row >= self.size || col >= self.size {
+            return false;
+        }
+        let occupied = self.get_occupied();
         let directions = [-1isize, 0, 1];
 
         for &dr in &directions {
@@ -116,10 +140,8 @@ impl Board {
                     && new_row < self.size as isize
                     && new_col < self.size as isize
                 {
-                    if self
-                        .get_player(new_row as usize, new_col as usize)
-                        .is_some()
-                    {
+                    let idx = self.index(new_row as usize, new_col as usize);
+                    if Self::is_bit_set(&occupied, idx) {
                         return true;
                     }
                 }
