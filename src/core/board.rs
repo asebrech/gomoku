@@ -151,6 +151,27 @@ impl Board {
         false
     }
 
+    pub fn is_full(&self) -> bool {
+        let occupied = self.get_occupied();
+        let mut total_set_bits = 0;
+
+        for (i, &bits) in occupied.iter().enumerate() {
+            if i == self.u64_count - 1 {
+                let bits_in_last = self.total_cells % 64;
+                let mask = if bits_in_last != 0 {
+                    (1u64 << bits_in_last) - 1
+                } else {
+                    u64::MAX
+                };
+                total_set_bits += (bits & mask).count_ones() as usize;
+            } else {
+                total_set_bits += bits.count_ones() as usize;
+            }
+        }
+
+        total_set_bits == self.total_cells
+    }
+
     pub fn hash(&self) -> u64 {
         let mut hasher = DefaultHasher::new();
         for &b in &self.max_bits {

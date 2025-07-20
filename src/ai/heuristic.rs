@@ -61,7 +61,7 @@ impl Heuristic {
             return -WINNING_SCORE - depth;
         }
 
-        if Self::is_board_full(&state.board) {
+        if state.board.is_full() {
             return 0;
         }
 
@@ -321,15 +321,6 @@ impl Heuristic {
             + (counts.live_two as i32) * LIVE_TWO_SCORE;
 
         score
-    }
-
-    fn is_board_full(board: &Board) -> bool {
-        // Board is full if every cell is occupied by either player
-        (0..board.size).all(|row| {
-            (0..board.size).all(|col| {
-                board.get_player(row, col).is_some()
-            })
-        })
     }
 
     fn calculate_capture_bonus(state: &GameState) -> i32 {
