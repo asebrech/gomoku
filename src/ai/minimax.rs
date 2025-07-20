@@ -1,7 +1,7 @@
 use crate::core::state::GameState;
 use std::cmp::{max, min};
 
-use super::{heuristic::Heuristic, transposition::TranspositionTable};
+use super::{heuristic::Heuristic, move_ordering::MoveOrdering};
 
 pub fn minimax(
     state: &mut GameState,
@@ -23,7 +23,7 @@ pub fn minimax(
     }*/
 
     let mut moves = state.get_possible_moves();
-    Heuristic::order_moves(state, &mut moves);
+    MoveOrdering::order_moves(state, &mut moves);
 
     if maximizing_player {
         let mut value = i32::MIN;
