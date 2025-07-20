@@ -21,7 +21,7 @@ impl Player {
 pub struct Board {
     pub max_bits: Vec<u64>,
     pub min_bits: Vec<u64>,
-    pub occupied: Vec<u64>, // Incremental occupied bitboard
+    pub occupied: Vec<u64>,
     pub size: usize,
     pub u64_count: usize,
     pub total_cells: usize,

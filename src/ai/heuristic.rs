@@ -89,7 +89,18 @@ impl Heuristic {
 
         for row in 0..board.size {
             for col in 0..board.size {
-                if let Some(player) = board.get_player(row, col) {
+                let idx = board.index(row, col);
+                let is_max = Board::is_bit_set(&board.max_bits, idx);
+                let is_min = Board::is_bit_set(&board.min_bits, idx);
+                let player = if is_max {
+                    Some(Player::Max)
+                } else if is_min {
+                    Some(Player::Min)
+                } else {
+                    None
+                };
+
+                if let Some(player) = player {
                     for (dir_idx, &(dx, dy)) in DIRECTIONS.iter().enumerate() {
                         let bit_mask = 1u8 << dir_idx;
 
@@ -173,15 +184,21 @@ impl Heuristic {
         dy: isize,
         player: Player,
     ) -> usize {
+        let player_bits = match player {
+            Player::Max => &board.max_bits,
+            Player::Min => &board.min_bits,
+        };
         let mut count = 0;
         let mut current_row = row as isize;
         let mut current_col = col as isize;
-        let max_row = board.size as isize;
-        let max_col = board.size as isize;
 
-        while current_row >= 0 && current_row < max_row && current_col >= 0 && current_col < max_col
+        while current_row >= 0
+            && current_row < board.size as isize
+            && current_col >= 0
+            && current_col < board.size as isize
         {
-            if board.get_player(current_row as usize, current_col as usize) == Some(player) {
+            let idx = board.index(current_row as usize, current_col as usize);
+            if Board::is_bit_set(player_bits, idx) {
                 count += 1;
                 current_row += dx;
                 current_col += dy;
@@ -200,6 +217,10 @@ impl Heuristic {
         dy: isize,
         player: Player,
     ) -> (usize, usize) {
+        let player_bits = match player {
+            Player::Max => &board.max_bits,
+            Player::Min => &board.min_bits,
+        };
         let mut current_row = row as isize;
         let mut current_col = col as isize;
 
@@ -211,10 +232,14 @@ impl Heuristic {
                 && prev_row < board.size as isize
                 && prev_col >= 0
                 && prev_col < board.size as isize
-                && board.get_player(prev_row as usize, prev_col as usize) == Some(player)
             {
-                current_row = prev_row;
-                current_col = prev_col;
+                let idx = board.index(prev_row as usize, prev_col as usize);
+                if Board::is_bit_set(player_bits, idx) {
+                    current_row = prev_row;
+                    current_col = prev_col;
+                } else {
+                    break;
+                }
             } else {
                 break;
             }
@@ -244,11 +269,11 @@ impl Heuristic {
 
     #[inline(always)]
     fn is_position_empty(board: &Board, row: isize, col: isize) -> bool {
-        row >= 0
-            && row < board.size as isize
-            && col >= 0
-            && col < board.size as isize
-            && board.get_player(row as usize, col as usize).is_none()
+        if row < 0 || col < 0 || row >= board.size as isize || col >= board.size as isize {
+            return false;
+        }
+        let idx = board.index(row as usize, col as usize);
+        !Board::is_bit_set(&board.occupied, idx)
     }
 
     fn mark_pattern_analyzed(
