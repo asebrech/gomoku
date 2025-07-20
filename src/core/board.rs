@@ -21,6 +21,7 @@ impl Player {
 pub struct Board {
     pub max_bits: Vec<u64>,
     pub min_bits: Vec<u64>,
+    pub occupied: Vec<u64>, // Incremental occupied bitboard
     pub size: usize,
     pub u64_count: usize,
     pub total_cells: usize,
@@ -33,6 +34,7 @@ impl Board {
         Board {
             max_bits: vec![0u64; u64_count],
             min_bits: vec![0u64; u64_count],
+            occupied: vec![0u64; u64_count],
             size,
             u64_count,
             total_cells,
@@ -61,16 +63,8 @@ impl Board {
         (bits[array_idx] & (1u64 << bit_idx)) != 0
     }
 
-    pub fn get_occupied(&self) -> Vec<u64> {
-        self.max_bits
-            .iter()
-            .zip(&self.min_bits)
-            .map(|(&a, &b)| a | b)
-            .collect()
-    }
-
     pub fn is_empty(&self) -> bool {
-        self.max_bits.iter().all(|&b| b == 0) && self.min_bits.iter().all(|&b| b == 0)
+        self.occupied.iter().all(|&b| b == 0)
     }
 
     pub fn center(&self) -> (usize, usize) {
@@ -82,7 +76,7 @@ impl Board {
             return false;
         }
         let idx = self.index(row, col);
-        !Self::is_bit_set(&self.max_bits, idx) && !Self::is_bit_set(&self.min_bits, idx)
+        !Self::is_bit_set(&self.occupied, idx)
     }
 
     pub fn get_player(&self, row: usize, col: usize) -> Option<Player> {
@@ -108,6 +102,7 @@ impl Board {
             Player::Max => Self::set_bit(&mut self.max_bits, idx),
             Player::Min => Self::set_bit(&mut self.min_bits, idx),
         }
+        Self::set_bit(&mut self.occupied, idx);
     }
 
     pub fn remove_stone(&mut self, row: usize, col: usize) {
@@ -117,45 +112,40 @@ impl Board {
         let idx = self.index(row, col);
         Self::clear_bit(&mut self.max_bits, idx);
         Self::clear_bit(&mut self.min_bits, idx);
+        Self::clear_bit(&mut self.occupied, idx);
     }
 
     pub fn is_adjacent_to_stone(&self, row: usize, col: usize) -> bool {
         if row >= self.size || col >= self.size {
             return false;
         }
-        let occupied = self.get_occupied();
+        let mut neighbor_mask = vec![0u64; self.u64_count];
         let directions = [-1isize, 0, 1];
-
         for &dr in &directions {
             for &dc in &directions {
                 if dr == 0 && dc == 0 {
                     continue;
                 }
-
-                let new_row = row as isize + dr;
-                let new_col = col as isize + dc;
-
-                if new_row >= 0
-                    && new_col >= 0
-                    && new_row < self.size as isize
-                    && new_col < self.size as isize
-                {
-                    let idx = self.index(new_row as usize, new_col as usize);
-                    if Self::is_bit_set(&occupied, idx) {
-                        return true;
-                    }
+                let nr = row as isize + dr;
+                let nc = col as isize + dc;
+                if nr >= 0 && nc >= 0 && nr < self.size as isize && nc < self.size as isize {
+                    let idx = self.index(nr as usize, nc as usize);
+                    Self::set_bit(&mut neighbor_mask, idx);
                 }
             }
         }
-
+        for (&o, &m) in self.occupied.iter().zip(&neighbor_mask) {
+            if (o & m) != 0 {
+                return true;
+            }
+        }
         false
     }
 
     pub fn is_full(&self) -> bool {
-        let occupied = self.get_occupied();
         let mut total_set_bits = 0;
 
-        for (i, &bits) in occupied.iter().enumerate() {
+        for (i, &bits) in self.occupied.iter().enumerate() {
             if i == self.u64_count - 1 {
                 let bits_in_last = self.total_cells % 64;
                 let mask = if bits_in_last != 0 {
@@ -181,5 +171,67 @@ impl Board {
             b.hash(&mut hasher);
         }
         hasher.finish()
+    }
+
+    pub fn count_in_line(
+        &self,
+        row: usize,
+        col: usize,
+        player: Player,
+        direction: (isize, isize),
+        length: usize,
+    ) -> usize {
+        if row >= self.size || col >= self.size {
+            return 0;
+        }
+        let bits = match player {
+            Player::Max => &self.max_bits,
+            Player::Min => &self.min_bits,
+        };
+        let mut count = 0;
+        let mut current_row = row as isize;
+        let mut current_col = col as isize;
+        for _ in 0..length {
+            if current_row < 0
+                || current_col < 0
+                || current_row >= self.size as isize
+                || current_col >= self.size as isize
+            {
+                break;
+            }
+            let idx = self.index(current_row as usize, current_col as usize);
+            if Self::is_bit_set(bits, idx) {
+                count += 1;
+            } else {
+                break;
+            }
+            current_row += direction.0;
+            current_col += direction.1;
+        }
+        count
+    }
+
+    pub fn get_empty_positions(&self) -> Vec<(usize, usize)> {
+        let mut empties = Vec::new();
+        for array_idx in 0..self.u64_count {
+            let mut bits = !self.occupied[array_idx];
+            if array_idx == self.u64_count - 1 {
+                let bits_in_last = self.total_cells % 64;
+                if bits_in_last != 0 {
+                    bits &= (1u64 << bits_in_last) - 1;
+                }
+            }
+            while bits != 0 {
+                let bit_pos = bits.trailing_zeros() as usize;
+                let global_idx = array_idx * 64 + bit_pos;
+                if global_idx < self.total_cells {
+                    let row = global_idx / self.size;
+                    let col = global_idx % self.size;
+                    empties.push((row, col));
+                }
+                bits &= bits - 1;
+            }
+        }
+        empties
     }
 }
