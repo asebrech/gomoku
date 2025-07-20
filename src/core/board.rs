@@ -45,7 +45,7 @@ impl Board {
         row * self.size + col
     }
 
-    fn set_bit(bits: &mut Vec<u64>, idx: usize) {
+    pub fn set_bit(bits: &mut Vec<u64>, idx: usize) {
         let array_idx = idx / 64;
         let bit_idx = (idx % 64) as u32;
         bits[array_idx] |= 1u64 << bit_idx;

@@ -92,7 +92,14 @@ impl GameState {
             return;
         }
 
-        CaptureHandler::execute_captures(&mut self.board, &captures);
+        for &(row, col) in &captures {
+            if row < self.board.size && col < self.board.size {
+                let idx = self.board.index(row, col);
+                Board::clear_bit(&mut self.board.max_bits, idx);
+                Board::clear_bit(&mut self.board.min_bits, idx);
+                Board::clear_bit(&mut self.board.occupied, idx);
+            }
+        }
 
         let pairs_captured = captures.len() / 2;
         match self.current_player {
@@ -107,9 +114,19 @@ impl GameState {
         if let Some(last_captures) = self.capture_history.pop() {
             if !last_captures.is_empty() {
                 let opponent = self.current_player.opponent();
+                let size = self.board.size;
+
+                let opponent_bits = match opponent {
+                    Player::Max => &mut self.board.max_bits,
+                    Player::Min => &mut self.board.min_bits,
+                };
 
                 for &(row, col) in &last_captures {
-                    self.board.place_stone(row, col, opponent);
+                    if row < size && col < size {
+                        let idx = row * size + col;
+                        Board::set_bit(opponent_bits, idx);
+                        Board::set_bit(&mut self.board.occupied, idx);
+                    }
                 }
 
                 let pairs_captured = last_captures.len() / 2;
