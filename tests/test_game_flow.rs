@@ -218,8 +218,10 @@ fn test_ai_decision_quality() {
     // Should block the threat
     assert!(best_move.is_some());
     let (row, col) = best_move.unwrap();
-    // Updated expected behavior - AI now plays more strategically
-    assert!(row == 8 && col == 8);
+    println!("🎯 AI chose move: ({}, {})", row, col);
+    // AI should block the immediate threat at either end
+    assert!((row == 9 && col == 8) || (row == 9 && col == 13), 
+           "AI should block at (9,8) or (9,13) but chose ({},{})", row, col);
 }
 
 #[test]
@@ -287,6 +289,10 @@ fn test_simultaneous_threats() {
     assert!(best_move.is_some());
 
     let (row, col) = best_move.unwrap();
-    // Updated expected behavior - AI now plays more strategically
-    assert!(row == 8 && col == 8);
+    println!("🎯 AI chose move: ({}, {}) in simultaneous threats test", row, col);
+    // Both threats are equally dangerous (4 stones each with shared corner)
+    // Valid blocks: (9,8)/(9,13) for horizontal, (8,9)/(13,9) for vertical
+    assert!((row == 9 && col == 8) || (row == 9 && col == 13) || 
+            (row == 8 && col == 9) || (row == 13 && col == 9), 
+           "AI should block one of the 4-stone threats but chose ({},{})", row, col);
 }

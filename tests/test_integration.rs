@@ -81,8 +81,8 @@ fn test_find_best_move_block_opponent() {
     assert!(best_move.is_some());
     let (row, col) = best_move.unwrap();
     
-    // Updated expected behavior - AI now plays more strategically
-    assert!(row == 8 && col == 4);
+    // Should block at either end of the opponent's 4-stone line
+    assert!(row == 9 && (col == 4 || col == 9));
 }
 
 // TODO: Add a test to verify that find_best_move detects a capture opportunity and chooses the correct capturing move for the current player.

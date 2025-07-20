@@ -200,7 +200,13 @@ impl MinimaxWithTT {
     
     /// Get transposition table statistics
     pub fn get_tt_stats(&self) -> (usize, f64, u64) {
-        (self.tt.size(), self.tt.hit_rate(), self.tt.collisions)
+        let (hits, misses, collisions) = self.tt.get_stats();
+        let hit_rate = if hits + misses > 0 {
+            hits as f64 / (hits + misses) as f64
+        } else {
+            0.0
+        };
+        (self.tt.size(), hit_rate, collisions)
     }
 }
 

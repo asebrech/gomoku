@@ -1,9 +1,11 @@
 pub mod ai {
     pub mod heuristic;
     pub mod minimax;
+    pub mod minimax_tt;
     pub mod move_ordering;
     pub mod zobrist;
     pub mod transposition_table;
+    pub mod iterative_deepening;
 }
 
 pub mod core {
