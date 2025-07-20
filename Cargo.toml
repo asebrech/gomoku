@@ -5,3 +5,7 @@ edition = "2024"
 
 [dependencies]
 bevy = "0.16.1"
+
+[[example]]
+name = "advanced_ai_demo"
+path = "examples/advanced_ai_demo.rs"

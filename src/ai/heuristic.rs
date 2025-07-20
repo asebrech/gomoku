@@ -3,15 +3,18 @@ use crate::core::state::GameState;
 
 pub struct Heuristic;
 
-const WINNING_SCORE: i32 = 1_000_000;
-const FIVE_IN_ROW_SCORE: i32 = 100_000;
-const LIVE_FOUR_SINGLE_SCORE: i32 = 15_000;
-const LIVE_FOUR_MULTIPLE_SCORE: i32 = 20_000;
-const WINNING_THREAT_SCORE: i32 = 10_000;
-const DEAD_FOUR_SCORE: i32 = 1_000;
-const LIVE_THREE_SCORE: i32 = 500;
-const DEAD_THREE_SCORE: i32 = 100;
-const LIVE_TWO_SCORE: i32 = 50;
+// Urgency-based scoring: Immediate threats get exponentially higher scores
+const WINNING_SCORE: i32 = 10_000_000;
+const IMMEDIATE_WIN_SCORE: i32 = 5_000_000;        // Can win in 1 move
+const IMMEDIATE_THREAT_SCORE: i32 = 2_500_000;     // Must block or lose in 1 move  
+const DOUBLE_THREAT_SCORE: i32 = 1_000_000;        // Creates multiple threats (fork)
+const URGENT_THREAT_SCORE: i32 = 500_000;          // Strong threat in 2-3 moves
+const TACTICAL_THREAT_SCORE: i32 = 100_000;        // Good tactical position
+const LIVE_FOUR_SCORE: i32 = 50_000;
+const DEAD_FOUR_SCORE: i32 = 10_000;
+const LIVE_THREE_SCORE: i32 = 5_000;
+const DEAD_THREE_SCORE: i32 = 1_000;
+const LIVE_TWO_SCORE: i32 = 500;
 const CAPTURE_BONUS_MULTIPLIER: i32 = 2_000;
 
 const DIRECTIONS: [(isize, isize); 4] = [(1, 0), (0, 1), (1, 1), (1, -1)];
@@ -61,42 +64,288 @@ impl Heuristic {
             return terminal_score;
         }
 
-		if state.board.is_board_full() {
-			return 0; // Draw
-		}
+        if state.board.is_board_full() {
+            return 0; // Draw
+        }
 
-        // FAST HEURISTIC: Only evaluate around placed stones instead of full board scan
-        Self::fast_evaluate(state, depth)
+        // PRIORITY 1: Immediate threat detection (0-2 moves ahead)
+        let immediate_threat_bonus = Self::evaluate_immediate_threats(state, depth);
+        if immediate_threat_bonus.abs() >= IMMEDIATE_THREAT_SCORE {
+            return immediate_threat_bonus; // Return immediately for critical threats
+        }
+
+        // PRIORITY 2: Standard tactical evaluation with depth penalty
+        let tactical_score = Self::evaluate_tactical_threats(state) + immediate_threat_bonus;
+        
+        // Apply depth penalty to encourage faster solutions
+        let depth_penalty = depth * 100; // Prefer shallower wins
+        let adjusted_score = if tactical_score > 0 { 
+            tactical_score - depth_penalty 
+        } else { 
+            tactical_score + depth_penalty 
+        };
+
+        // PRIORITY 3: Positional evaluation (only if no major threats)
+        if adjusted_score.abs() < URGENT_THREAT_SCORE {
+            adjusted_score + Self::evaluate_all_patterns(state) / 10 // Reduce positional weight
+        } else {
+            adjusted_score
+        }
     }
 
-    // Much faster heuristic that only looks at meaningful positions
+    // Detect threats that must be addressed in the next 1-2 moves
+    fn evaluate_immediate_threats(state: &GameState, depth: i32) -> i32 {
+        let mut max_score = 0;
+        let mut min_score = 0;
+        
+        // Check all empty positions for immediate threats
+        for row in 0..state.board.size() {
+            for col in 0..state.board.size() {
+                if state.board.is_empty_position(row, col) {
+                    // Test move for Max player
+                    let max_threat = Self::evaluate_move_urgency(&state.board, row, col, Player::Max, depth);
+                    max_score = max_score.max(max_threat);
+                    
+                    // Test move for Min player  
+                    let min_threat = Self::evaluate_move_urgency(&state.board, row, col, Player::Min, depth);
+                    min_score = min_score.min(-min_threat);
+                }
+            }
+        }
+        
+        // Return the most urgent threat
+        if max_score >= IMMEDIATE_WIN_SCORE || min_score <= -IMMEDIATE_WIN_SCORE {
+            return if max_score >= IMMEDIATE_WIN_SCORE { max_score } else { min_score };
+        }
+        
+        // Check for opponent threats that must be blocked
+        if (-min_score) >= IMMEDIATE_THREAT_SCORE {
+            return min_score + IMMEDIATE_THREAT_SCORE; // Huge penalty for not blocking
+        }
+        
+        max_score + min_score
+    }
+
+    // Evaluate how urgent a move is (immediate win, immediate threat, etc.)
+    fn evaluate_move_urgency(board: &Board, row: usize, col: usize, player: Player, depth: i32) -> i32 {
+        let mut urgency = 0;
+        
+        // Check all directions for immediate patterns
+        for &(dx, dy) in &[(1,0), (0,1), (1,1), (1,-1)] {
+            let line_urgency = Self::evaluate_line_urgency(board, row, col, dx, dy, player, depth);
+            urgency = urgency.max(line_urgency);
+        }
+        
+        urgency
+    }
+
+    // Evaluate urgency of a line formation
+    fn evaluate_line_urgency(board: &Board, row: usize, col: usize, dx: isize, dy: isize, player: Player, depth: i32) -> i32 {
+        let backwards = Self::count_direction(board, row, col, -dx, -dy, player);
+        let forwards = Self::count_direction(board, row, col, dx, dy, player);
+        let total_pieces = backwards + forwards;
+        
+        let back_blocked = Self::is_position_blocked(board, row, col, -dx, -dy, backwards + 1, player);
+        let forward_blocked = Self::is_position_blocked(board, row, col, dx, dy, forwards + 1, player);
+        
+        // Urgency based on immediate threat level
+        match total_pieces {
+            4 => IMMEDIATE_WIN_SCORE - depth * 1000, // Immediate win - highest priority
+            3 => {
+                if !back_blocked || !forward_blocked {
+                    IMMEDIATE_THREAT_SCORE - depth * 500 // Open 4-threat - must address NOW
+                } else {
+                    URGENT_THREAT_SCORE / 2 // Blocked 4 - still serious
+                }
+            },
+            2 => {
+                if !back_blocked && !forward_blocked {
+                    URGENT_THREAT_SCORE / 4 // Open 3 - building threat
+                } else {
+                    TACTICAL_THREAT_SCORE / 2 // Blocked 3 - tactical value
+                }
+            },
+            1 => {
+                if !back_blocked && !forward_blocked {
+                    TACTICAL_THREAT_SCORE / 4 // Open 2 - building
+                } else {
+                    100 // Basic value
+                }
+            },
+            _ => 50,
+        }
+    }
+
+    // Much better heuristic that actually understands Gomoku tactics
     fn fast_evaluate(state: &GameState, _depth: i32) -> i32 {
         let mut score = 0;
         
-        // Simple material count + positional bonus
-        let center = state.board.size() / 2;
+        // Check for immediate tactical threats (most important)
+        score += Self::evaluate_tactical_threats(state);
         
-        // Quick scan - much faster than full pattern analysis
+        // Evaluate patterns for both players
+        score += Self::evaluate_all_patterns(state);
+        
+        // Add capture advantage
+        score += (state.max_captures as i32 - state.min_captures as i32) * 200;
+        
+        // Small positional bonus for center control
+        score += Self::evaluate_center_control(state);
+        
+        score
+    }
+    
+    fn evaluate_tactical_threats(state: &GameState) -> i32 {
+        let mut score = 0;
+        
+        // Check all positions for immediate threats
+        for row in 0..state.board.size() {
+            for col in 0..state.board.size() {
+                if state.board.is_empty_position(row, col) {
+                    // Check what happens if each player plays here
+                    let max_threat = Self::evaluate_move_strength(&state.board, row, col, Player::Max);
+                    let min_threat = Self::evaluate_move_strength(&state.board, row, col, Player::Min);
+                    
+                    // Heavily prioritize blocking opponent immediate threats
+                    let opponent_blocking_bonus = if min_threat >= 100000 { 150000 } else { 0 }; // Block wins
+                    let opponent_threat_bonus = if min_threat >= 20000 { 25000 } else { 0 };     // Block strong threats
+                    
+                    // AI's own threats are important but blocking is more important
+                    score += max_threat - (min_threat + opponent_blocking_bonus + opponent_threat_bonus);
+                }
+            }
+        }
+        
+        score
+    }
+    
+    fn evaluate_move_strength(board: &Board, row: usize, col: usize, player: Player) -> i32 {
+        let mut strength = 0;
+        
+        // Check all directions for potential lines
+        for &(dx, dy) in &[(1,0), (0,1), (1,1), (1,-1)] {
+            let line_strength = Self::evaluate_line_through_position(board, row, col, dx, dy, player);
+            strength += line_strength;
+        }
+        
+        strength
+    }
+    
+    fn evaluate_line_through_position(board: &Board, row: usize, col: usize, dx: isize, dy: isize, player: Player) -> i32 {
+        // Count pieces in both directions
+        let backwards = Self::count_direction(board, row, col, -dx, -dy, player);
+        let forwards = Self::count_direction(board, row, col, dx, dy, player);
+        let total_pieces = backwards + forwards;
+        
+        // Check if the line can be extended (not blocked by opponent)
+        let back_blocked = Self::is_position_blocked(board, row, col, -dx, -dy, backwards + 1, player);
+        let forward_blocked = Self::is_position_blocked(board, row, col, dx, dy, forwards + 1, player);
+        
+        // Much more aggressive scoring to prioritize line building/blocking
+        let base_score = match total_pieces {
+            4 => 100000, // Immediate win - highest priority
+            3 => if back_blocked && forward_blocked { 500 } else { 20000 }, // Very strong threat - must block!
+            2 => if back_blocked && forward_blocked { 100 } else { 2000 },   // Strong threat - important to block
+            1 => if back_blocked && forward_blocked { 20 } else { 200 },     // Building position
+            0 => if back_blocked && forward_blocked { 5 } else { 50 },       // Potential
+            _ => 0,
+        };
+        
+        // Massive bonus for open lines (can extend in both directions)
+        if !back_blocked && !forward_blocked {
+            match total_pieces {
+                3 => base_score * 5, // Open 3-in-a-row is extremely dangerous
+                2 => base_score * 3, // Open 2-in-a-row is quite dangerous
+                1 => base_score * 2, // Open 1-in-a-row has potential
+                _ => base_score,
+            }
+        } else {
+            base_score
+        }
+    }
+    
+    fn is_position_blocked(board: &Board, row: usize, col: usize, dx: isize, dy: isize, distance: usize, player: Player) -> bool {
+        let check_row = row as isize + dx * distance as isize;
+        let check_col = col as isize + dy * distance as isize;
+        
+        if check_row < 0 || check_row >= board.size() as isize || 
+           check_col < 0 || check_col >= board.size() as isize {
+            return true; // Board edge
+        }
+        
+        match board.get_player(check_row as usize, check_col as usize) {
+            Some(p) if p != player => true, // Blocked by opponent
+            _ => false, // Empty or our piece
+        }
+    }
+    
+    fn evaluate_all_patterns(state: &GameState) -> i32 {
+        let mut score = 0;
+        
+        // Look for existing patterns on the board
         for row in 0..state.board.size() {
             for col in 0..state.board.size() {
                 if let Some(player) = state.board.get_player(row, col) {
-                    let distance_from_center = ((row as i32 - center as i32).abs() + (col as i32 - center as i32).abs()) as i32;
-                    let positional_bonus = 10 - distance_from_center.min(10);
-                    
+                    let pattern_value = Self::evaluate_patterns_from_position(&state.board, row, col, player);
                     match player {
-                        Player::Max => {
-                            score += 10 + positional_bonus;
-                        },
-                        Player::Min => {
-                            score -= 10 + positional_bonus;
-                        }
+                        Player::Max => score += pattern_value,
+                        Player::Min => score -= pattern_value,
                     }
                 }
             }
         }
         
-        // Add capture bonus
-        score += (state.max_captures as i32 - state.min_captures as i32) * 50;
+        score
+    }
+    
+    fn evaluate_patterns_from_position(board: &Board, row: usize, col: usize, player: Player) -> i32 {
+        let mut value = 0;
+        
+        // Check all directions for patterns
+        for &(dx, dy) in &[(1,0), (0,1), (1,1), (1,-1)] {
+            let pattern_value = Self::get_pattern_value_in_direction(board, row, col, dx, dy, player);
+            value += pattern_value;
+        }
+        
+        value
+    }
+    
+    fn get_pattern_value_in_direction(board: &Board, row: usize, col: usize, dx: isize, dy: isize, player: Player) -> i32 {
+        // Count consecutive pieces starting from this position
+        let consecutive = Self::count_direction(board, row, col, dx, dy, player) + 1;
+        
+        if consecutive < 2 { return 0; }
+        
+        // Check if pattern is blocked
+        let start_blocked = Self::is_position_blocked(board, row, col, -dx, -dy, 1, player);
+        let end_blocked = Self::is_position_blocked(board, row, col, dx, dy, consecutive, player);
+        
+        match consecutive {
+            5 => 100000, // Five in a row
+            4 => if start_blocked && end_blocked { 200 } else { 10000 }, // Four in a row
+            3 => if start_blocked && end_blocked { 50 } else { 1000 },   // Three in a row
+            2 => if start_blocked && end_blocked { 10 } else { 100 },    // Two in a row
+            _ => 0,
+        }
+    }
+    
+    fn evaluate_center_control(state: &GameState) -> i32 {
+        let center = state.board.size() / 2;
+        let mut score = 0;
+        
+        // Small bonus for pieces near center
+        for row in 0..state.board.size() {
+            for col in 0..state.board.size() {
+                if let Some(player) = state.board.get_player(row, col) {
+                    let distance = Self::manhattan_distance(row, col, center, center);
+                    let bonus = (10 - distance.min(10)) as i32;
+                    match player {
+                        Player::Max => score += bonus,
+                        Player::Min => score -= bonus,
+                    }
+                }
+            }
+        }
         
         score
     }
@@ -318,12 +567,12 @@ impl Heuristic {
         let mut score = 0;
 
         if counts.five_in_row > 0 {
-            score += FIVE_IN_ROW_SCORE;
+            score += IMMEDIATE_WIN_SCORE; // Use immediate win score for 5-in-row
         }
 
         score += match counts.live_four {
-            1 => LIVE_FOUR_SINGLE_SCORE,
-            n if n > 1 => LIVE_FOUR_MULTIPLE_SCORE,
+            1 => LIVE_FOUR_SCORE,
+            n if n > 1 => DOUBLE_THREAT_SCORE, // Multiple live fours = fork
             _ => 0,
         };
 
@@ -331,7 +580,7 @@ impl Heuristic {
             || counts.dead_four >= 2
             || (counts.dead_four >= 1 && counts.live_three >= 1)
         {
-            score += WINNING_THREAT_SCORE;
+            score += URGENT_THREAT_SCORE; // Urgent tactical threat
         }
 
         score += (counts.dead_four as i32) * DEAD_FOUR_SCORE

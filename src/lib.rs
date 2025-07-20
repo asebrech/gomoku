@@ -2,6 +2,7 @@ pub mod ai {
     pub mod heuristic;
     pub mod minimax;
     pub mod transposition;
+    pub mod advanced_search;
 }
 
 pub mod core {

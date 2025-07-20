@@ -3,7 +3,7 @@ use std::cmp::{max, min};
 use std::time::Instant;
 use std::sync::atomic::{AtomicUsize, AtomicU64, Ordering};
 
-use super::{heuristic::Heuristic, transposition::TranspositionTable};
+use super::{heuristic::Heuristic, transposition::{TranspositionTable, BoundType}};
 
 // Atomic counters for profiling (thread-safe)
 static MINIMAX_CALLS: AtomicUsize = AtomicUsize::new(0);
@@ -50,12 +50,12 @@ pub fn minimax(
 ) -> i32 {
     MINIMAX_CALLS.fetch_add(1, Ordering::Relaxed);
     
-    // Check transposition table first
+    // Check transposition table first with enhanced lookup
     let tt_start = Instant::now();
-    let cached_result = tt.lookup_with_hash(state.zobrist_hash);
+    let cached_result = tt.lookup_enhanced(state.zobrist_hash, depth, alpha, beta);
     TT_TIME.fetch_add(tt_start.elapsed().as_micros() as u64, Ordering::Relaxed);
     
-    if let Some(cached_value) = cached_result {
+    if let Some((cached_value, _best_move)) = cached_result {
         TT_HITS.fetch_add(1, Ordering::Relaxed);
         return cached_value;
     }
@@ -67,7 +67,7 @@ pub fn minimax(
         HEURISTIC_CALLS.fetch_add(1, Ordering::Relaxed);
         
         let tt_store_start = Instant::now();
-        tt.store_with_hash(state.zobrist_hash, eval);
+        tt.store_enhanced(state.zobrist_hash, eval, depth, BoundType::Exact, None);
         TT_TIME.fetch_add(tt_store_start.elapsed().as_micros() as u64, Ordering::Relaxed);
         return eval;
     }
@@ -82,27 +82,50 @@ pub fn minimax(
     state.for_each_possible_move(|mv| moves.push(mv));
     MOVE_GENERATION_TIME.fetch_add(move_gen_start.elapsed().as_micros() as u64, Ordering::Relaxed);
     
+    // Check if we have a best move from TT for move ordering
+    if let Some((_score, Some(tt_best_move))) = cached_result {
+        if moves.contains(&tt_best_move) {
+            // Move the TT best move to front for better pruning
+            moves.retain(|&mv| mv != tt_best_move);
+            moves.insert(0, tt_best_move);
+        }
+    }
+    
+    let original_alpha = alpha;
+    let original_beta = beta;
+    let mut best_move = None;
+    
     let eval = if maximizing_player {
         let mut value = i32::MIN;
         
-        // Try center move first if available (good heuristic for opening)
-        if moves.contains(&center_move) {
+        // Try center move first if available and not already prioritized by TT
+        if moves.contains(&center_move) && moves[0] != center_move {
             state.make_move(center_move);
-            value = max(value, minimax(state, depth - 1, alpha, beta, false, tt));
+            let move_value = minimax(state, depth - 1, alpha, beta, false, tt);
             state.undo_move(center_move);
+            if move_value > value {
+                value = move_value;
+                best_move = Some(center_move);
+            }
             if value >= beta {
-                tt.store_with_hash(state.zobrist_hash, value);
+                let tt_store_start = Instant::now();
+                tt.store_enhanced(state.zobrist_hash, value, depth, BoundType::LowerBound, best_move);
+                TT_TIME.fetch_add(tt_store_start.elapsed().as_micros() as u64, Ordering::Relaxed);
                 return value;
             }
             alpha = max(alpha, value);
         }
         
-        // Try all other moves without expensive ordering
+        // Try all other moves
         for &move_ in &moves {
             if move_ != center_move { // Skip center as we already tried it
                 state.make_move(move_);
-                value = max(value, minimax(state, depth - 1, alpha, beta, false, tt));
+                let move_value = minimax(state, depth - 1, alpha, beta, false, tt);
                 state.undo_move(move_);
+                if move_value > value {
+                    value = move_value;
+                    best_move = Some(move_);
+                }
                 if value >= beta {
                     break; // Alpha-beta pruning
                 }
@@ -113,24 +136,34 @@ pub fn minimax(
     } else {
         let mut value = i32::MAX;
         
-        // Try center move first if available
-        if moves.contains(&center_move) {
+        // Try center move first if available and not already prioritized by TT
+        if moves.contains(&center_move) && moves[0] != center_move {
             state.make_move(center_move);
-            value = min(value, minimax(state, depth - 1, alpha, beta, true, tt));
+            let move_value = minimax(state, depth - 1, alpha, beta, true, tt);
             state.undo_move(center_move);
+            if move_value < value {
+                value = move_value;
+                best_move = Some(center_move);
+            }
             if value <= alpha {
-                tt.store_with_hash(state.zobrist_hash, value);
+                let tt_store_start = Instant::now();
+                tt.store_enhanced(state.zobrist_hash, value, depth, BoundType::UpperBound, best_move);
+                TT_TIME.fetch_add(tt_store_start.elapsed().as_micros() as u64, Ordering::Relaxed);
                 return value;
             }
             beta = min(beta, value);
         }
         
-        // Try all other moves without expensive ordering
+        // Try all other moves
         for &move_ in &moves {
             if move_ != center_move { // Skip center as we already tried it
                 state.make_move(move_);
-                value = min(value, minimax(state, depth - 1, alpha, beta, true, tt));
+                let move_value = minimax(state, depth - 1, alpha, beta, true, tt);
                 state.undo_move(move_);
+                if move_value < value {
+                    value = move_value;
+                    best_move = Some(move_);
+                }
                 if value <= alpha {
                     break; // Alpha-beta pruning
                 }
@@ -140,8 +173,17 @@ pub fn minimax(
         value
     };
     
+    // Determine bound type based on how search ended
+    let bound_type = if eval <= original_alpha {
+        BoundType::UpperBound  // Failed low
+    } else if eval >= original_beta {
+        BoundType::LowerBound  // Failed high  
+    } else {
+        BoundType::Exact       // Exact value
+    };
+    
     let tt_store_start = Instant::now();
-    tt.store_with_hash(state.zobrist_hash, eval);
+    tt.store_enhanced(state.zobrist_hash, eval, depth, bound_type, best_move);
     TT_TIME.fetch_add(tt_store_start.elapsed().as_micros() as u64, Ordering::Relaxed);
     eval
 }

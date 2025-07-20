@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::ui::{app::GameSettings, screens::game::game::AITimeText};
+use crate::ui::{app::GameSettings, screens::game::game::{AITimeText, AIDepthText}};
 
 #[derive(Component)]
 pub struct GameSettingsPanel;
@@ -52,7 +52,7 @@ pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &
 
             // AI Settings (only if vs AI)
             if game_settings.versus_ai {
-                spawn_setting_row(builder, "AI Depth", &game_settings.ai_depth.to_string());
+                spawn_ai_depth_row(builder, "AI Depth Reached", "0");
                 
                 let alpha_beta = if game_settings.alpha_beta_enabled { "Enabled" } else { "Disabled" };
                 spawn_setting_row(builder, "Alpha-Beta", alpha_beta);
@@ -150,5 +150,44 @@ fn spawn_timer_row(builder: &mut ChildSpawnerCommands, label: &str, value: &str)
                         ..default()
                     },
                 ));
+        });
+}
+
+fn spawn_ai_depth_row(builder: &mut ChildSpawnerCommands, label: &str, value: &str) {
+    builder
+        .spawn((
+            Node {
+                display: Display::Flex,
+                flex_direction: FlexDirection::Row,
+                justify_content: JustifyContent::SpaceBetween,
+                align_items: AlignItems::Center,
+                width: Val::Percent(100.0),
+                padding: UiRect::all(Val::Px(8.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.08, 0.08, 0.08)),
+            BorderRadius::all(Val::Px(4.0)),
+        ))
+        .with_children(|builder| {
+            // Label
+            builder.spawn((
+                Text::new(label),
+                TextFont {
+                    font_size: 16.0,
+                    ..default()
+                },
+                TextColor(Color::srgb(0.8, 0.8, 0.8)),
+            ));
+
+            // Value with AIDepthText component for updates
+            builder.spawn((
+                Text::new(value),
+                TextFont {
+                    font_size: 16.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+                AIDepthText,
+            ));
         });
 }
