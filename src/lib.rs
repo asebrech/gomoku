@@ -2,6 +2,8 @@ pub mod ai {
     pub mod heuristic;
     pub mod minimax;
     pub mod move_ordering;
+    pub mod zobrist;
+    pub mod transposition_table;
 }
 
 pub mod core {

@@ -1,10 +1,14 @@
 use gomoku::core::board::Player;
 use gomoku::core::state::GameState;
-use gomoku::interface::utils::find_best_move;
+use gomoku::interface::utils::{find_best_move, init_ai, clear_tt};
 
 #[test]
 fn test_find_best_move_first_move() {
     let mut state = GameState::new(19, 5);
+    
+    // Initialize AI first
+    init_ai(19);
+    clear_tt();
 
     let best_move = find_best_move(&mut state, 2);
 
@@ -15,6 +19,10 @@ fn test_find_best_move_first_move() {
 #[test]
 fn test_find_best_move_response() {
     let mut state = GameState::new(19, 5);
+    
+    // Initialize AI first
+    init_ai(19);
+    clear_tt();
 
     // Make first move
     state.make_move((9, 9));
@@ -30,6 +38,10 @@ fn test_find_best_move_response() {
 #[test]
 fn test_find_best_move_winning_opportunity() {
     let mut state = GameState::new(19, 5);
+    
+    // Initialize AI first
+    init_ai(19);
+    clear_tt();
 
     // Set up winning opportunity for current player (Max)
     state.board.place_stone(9, 5, Player::Max);
@@ -51,6 +63,10 @@ fn test_find_best_move_winning_opportunity() {
 #[test]
 fn test_find_best_move_block_opponent() {
     let mut state = GameState::new(19, 5);
+    
+    // Initialize AI first
+    init_ai(19);
+    clear_tt();
 
     // Set up threat from opponent (Min has 4 in a row)
     state.board.place_stone(9, 5, Player::Min);
@@ -93,6 +109,10 @@ fn test_find_best_move_block_opponent() {
 #[test]
 fn test_find_best_move_no_moves() {
     let mut state = GameState::new(3, 3);
+    
+    // Initialize AI first
+    init_ai(3);
+    clear_tt();
 
     // Fill the board
     for i in 0..3 {
@@ -110,6 +130,10 @@ fn test_find_best_move_no_moves() {
 #[test]
 fn test_find_best_move_different_depths() {
     let mut state = GameState::new(19, 5);
+    
+    // Initialize AI first
+    init_ai(19);
+    clear_tt();
 
     // Set up a position
     state.board.place_stone(9, 9, Player::Max);
@@ -130,6 +154,10 @@ fn test_find_best_move_different_depths() {
 #[test]
 fn test_find_best_move_player_alternation() {
     let mut state = GameState::new(19, 5);
+    
+    // Initialize AI first
+    init_ai(19);
+    clear_tt();
 
     // Test with Max player
     state.current_player = Player::Max;
@@ -149,6 +177,10 @@ fn test_find_best_move_player_alternation() {
 #[test]
 fn test_find_best_move_complex_position() {
     let mut state = GameState::new(19, 5);
+    
+    // Initialize AI first
+    init_ai(19);
+    clear_tt();
 
     // Create a complex position
     state.board.place_stone(9, 9, Player::Max);
@@ -172,6 +204,10 @@ fn test_find_best_move_complex_position() {
 #[test]
 fn test_find_best_move_state_preservation() {
     let mut state = GameState::new(19, 5);
+    
+    // Initialize AI first
+    init_ai(19);
+    clear_tt();
 
     // Set up initial state
     state.board.place_stone(9, 9, Player::Max);
@@ -190,6 +226,10 @@ fn test_find_best_move_state_preservation() {
 #[test]
 fn test_find_best_move_consistent_results() {
     let mut state = GameState::new(19, 5);
+    
+    // Initialize AI first
+    init_ai(19);
+    clear_tt();
 
     // Set up a deterministic position
     state.board.place_stone(9, 9, Player::Max);
@@ -205,6 +245,10 @@ fn test_find_best_move_consistent_results() {
 #[test]
 fn test_find_best_move_edge_cases() {
     let mut state = GameState::new(19, 5);
+    
+    // Initialize AI first
+    init_ai(19);
+    clear_tt();
 
     // Fill most of the board leaving only a few moves
     for i in 0..19 {
@@ -250,8 +294,12 @@ fn test_find_best_move_edge_cases() {
 fn test_find_best_move_different_board_sizes() {
     let mut state13 = GameState::new(13, 5);
     let mut state15 = GameState::new(15, 5);
-
+    
+    // Initialize AI for both sizes
+    init_ai(13);
     let move13 = find_best_move(&mut state13, 2);
+    
+    init_ai(15);
     let move15 = find_best_move(&mut state15, 2);
 
     // Should find center moves for different board sizes
