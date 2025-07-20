@@ -72,18 +72,10 @@ pub fn find_best_move(state: &mut GameState, depth: i32) -> Option<(usize, usize
     // Create iterative deepening engine
     let mut engine = IterativeDeepeningEngine::new(state.board.size);
     
-    // Configure search with reasonable time limit
-    let time_limit = match depth {
-        1..=2 => 1,
-        3..=4 => 2, 
-        5..=6 => 3,
-        7..=8 => 5,
-        _ => 10,
-    };
-    
+    // Configure search with 500ms time limit
     let config = SearchConfig {
         max_depth: depth,
-        max_time: Some(Duration::from_secs(time_limit)),
+        max_time: Some(Duration::from_millis(500)),
     };
     
     // Perform the search

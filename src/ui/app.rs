@@ -45,10 +45,10 @@ impl GameSettings {
 			board_size: 19,
 			total_capture_to_win: 10,
 			minimum_chain_to_win: 5,
-			ai_depth: 20,
+			ai_depth: 8,
 			alpha_beta_enabled: true,
 			versus_ai: true,
-			time_limit: None,
+			time_limit: Some(500), // 500ms time limit
 			use_iterative_deepening: true, // Enable iterative deepening by default
 		}
 	}
