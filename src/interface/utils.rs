@@ -1,4 +1,4 @@
-use crate::ai::{minimax::minimax, transposition::TranspositionTable};
+use crate::ai::{minimax::minimax};
 use crate::core::state::GameState;
 use crate::core::board::Player;
 
@@ -10,7 +10,6 @@ pub fn find_best_move(state: &mut GameState, depth: i32) -> Option<(usize, usize
     } else {
         i32::MAX
     };
-    let _tt = TranspositionTable::new();
 
     for mv in state.get_possible_moves() {
         state.make_move(mv);
@@ -22,7 +21,6 @@ pub fn find_best_move(state: &mut GameState, depth: i32) -> Option<(usize, usize
             i32::MIN,
             i32::MAX,
             current_player == Player::Min, // This is correct because we want to maximize if current_player is Max
-            //&mut tt,
         );
         state.undo_move(mv);
 

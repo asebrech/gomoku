@@ -9,18 +9,11 @@ pub fn minimax(
     mut alpha: i32,
     mut beta: i32,
     maximizing_player: bool,
-    //tt: &mut TranspositionTable,
 ) -> i32 {
     if depth == 0 || state.is_terminal() {
         let eval = Heuristic::evaluate(state, depth);
-        //tt.store(state.hash(), eval);
         return eval;
     }
-
-    /*let key = state.hash();
-    if let Some(score) = tt.lookup(key) {
-        return score;
-    }*/
 
     let mut moves = state.get_possible_moves();
     MoveOrdering::order_moves(state, &mut moves);
@@ -36,7 +29,6 @@ pub fn minimax(
             }
             alpha = max(alpha, value);
         }
-        //tt.store(key, value);
         value
     } else {
         let mut value = i32::MAX;
@@ -49,7 +41,6 @@ pub fn minimax(
             }
             beta = min(beta, value);
         }
-        //tt.store(key, value);
         value
     }
 }
