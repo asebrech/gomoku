@@ -15,16 +15,6 @@ const LIVE_TWO_SCORE: i32 = 50;
 const CAPTURE_BONUS_MULTIPLIER: i32 = 1_000;
 
 const DIRECTIONS: [(isize, isize); 4] = [(1, 0), (0, 1), (1, 1), (1, -1)];
-const ALL_DIRECTIONS: [(isize, isize); 8] = [
-    (-1, -1),
-    (-1, 0),
-    (-1, 1),
-    (0, -1),
-    (0, 1),
-    (1, -1),
-    (1, 0),
-    (1, 1),
-];
 
 #[derive(Debug, Clone, Copy)]
 struct PatternCounts {
