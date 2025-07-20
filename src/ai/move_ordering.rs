@@ -75,6 +75,10 @@ impl MoveOrdering {
         dy: isize,
         player: Player,
     ) -> usize {
+        let player_bits = match player {
+            Player::Max => &board.max_bits,
+            Player::Min => &board.min_bits,
+        };
         let mut count = 0;
         let mut current_row = row as isize + dx;
         let mut current_col = col as isize + dy;
@@ -83,36 +87,40 @@ impl MoveOrdering {
             && current_row < board.size as isize
             && current_col >= 0
             && current_col < board.size as isize
-            && board.get_player(current_row as usize, current_col as usize) == Some(player)
         {
-            count += 1;
-            current_row += dx;
-            current_col += dy;
+            let idx = board.index(current_row as usize, current_col as usize);
+            if Board::is_bit_set(player_bits, idx) {
+                count += 1;
+                current_row += dx;
+                current_col += dy;
+            } else {
+                break;
+            }
         }
         count
     }
 
     fn calculate_adjacency_bonus(board: &Board, row: usize, col: usize) -> i32 {
-        let mut bonus = 0;
+        let mut neighbor_mask = vec![0u64; board.u64_count];
+        let mut num_adjacent = 0;
+
         for &(dx, dy) in &ALL_DIRECTIONS {
-            let new_row = row as isize + dx;
-            let new_col = col as isize + dy;
-            if new_row >= 0
-                && new_row < board.size as isize
-                && new_col >= 0
-                && new_col < board.size as isize
-                && board
-                    .get_player(new_row as usize, new_col as usize)
-                    .is_some()
-            {
-                bonus += 50;
+            let nr = row as isize + dx;
+            let nc = col as isize + dy;
+            if nr >= 0 && nc >= 0 && nr < board.size as isize && nc < board.size as isize {
+                let idx = board.index(nr as usize, nc as usize);
+                Board::set_bit(&mut neighbor_mask, idx);
             }
         }
-        bonus
+
+        for (&o, &m) in board.occupied.iter().zip(&neighbor_mask) {
+            num_adjacent += (o & m).count_ones() as i32;
+        }
+
+        num_adjacent * 50
     }
 
     fn manhattan_distance(row1: usize, col1: usize, row2: usize, col2: usize) -> usize {
         ((row1 as isize - row2 as isize).abs() + (col1 as isize - col2 as isize).abs()) as usize
     }
 }
-
