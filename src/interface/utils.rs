@@ -60,19 +60,105 @@ pub fn get_tt_stats() -> (usize, f64, u64) {
 
 /// Enhanced find_best_move with parallel search and transposition table
 pub fn find_best_move(state: &mut GameState, depth: i32) -> Option<(usize, usize)> {
+    use std::time::Instant;
+    let start_time = Instant::now();
+    
+    println!("🔍 AI search depth: {}", depth);
+    
     // Safety check for depth
     if depth <= 0 {
         let moves = state.get_possible_moves();
         return moves.first().copied();
     }
     
-    // For now, use simple sequential search to avoid infinite loops
-    find_best_move_sequential(state, depth)
+    // Get the correct Zobrist hash for this board size
+    let zobrist = get_zobrist(state.board.size);
+    
+    let tt = match TRANSPOSITION_TABLE.get() {
+        Some(t) => t,
+        None => {
+            println!("⚠️  TT not initialized, falling back to sequential");
+            let result = find_best_move_sequential(state, depth);
+            let elapsed = start_time.elapsed();
+            println!("⏱️  AI search time: {:?}", elapsed);
+            return result;
+        }
+    };
+    
+    let moves = state.get_possible_moves();
+    if moves.is_empty() {
+        return None;
+    }
+    
+    println!("🧠 Using REAL minimax with TT and {} moves", moves.len());
+    
+    // Check thread count
+    let thread_count = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1);
+    println!("💻 Available CPU cores: {}", thread_count);
+    
+    // Advance age for new search
+    tt.advance_age();
+    
+    let current_player = state.current_player;
+    let initial_hash = zobrist.compute_hash(state);
+    
+    // Use parallel search at root level for better performance
+    println!("🚀 Starting parallel root search with {} threads", 
+             std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1));
+    
+    let result = moves.into_par_iter().map(|mv| {
+        let mut state_copy = state.clone();
+        state_copy.make_move(mv);
+        
+        let new_hash = zobrist.update_hash_make_move(initial_hash, mv.0, mv.1, current_player);
+        
+        let score = minimax(
+            &mut state_copy,
+            depth - 1,
+            i32::MIN + 1,
+            i32::MAX - 1,
+            current_player == Player::Min,
+            new_hash,
+            &zobrist,
+            tt,
+        );
+        
+        println!("📊 Thread {:?} evaluated move ({}, {}) = {}", 
+                 std::thread::current().id(), mv.0, mv.1, score);
+        
+        (mv, score)
+    }).max_by_key(|&(_, score)| {
+        if current_player == Player::Max {
+            score
+        } else {
+            -score // For Min player, we want the minimum score
+        }
+    });
+    
+    let best_move = result.map(|(mv, _)| mv);
+    
+    let elapsed = start_time.elapsed();
+    println!("⏱️  AI search time: {:?}", elapsed);
+    
+    if let Some((row, col)) = best_move {
+        println!("🎯 Best move: ({}, {})", row, col);
+    }
+    
+    // Print TT stats
+    let (tt_size, hit_rate, collisions) = get_tt_stats();
+    if tt_size > 0 {
+        println!("📊 TT Stats - Size: {}, Hit Rate: {:.1}%, Collisions: {}", 
+                tt_size, hit_rate * 100.0, collisions);
+    }
+    
+    best_move
 }
 
 /// Fallback sequential version of find_best_move  
 fn find_best_move_sequential(state: &mut GameState, depth: i32) -> Option<(usize, usize)> {
     let moves = state.get_possible_moves();
+    println!("📝 Evaluating {} possible moves", moves.len());
+    
     if moves.is_empty() {
         return None;
     }

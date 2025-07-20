@@ -4,6 +4,7 @@ use bevy::window::{PresentMode, WindowTheme};
 use bevy::color::palettes::css::CRIMSON;
 
 use crate::core::state::GameState;
+use crate::interface::utils::init_ai;
 use crate::ui::display::display::make_visible;
 use crate::ui::screens::game::game::game_plugin;
 use crate::ui::screens::menu::menu_plugin;
@@ -43,7 +44,7 @@ impl GameSettings {
 			board_size: 19,
 			total_capture_to_win: 10,
 			minimum_chain_to_win: 5,
-			ai_depth: 10,
+			ai_depth: 3,
 			alpha_beta_enabled: true,
 			versus_ai: true,
 			time_limit: None
@@ -115,6 +116,11 @@ impl GomokuApp {
 
 	fn init_resources(&mut self) {
 		let settings = GameSettings::new();
+		
+		// Initialize AI components with the board size
+		init_ai(settings.board_size);
+		println!("🚀 AI initialized with board size: {}", settings.board_size);
+		
 		self.app
 		.insert_resource(GameState::new(settings.board_size, settings.minimum_chain_to_win))
         .insert_resource(settings)
