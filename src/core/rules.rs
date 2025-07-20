@@ -4,34 +4,46 @@ pub struct WinChecker;
 
 impl WinChecker {
     pub fn check_win_around(board: &Board, row: usize, col: usize, win_condition: usize) -> bool {
-        let player = board.get_player(row, col).unwrap();
+        let player_opt = board.get_player(row, col);
+        if player_opt.is_none() {
+            return false;
+        }
+        let player = player_opt.unwrap();
         let directions = [(1, 0), (0, 1), (1, 1), (1, -1)];
 
         for &(dx, dy) in directions.iter() {
             let mut count = 1;
 
-            let mut x = row as isize + dx as isize;
-            let mut y = col as isize + dy as isize;
-            while x >= 0 && y >= 0 && x < board.size as isize && y < board.size as isize {
+            // Forward direction
+            let mut step = 1;
+            loop {
+                let x = row as isize + dx as isize * step;
+                let y = col as isize + dy as isize * step;
+                if x < 0 || y < 0 || x >= board.size as isize || y >= board.size as isize {
+                    break;
+                }
                 if board.get_player(x as usize, y as usize) == Some(player) {
                     count += 1;
-                    x += dx as isize;
-                    y += dy as isize;
                 } else {
                     break;
                 }
+                step += 1;
             }
 
-            let mut x = row as isize - dx as isize;
-            let mut y = col as isize - dy as isize;
-            while x >= 0 && y >= 0 && x < board.size as isize && y < board.size as isize {
+            // Backward direction
+            let mut step = 1;
+            loop {
+                let x = row as isize - dx as isize * step;
+                let y = col as isize - dy as isize * step;
+                if x < 0 || y < 0 || x >= board.size as isize || y >= board.size as isize {
+                    break;
+                }
                 if board.get_player(x as usize, y as usize) == Some(player) {
                     count += 1;
-                    x -= dx as isize;
-                    y -= dy as isize;
                 } else {
                     break;
                 }
+                step += 1;
             }
 
             if count >= win_condition {
