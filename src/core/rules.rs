@@ -4,11 +4,21 @@ pub struct WinChecker;
 
 impl WinChecker {
     pub fn check_win_around(board: &Board, row: usize, col: usize, win_condition: usize) -> bool {
-        let player_opt = board.get_player(row, col);
-        if player_opt.is_none() {
+        if row >= board.size || col >= board.size {
             return false;
         }
-        let player = player_opt.unwrap();
+        let idx = board.index(row, col);
+        let is_max = Board::is_bit_set(&board.max_bits, idx);
+        let is_min = Board::is_bit_set(&board.min_bits, idx);
+        if !is_max && !is_min {
+            return false;
+        }
+        let player_bits = if is_max {
+            &board.max_bits
+        } else {
+            &board.min_bits
+        };
+
         let directions = [(1, 0), (0, 1), (1, 1), (1, -1)];
 
         for &(dx, dy) in directions.iter() {
@@ -22,12 +32,16 @@ impl WinChecker {
                 if x < 0 || y < 0 || x >= board.size as isize || y >= board.size as isize {
                     break;
                 }
-                if board.get_player(x as usize, y as usize) == Some(player) {
+                let check_idx = board.index(x as usize, y as usize);
+                if Board::is_bit_set(player_bits, check_idx) {
                     count += 1;
                 } else {
                     break;
                 }
                 step += 1;
+                if count >= win_condition {
+                    return true;
+                }
             }
 
             // Backward direction
@@ -38,12 +52,16 @@ impl WinChecker {
                 if x < 0 || y < 0 || x >= board.size as isize || y >= board.size as isize {
                     break;
                 }
-                if board.get_player(x as usize, y as usize) == Some(player) {
+                let check_idx = board.index(x as usize, y as usize);
+                if Board::is_bit_set(player_bits, check_idx) {
                     count += 1;
                 } else {
                     break;
                 }
                 step += 1;
+                if count >= win_condition {
+                    return true;
+                }
             }
 
             if count >= win_condition {
