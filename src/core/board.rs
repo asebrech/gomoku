@@ -41,7 +41,7 @@ impl Board {
         }
     }
 
-    fn index(&self, row: usize, col: usize) -> usize {
+    pub fn index(&self, row: usize, col: usize) -> usize {
         row * self.size + col
     }
 
@@ -51,13 +51,13 @@ impl Board {
         bits[array_idx] |= 1u64 << bit_idx;
     }
 
-    fn clear_bit(bits: &mut Vec<u64>, idx: usize) {
+    pub fn clear_bit(bits: &mut Vec<u64>, idx: usize) {
         let array_idx = idx / 64;
         let bit_idx = (idx % 64) as u32;
         bits[array_idx] &= !(1u64 << bit_idx);
     }
 
-    fn is_bit_set(bits: &Vec<u64>, idx: usize) -> bool {
+    pub fn is_bit_set(bits: &Vec<u64>, idx: usize) -> bool {
         let array_idx = idx / 64;
         let bit_idx = (idx % 64) as u32;
         (bits[array_idx] & (1u64 << bit_idx)) != 0
