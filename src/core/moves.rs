@@ -12,11 +12,11 @@ impl MoveHandler {
             return vec![board.center()];
         }
 
-        (0..board.size)
-            .flat_map(|i| (0..board.size).map(move |j| (i, j)))
+        board
+            .get_empty_positions()
+            .into_iter()
             .filter(|&(i, j)| {
-                board.is_empty_position(i, j)
-                    && board.is_adjacent_to_stone(i, j)
+                board.is_adjacent_to_stone(i, j)
                     && !RuleValidator::creates_double_three(board, i, j, player)
             })
             .collect()
@@ -57,7 +57,7 @@ impl RuleValidator {
         let left_info = Self::scan_direction(board, row, col, player, -dr, -dc);
         let right_info = Self::scan_direction(board, row, col, player, dr, dc);
 
-        let total_stones = 1 + left_info.0 + right_info.0; // +1 for the current stone
+        let total_stones = 1 + left_info.0 + right_info.0; // +1 for the hypothetical stone at (row, col)
         let left_open = left_info.1;
         let right_open = right_info.1;
 
@@ -72,34 +72,44 @@ impl RuleValidator {
         dr: isize,
         dc: isize,
     ) -> (usize, bool) {
+        let player_bits = match player {
+            Player::Max => &board.max_bits,
+            Player::Min => &board.min_bits,
+        };
+        let opponent_bits = match player.opponent() {
+            Player::Max => &board.max_bits,
+            Player::Min => &board.min_bits,
+        };
+
         let mut stones = 0;
         let mut empty_found = false;
         let mut is_open = false;
 
         for i in 1..=MAX_SEARCH_DISTANCE {
-            let (new_row, new_col) = (row as isize + dr * i, col as isize + dc * i);
+            let new_row = row as isize + dr * i;
+            let new_col = col as isize + dc * i;
 
             if !Self::is_valid_pos(board, new_row, new_col) {
                 break;
             }
+            let idx = board.index(new_row as usize, new_col as usize);
 
-            match board.get_player(new_row as usize, new_col as usize) {
-                Some(p) if p == player => {
-                    if empty_found {
-                        break; // Gap in stones
-                    }
-                    stones += 1;
+            if Board::is_bit_set(player_bits, idx) {
+                if empty_found {
+                    break; // Gap in stones
                 }
-                None => {
-                    if !empty_found && stones > 0 {
-                        is_open = true;
-                    }
-                    empty_found = true;
-                    if stones > 0 {
-                        break; // Only care about first empty space after stones
-                    }
+                stones += 1;
+            } else if !Board::is_bit_set(&board.occupied, idx) {
+                // Empty position
+                if !empty_found && stones > 0 {
+                    is_open = true;
                 }
-                Some(_) => break, // Opponent stone blocks
+                empty_found = true;
+                if stones > 0 {
+                    break; // Only care about first empty space after stones
+                }
+            } else if Board::is_bit_set(opponent_bits, idx) {
+                break; // Opponent stone blocks
             }
         }
 
