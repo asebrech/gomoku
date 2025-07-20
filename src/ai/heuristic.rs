@@ -324,10 +324,12 @@ impl Heuristic {
     }
 
     fn is_board_full(board: &Board) -> bool {
-        board
-            .cells
-            .iter()
-            .all(|row| row.iter().all(|&cell| cell.is_some()))
+        // Board is full if every cell is occupied by either player
+        (0..board.size).all(|row| {
+            (0..board.size).all(|col| {
+                board.get_player(row, col).is_some()
+            })
+        })
     }
 
     fn calculate_capture_bonus(state: &GameState) -> i32 {

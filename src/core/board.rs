@@ -19,22 +19,50 @@ impl Player {
 
 #[derive(Resource, Component, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Board {
-    pub cells: Vec<Vec<Option<Player>>>,
+    pub max_bits: Vec<u64>,
+    pub min_bits: Vec<u64>,
     pub size: usize,
+    pub u64_count: usize,
+    pub total_cells: usize,
 }
 
 impl Board {
     pub fn new(size: usize) -> Self {
+        let total_cells = size * size;
+        let u64_count = ((total_cells + 63) / 64) as usize;
         Board {
-            cells: vec![vec![None; size]; size],
+            max_bits: vec![0u64; u64_count],
+            min_bits: vec![0u64; u64_count],
             size,
+            u64_count,
+            total_cells,
         }
     }
 
+    fn index(&self, row: usize, col: usize) -> usize {
+        row * self.size + col
+    }
+
+    fn set_bit(bits: &mut Vec<u64>, idx: usize) {
+        let array_idx = idx / 64;
+        let bit_idx = (idx % 64) as u32;
+        bits[array_idx] |= 1u64 << bit_idx;
+    }
+
+    fn clear_bit(bits: &mut Vec<u64>, idx: usize) {
+        let array_idx = idx / 64;
+        let bit_idx = (idx % 64) as u32;
+        bits[array_idx] &= !(1u64 << bit_idx);
+    }
+
+    fn is_bit_set(bits: &Vec<u64>, idx: usize) -> bool {
+        let array_idx = idx / 64;
+        let bit_idx = (idx % 64) as u32;
+        (bits[array_idx] & (1u64 << bit_idx)) != 0
+    }
+
     pub fn is_empty(&self) -> bool {
-        self.cells
-            .iter()
-            .all(|row| row.iter().all(|cell| cell.is_none()))
+        self.max_bits.iter().all(|&b| b == 0) && self.min_bits.iter().all(|&b| b == 0)
     }
 
     pub fn center(&self) -> (usize, usize) {
@@ -42,23 +70,37 @@ impl Board {
     }
 
     pub fn is_empty_position(&self, row: usize, col: usize) -> bool {
-        self.cells[row][col].is_none()
+        let idx = self.index(row, col);
+        !Self::is_bit_set(&self.max_bits, idx) && !Self::is_bit_set(&self.min_bits, idx)
     }
 
     pub fn get_player(&self, row: usize, col: usize) -> Option<Player> {
-        self.cells[row][col]
+        let idx = self.index(row, col);
+        if Self::is_bit_set(&self.max_bits, idx) {
+            Some(Player::Max)
+        } else if Self::is_bit_set(&self.min_bits, idx) {
+            Some(Player::Min)
+        } else {
+            None
+        }
     }
 
     pub fn place_stone(&mut self, row: usize, col: usize, player: Player) {
-        self.cells[row][col] = Some(player);
+        let idx = self.index(row, col);
+        match player {
+            Player::Max => Self::set_bit(&mut self.max_bits, idx),
+            Player::Min => Self::set_bit(&mut self.min_bits, idx),
+        }
     }
 
     pub fn remove_stone(&mut self, row: usize, col: usize) {
-        self.cells[row][col] = None;
+        let idx = self.index(row, col);
+        Self::clear_bit(&mut self.max_bits, idx);
+        Self::clear_bit(&mut self.min_bits, idx);
     }
 
     pub fn is_adjacent_to_stone(&self, row: usize, col: usize) -> bool {
-        let directions = [-1, 0, 1];
+        let directions = [-1isize, 0, 1];
 
         for &dr in &directions {
             for &dc in &directions {
@@ -74,7 +116,10 @@ impl Board {
                     && new_row < self.size as isize
                     && new_col < self.size as isize
                 {
-                    if self.cells[new_row as usize][new_col as usize].is_some() {
+                    if self
+                        .get_player(new_row as usize, new_col as usize)
+                        .is_some()
+                    {
                         return true;
                     }
                 }
@@ -86,10 +131,11 @@ impl Board {
 
     pub fn hash(&self) -> u64 {
         let mut hasher = DefaultHasher::new();
-        for row in &self.cells {
-            for cell in row {
-                cell.hash(&mut hasher);
-            }
+        for &b in &self.max_bits {
+            b.hash(&mut hasher);
+        }
+        for &b in &self.min_bits {
+            b.hash(&mut hasher);
         }
         hasher.finish()
     }
