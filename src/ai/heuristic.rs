@@ -12,7 +12,7 @@ const DEAD_FOUR_SCORE: i32 = 1_000;
 const LIVE_THREE_SCORE: i32 = 500;
 const DEAD_THREE_SCORE: i32 = 100;
 const LIVE_TWO_SCORE: i32 = 50;
-const CAPTURE_BONUS_MULTIPLIER: i32 = 2_000;
+const CAPTURE_BONUS_MULTIPLIER: i32 = 1_000;
 
 const DIRECTIONS: [(isize, isize); 4] = [(1, 0), (0, 1), (1, 1), (1, -1)];
 const ALL_DIRECTIONS: [(isize, isize); 8] = [
@@ -57,8 +57,18 @@ struct PatternInfo {
 
 impl Heuristic {
     pub fn evaluate(state: &GameState, depth: i32) -> i32 {
-        if let Some(terminal_score) = Self::evaluate_terminal_states(state, depth) {
-            return terminal_score;
+        if let Some(winner) = state.check_winner() {
+            return match winner {
+                Player::Max => WINNING_SCORE + depth,
+                Player::Min => -WINNING_SCORE - depth,
+            };
+        }
+
+        if state.max_captures >= 5 {
+            return WINNING_SCORE + depth;
+        }
+        if state.min_captures >= 5 {
+            return -WINNING_SCORE - depth;
         }
 
         if Self::is_board_full(&state.board) {
@@ -68,7 +78,6 @@ impl Heuristic {
         let (max_counts, min_counts) =
             Self::analyze_both_players(&state.board, state.win_condition);
 
-        // Early termination for winning patterns
         if max_counts.five_in_row > 0 || max_counts.live_four > 1 {
             return WINNING_SCORE + depth;
         }
@@ -417,22 +426,6 @@ impl Heuristic {
             }
         }
         bonus
-    }
-
-    fn evaluate_terminal_states(state: &GameState, depth: i32) -> Option<i32> {
-        if let Some(winner) = state.check_winner() {
-            return Some(match winner {
-                Player::Max => WINNING_SCORE + depth,
-                Player::Min => -WINNING_SCORE - depth,
-            });
-        }
-        if state.max_captures >= 5 {
-            return Some(WINNING_SCORE + depth);
-        }
-        if state.min_captures >= 5 {
-            return Some(-WINNING_SCORE - depth);
-        }
-        None
     }
 
     fn is_board_full(board: &Board) -> bool {
