@@ -82,25 +82,25 @@ fn test_find_best_move_block_opponent() {
 }
 
 // TODO: Add a test to verify that find_best_move detects a capture opportunity and chooses the correct capturing move for the current player.
-// #[test]
-// fn test_find_best_move_capture_opportunity() {
-//     let mut state = GameState::new(19, 5);
-//
-//     // Set up capture opportunity
-//     state.board.place_stone(9, 9, Player::Max);
-//     state.board.place_stone(9, 10, Player::Min);
-//     state.board.place_stone(9, 11, Player::Min);
-//     state.current_player = Player::Max;
-//
-//     let best_move = find_best_move(&mut state, 2, &mut tt);
-//
-//     // Should find the capturing move
-//     assert!(best_move.is_some());
-//     let (row, col) = best_move.unwrap();
-//
-//     // Should be the capturing position
-//     assert_eq!((row, col), (9, 12));
-// }
+#[test]
+fn test_find_best_move_capture_opportunity() {
+    let mut state = GameState::new(19, 5);
+    let mut tt = TranspositionTable::new_default();
+    // Set up capture opportunity
+    state.board.place_stone(9, 9, Player::Max);
+    state.board.place_stone(9, 10, Player::Min);
+    state.board.place_stone(9, 11, Player::Min);
+    state.current_player = Player::Max;
+
+    let best_move = find_best_move(&mut state, 2, &mut tt);
+
+    // Should find the capturing move
+    assert!(best_move.is_some());
+    let (row, col) = best_move.unwrap();
+
+    // Should be the capturing position
+    assert_eq!((row, col), (9, 12));
+}
 
 #[test]
 fn test_find_best_move_no_moves() {
@@ -248,22 +248,22 @@ fn test_find_best_move_edge_cases() {
 }
 
 // TODO: Add a test to confirm that find_best_move selects the correct move to win the game via a capture when one pair away from a capture-win.
-// #[test]
-// fn test_find_best_move_capture_win() {
-//     let mut state = GameState::new(19, 5);
-//
-//     // Set up near-capture-win scenario
-//     state.max_captures = 4; // One away from winning
-//     state.board.place_stone(9, 9, Player::Max);
-//     state.board.place_stone(9, 10, Player::Min);
-//     state.board.place_stone(9, 11, Player::Min);
-//     state.current_player = Player::Max;
-//
-//     let best_move = find_best_move(&mut state, 2, &mut tt);
-//
-//     // Should find the winning capture
-//     assert_eq!(best_move, Some((9, 12)));
-// }
+#[test]
+fn test_find_best_move_capture_win() {
+    let mut state = GameState::new(19, 5);
+
+    // Set up near-capture-win scenario
+    state.max_captures = 4; // One away from winning
+    state.board.place_stone(9, 9, Player::Max);
+    state.board.place_stone(9, 10, Player::Min);
+    state.board.place_stone(9, 11, Player::Min);
+    state.current_player = Player::Max;
+    let mut tt = TranspositionTable::new_default();
+    let best_move = find_best_move(&mut state, 2, &mut tt);
+
+    // Should find the winning capture
+    assert_eq!(best_move, Some((9, 12)));
+}
 
 #[test]
 fn test_find_best_move_different_board_sizes() {

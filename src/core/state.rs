@@ -154,8 +154,8 @@ impl GameState {
 
         let pairs_captured = captures.len() / 2;
         match self.current_player {
-            Player::Max => self.min_captures += pairs_captured,
-            Player::Min => self.max_captures += pairs_captured,
+            Player::Max => self.max_captures += pairs_captured,
+            Player::Min => self.min_captures += pairs_captured,
         }
 
         self.capture_history.push(captures);
@@ -183,13 +183,13 @@ impl GameState {
                 let pairs_captured = last_captures.len() / 2;
                 match self.current_player {
                     Player::Max => {
-                        if self.min_captures >= pairs_captured {
-                            self.min_captures -= pairs_captured;
+                        if self.max_captures >= pairs_captured {
+                            self.max_captures -= pairs_captured;
                         }
                     }
                     Player::Min => {
-                        if self.max_captures >= pairs_captured {
-                            self.max_captures -= pairs_captured;
+                        if self.min_captures >= pairs_captured {
+                            self.min_captures -= pairs_captured;
                         }
                     }
                 }

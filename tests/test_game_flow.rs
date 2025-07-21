@@ -39,31 +39,25 @@ fn test_full_game_flow_simple() {
 }
 
 // TODO: Implement a full game flow test with capture scenarios and ensure capture mechanics work as expected.
-// #[test]
-// fn test_full_game_with_captures() {
-//     let mut state = GameState::new(19, 5);
-//
-//     // Set up a game with captures
-//     state.make_move((9, 9)); // Max
-//     state.make_move((9, 10)); // Min
-//     state.make_move((9, 8)); // Max
-//     state.make_move((9, 11)); // Min
-//     state.make_move((9, 7)); // Max
-//     state.make_move((9, 12)); // Min
-//
-//     // Max makes a move that will allow capture
-//     state.make_move((10, 9)); // Max
-//     state.make_move((8, 9)); // Min
-//
-//     // Max creates a capture opportunity
-//     state.make_move((11, 9)); // Max
-//
-//     // Min should capture
-//     state.make_move((7, 9)); // Min - this should trigger capture
-//
-//     // Verify capture occurred
-//     assert!(state.min_captures > 0 || state.max_captures > 0);
-// }
+#[test]
+fn test_full_game_with_captures() {
+    let mut state = GameState::new(19, 5);
+
+    // Create a proper capture scenario: O-X-X-O pattern
+    state.make_move((9, 8)); // Max at (9,8)
+    state.make_move((9, 6)); // Min at (9,6) - this will be the first O
+    state.make_move((9, 7)); // Max at (9,7) - this will be captured (first X)
+    state.make_move((8, 8)); // Min somewhere else
+    // (9,8) already has Max - this will be captured (second X)
+    state.make_move((10, 10)); // Min somewhere else
+
+    // Now we have: O . X X . . .
+    // Min plays at (9,9) to create: O . X X O which captures the two X's
+    state.make_move((9, 9)); // Min - this should trigger capture of (9,7) and (9,8)
+
+    // Verify capture occurred
+    assert!(state.min_captures > 0 || state.max_captures > 0);
+}
 
 #[test]
 fn test_ai_vs_ai_game() {
@@ -145,28 +139,29 @@ fn test_undo_redo_sequence() {
     assert_eq!(state.min_captures, 0);
 }
 
-/*#[test]
+#[test]
 fn test_complex_capture_scenario() {
     let mut state = GameState::new(19, 5);
 
-    // Set up complex capture scenario
-    state.board.place_stone(9, 9, Player::Max);
-    state.board.place_stone(9, 10, Player::Min);
-    state.board.place_stone(9, 11, Player::Min);
-
-    // Horizontal capture
-    state.current_player = Player::Max;
-    state.make_move((9, 12));
+    // Set up complex capture scenario using proper move mechanics
+    state.make_move((9, 9)); // Max
+    state.make_move((9, 10)); // Min
+    state.make_move((8, 8)); // Max (dummy move)
+    state.make_move((9, 11)); // Min
+    
+    // Now Max to move - create horizontal capture: X-O-O-X
+    state.make_move((9, 12)); // Max - this should capture (9,10) and (9,11)
 
     // Verify capture
     assert_eq!(state.board.get_player(9, 10), None);
     assert_eq!(state.board.get_player(9, 11), None);
-    assert_eq!(state.min_captures, 1);
+    assert_eq!(state.max_captures, 1); // Max made the capture, so max_captures should increase
 
     // Verify capture history
-    assert_eq!(state.capture_history.len(), 1);
-    assert_eq!(state.capture_history[0].len(), 2);
-}*/
+    assert_eq!(state.capture_history.len(), 5); // One entry per move (empty for non-capture moves)
+    // The last entry should contain the captured stones
+    assert_eq!(state.capture_history[4].len(), 2); // 2 stones captured in the last move
+}
 
 #[test]
 fn test_game_state_consistency() {
