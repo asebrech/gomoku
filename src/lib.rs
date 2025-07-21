@@ -3,6 +3,7 @@ pub mod ai {
     pub mod minimax;
     pub mod move_ordering;
     pub mod transposition;
+    pub mod zobrist;
 }
 
 pub mod core {
