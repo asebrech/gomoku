@@ -148,7 +148,9 @@ fn test_edge_case_wins() {
     assert!(WinChecker::check_win_around(&board, 0, 0, 5));
     assert!(WinChecker::check_win_around(&board, 0, 4, 5));
 
-    // Test win at board corner
+    for i in 0..5 {
+        board.remove_stone(0, i);
+    }
     for i in 0..5 {
         board.place_stone(i, 0, Player::Min);
     }

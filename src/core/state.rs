@@ -1,9 +1,10 @@
+use crate::ai::zobrist::ZobristHash;
 use crate::core::board::{Board, Player};
 use crate::core::captures::CaptureHandler;
 use crate::core::moves::MoveHandler;
 use crate::core::rules::WinChecker;
-use std::hash::{DefaultHasher, Hash, Hasher};
 use bevy::prelude::*;
+use std::hash::Hash;
 
 #[derive(Resource, Component, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct GameState {
@@ -14,19 +15,29 @@ pub struct GameState {
     pub max_captures: usize,
     pub min_captures: usize,
     pub capture_history: Vec<Vec<(usize, usize)>>,
+    pub zobrist_hash: ZobristHash,
+    pub current_hash: u64,
 }
 
 impl GameState {
     pub fn new(board_size: usize, win_condition: usize) -> Self {
-        GameState {
-            board: Board::new(board_size),
-            current_player: Player::Max,
+        let zobrist_hash = ZobristHash::new(board_size);
+        let board = Board::new(board_size);
+        let current_player = Player::Max;
+        let mut state = GameState {
+            board,
+            current_player,
             win_condition,
             winner: None,
             max_captures: 0,
             min_captures: 0,
             capture_history: Vec::new(),
-        }
+            zobrist_hash: zobrist_hash.clone(),
+            current_hash: 0,
+        };
+        // Compute the initial hash
+        state.current_hash = zobrist_hash.compute_hash(&state);
+        state
     }
 
     pub fn get_possible_moves(&self) -> Vec<(usize, usize)> {
@@ -34,23 +45,59 @@ impl GameState {
     }
 
     pub fn make_move(&mut self, mv: (usize, usize)) {
+        self.current_hash = self.zobrist_hash.update_hash_make_move(
+            self.current_hash,
+            mv.0,
+            mv.1,
+            self.current_player,
+        );
+
         self.board.place_stone(mv.0, mv.1, self.current_player);
 
-        /*let captures =
+        let captures =
             CaptureHandler::detect_captures(&self.board, mv.0, mv.1, self.current_player);
-        self.execute_captures(captures);*/
+        
+        if !captures.is_empty() {
+            let captured_player = self.current_player.opponent();
+            self.current_hash = self.zobrist_hash.update_hash_capture(
+                self.current_hash,
+                &captures,
+                captured_player,
+            );
+        }
+        
+        self.execute_captures(captures);
 
         self.check_for_wins(mv);
         self.switch_player();
     }
 
     pub fn undo_move(&mut self, move_: (usize, usize)) {
-        self.current_player = self.current_player.opponent();
+        let move_player = self.current_player.opponent();
+        
+        if let Some(last_captures) = self.capture_history.last() {
+            if !last_captures.is_empty() {
+                let captured_player = move_player.opponent();
+                self.current_hash = self.zobrist_hash.update_hash_capture(
+                    self.current_hash,
+                    last_captures,
+                    captured_player,
+                );
+            }
+        }
 
         self.board.remove_stone(move_.0, move_.1);
+        self.current_hash = self.zobrist_hash.update_hash_undo_move(
+            self.current_hash,
+            move_.0,
+            move_.1,
+            move_player,
+        );
+
+        self.current_player = move_player;
         self.winner = None;
 
-        //self.restore_captured_stones();
+        self.restore_captured_stones();
     }
 
     pub fn is_terminal(&self) -> bool {
@@ -62,10 +109,7 @@ impl GameState {
     }
 
     pub fn hash(&self) -> u64 {
-        let mut hasher = DefaultHasher::new();
-        self.board.hash().hash(&mut hasher);
-        self.current_player.hash(&mut hasher);
-        hasher.finish()
+        self.current_hash
     }
 
     fn switch_player(&mut self) {
@@ -92,12 +136,19 @@ impl GameState {
             return;
         }
 
-        CaptureHandler::execute_captures(&mut self.board, &captures);
+        for &(row, col) in &captures {
+            if row < self.board.size && col < self.board.size {
+                let idx = self.board.index(row, col);
+                Board::clear_bit(&mut self.board.max_bits, idx);
+                Board::clear_bit(&mut self.board.min_bits, idx);
+                Board::clear_bit(&mut self.board.occupied, idx);
+            }
+        }
 
         let pairs_captured = captures.len() / 2;
         match self.current_player {
-            Player::Max => self.min_captures += pairs_captured,
-            Player::Min => self.max_captures += pairs_captured,
+            Player::Max => self.max_captures += pairs_captured,
+            Player::Min => self.min_captures += pairs_captured,
         }
 
         self.capture_history.push(captures);
@@ -107,21 +158,31 @@ impl GameState {
         if let Some(last_captures) = self.capture_history.pop() {
             if !last_captures.is_empty() {
                 let opponent = self.current_player.opponent();
+                let size = self.board.size;
+
+                let opponent_bits = match opponent {
+                    Player::Max => &mut self.board.max_bits,
+                    Player::Min => &mut self.board.min_bits,
+                };
 
                 for &(row, col) in &last_captures {
-                    self.board.place_stone(row, col, opponent);
+                    if row < size && col < size {
+                        let idx = row * size + col;
+                        Board::set_bit(opponent_bits, idx);
+                        Board::set_bit(&mut self.board.occupied, idx);
+                    }
                 }
 
                 let pairs_captured = last_captures.len() / 2;
                 match self.current_player {
                     Player::Max => {
-                        if self.min_captures >= pairs_captured {
-                            self.min_captures -= pairs_captured;
+                        if self.max_captures >= pairs_captured {
+                            self.max_captures -= pairs_captured;
                         }
                     }
                     Player::Min => {
-                        if self.max_captures >= pairs_captured {
-                            self.max_captures -= pairs_captured;
+                        if self.min_captures >= pairs_captured {
+                            self.min_captures -= pairs_captured;
                         }
                     }
                 }

@@ -4,6 +4,7 @@ use bevy::window::{PresentMode, WindowTheme};
 use bevy::color::palettes::css::CRIMSON;
 
 use crate::core::state::GameState;
+use crate::ai::transposition::TranspositionTable;
 use crate::ui::display::display::make_visible;
 use crate::ui::screens::game::game::game_plugin;
 use crate::ui::screens::menu::menu_plugin;
@@ -34,7 +35,7 @@ pub struct GameSettings {
 	pub ai_depth: i32, //default to 2
 	pub alpha_beta_enabled: bool, //wether deep checking is enabled or not
 	pub versus_ai: bool, //if the user is against an AI or multiplayer
-	pub time_limit: Option<usize> // time limit in seconds, optional
+	pub time_limit: Option<usize> // time limit in milliseconds, optional
 }
 
 impl GameSettings {
@@ -43,10 +44,10 @@ impl GameSettings {
 			board_size: 19,
 			total_capture_to_win: 10,
 			minimum_chain_to_win: 5,
-			ai_depth: 3,
+			ai_depth: 10, // Increased since iterative deepening can handle higher depths
 			alpha_beta_enabled: true,
 			versus_ai: true,
-			time_limit: None
+			time_limit: Some(500) // 1000ms (1 second) time limit for AI by default
 		}
 	}
 }
@@ -91,25 +92,18 @@ impl GomokuApp {
                     name: Some("bevy.app".into()),
                     resolution: (1240., 720.).into(),
                     present_mode: PresentMode::AutoVsync,
-                    // Tells Wasm to resize the window according to the available canvas
                     fit_canvas_to_parent: true,
-                    // Tells Wasm not to override default event handling, like F5, Ctrl+R etc.
                     prevent_default_event_handling: false,
                     window_theme: Some(WindowTheme::Dark),
                     enabled_buttons: bevy::window::EnabledButtons {
                         maximize: false,
                         ..Default::default()
                     },
-                    // This will spawn an invisible window
-                    // The window will be made visible in the make_visible() system after 3 frames.
-                    // This is useful when you want to avoid the white window that shows up before the GPU is ready to render the app.
                     visible: false,
                     ..default()
                 }),
                 ..default()
             }),
-            //LogDiagnosticsPlugin::default(),
-            //FrameTimeDiagnosticsPlugin::default(),
         ));
 	}
 
@@ -118,13 +112,13 @@ impl GomokuApp {
 		self.app
 		.insert_resource(GameState::new(settings.board_size, settings.minimum_chain_to_win))
         .insert_resource(settings)
-        .insert_resource(ColorScheme::new());
+        .insert_resource(ColorScheme::new())
+        .init_resource::<TranspositionTable>();
 
 	}
 
 	fn init_plugins(&mut self) {
 		self.app
-        // Declare the game state, whose starting value is determined by the `Default` trait
         .init_state::<AppState>()
         .add_systems(Startup, setup)
 		        .add_systems(
@@ -133,7 +127,6 @@ impl GomokuApp {
                 make_visible,
             ),
         )
-        // Adds the plugins for each state
         .add_plugins((splash_plugin, menu_plugin, game_plugin));
 	}
 

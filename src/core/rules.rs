@@ -4,33 +4,61 @@ pub struct WinChecker;
 
 impl WinChecker {
     pub fn check_win_around(board: &Board, row: usize, col: usize, win_condition: usize) -> bool {
-        let player = board.get_player(row, col).unwrap();
+        if row >= board.size || col >= board.size {
+            return false;
+        }
+        let idx = board.index(row, col);
+        let is_max = Board::is_bit_set(&board.max_bits, idx);
+        let is_min = Board::is_bit_set(&board.min_bits, idx);
+        if !is_max && !is_min {
+            return false;
+        }
+        let player_bits = if is_max {
+            &board.max_bits
+        } else {
+            &board.min_bits
+        };
+
         let directions = [(1, 0), (0, 1), (1, 1), (1, -1)];
 
         for &(dx, dy) in directions.iter() {
             let mut count = 1;
 
-            let mut x = row as isize + dx as isize;
-            let mut y = col as isize + dy as isize;
-            while x >= 0 && y >= 0 && x < board.size as isize && y < board.size as isize {
-                if board.get_player(x as usize, y as usize) == Some(player) {
+            let mut step = 1;
+            loop {
+                let x = row as isize + dx as isize * step;
+                let y = col as isize + dy as isize * step;
+                if x < 0 || y < 0 || x >= board.size as isize || y >= board.size as isize {
+                    break;
+                }
+                let check_idx = board.index(x as usize, y as usize);
+                if Board::is_bit_set(player_bits, check_idx) {
                     count += 1;
-                    x += dx as isize;
-                    y += dy as isize;
                 } else {
                     break;
                 }
+                step += 1;
+                if count >= win_condition {
+                    return true;
+                }
             }
 
-            let mut x = row as isize - dx as isize;
-            let mut y = col as isize - dy as isize;
-            while x >= 0 && y >= 0 && x < board.size as isize && y < board.size as isize {
-                if board.get_player(x as usize, y as usize) == Some(player) {
+            let mut step = 1;
+            loop {
+                let x = row as isize - dx as isize * step;
+                let y = col as isize - dy as isize * step;
+                if x < 0 || y < 0 || x >= board.size as isize || y >= board.size as isize {
+                    break;
+                }
+                let check_idx = board.index(x as usize, y as usize);
+                if Board::is_bit_set(player_bits, check_idx) {
                     count += 1;
-                    x -= dx as isize;
-                    y -= dy as isize;
                 } else {
                     break;
+                }
+                step += 1;
+                if count >= win_condition {
+                    return true;
                 }
             }
 

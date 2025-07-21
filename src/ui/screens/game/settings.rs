@@ -23,7 +23,6 @@ pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &
             GameSettingsPanel,
         ))
         .with_children(|builder| {
-            // Title
             builder.spawn((
                 Text::new("Game Settings"),
                 TextFont {
@@ -37,28 +36,21 @@ pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &
                 },
             ));
 
-            // Board Size
             spawn_setting_row(builder, "Board Size", &format!("{}x{}", game_settings.board_size, game_settings.board_size));
 
-            // Win Condition
             spawn_setting_row(builder, "Chain to Win", &game_settings.minimum_chain_to_win.to_string());
 
-            // Capture to Win
             spawn_setting_row(builder, "Captures to Win", &game_settings.total_capture_to_win.to_string());
 
-            // Game Mode
             let game_mode = if game_settings.versus_ai { "vs AI" } else { "Multiplayer" };
             spawn_setting_row(builder, "Game Mode", game_mode);
 
-            // AI Settings (only if vs AI)
             if game_settings.versus_ai {
                 spawn_setting_row(builder, "AI Depth", &game_settings.ai_depth.to_string());
                 
                 let alpha_beta = if game_settings.alpha_beta_enabled { "Enabled" } else { "Disabled" };
                 spawn_setting_row(builder, "Alpha-Beta", alpha_beta);
 
-                // AI Time Taken
-                //spawn_setting_row(builder, "AI Time", "0.00s");
 				spawn_timer_row(builder, "AI Time", "");
             }
 
@@ -88,7 +80,6 @@ fn spawn_setting_row(builder: &mut ChildSpawnerCommands, label: &str, value: &st
             BorderRadius::all(Val::Px(4.0)),
         ))
         .with_children(|builder| {
-            // Label
             builder.spawn((
                 Text::new(label),
                 TextFont {
@@ -98,7 +89,6 @@ fn spawn_setting_row(builder: &mut ChildSpawnerCommands, label: &str, value: &st
                 TextColor(Color::srgb(0.8, 0.8, 0.8)),
             ));
 
-            // Value
             builder.spawn((
                 Text::new(value),
                 TextFont {
@@ -126,7 +116,6 @@ fn spawn_timer_row(builder: &mut ChildSpawnerCommands, label: &str, value: &str)
             BorderRadius::all(Val::Px(4.0)),
         ))
         .with_children(|builder| {
-            // Label
             builder.spawn((
                 Text::new(label),
                 TextFont {
@@ -136,7 +125,6 @@ fn spawn_timer_row(builder: &mut ChildSpawnerCommands, label: &str, value: &str)
                 TextColor(Color::srgb(0.8, 0.8, 0.8)),
             ));
 
-            // Value
 				builder.spawn((
                     Text::new(" 0.00s"),
                     TextFont {

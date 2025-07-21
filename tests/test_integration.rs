@@ -1,3 +1,4 @@
+use gomoku::ai::transposition::TranspositionTable;
 use gomoku::core::board::Player;
 use gomoku::core::state::GameState;
 use gomoku::interface::utils::find_best_move;
@@ -5,8 +6,9 @@ use gomoku::interface::utils::find_best_move;
 #[test]
 fn test_find_best_move_first_move() {
     let mut state = GameState::new(19, 5);
+    let mut tt = TranspositionTable::new_default();
 
-    let best_move = find_best_move(&mut state, 2);
+    let best_move = find_best_move(&mut state, 2, &mut tt);
 
     // Should return center move for first move
     assert_eq!(best_move, Some((9, 9)));
@@ -15,11 +17,12 @@ fn test_find_best_move_first_move() {
 #[test]
 fn test_find_best_move_response() {
     let mut state = GameState::new(19, 5);
+    let mut tt = TranspositionTable::new_default();
 
     // Make first move
     state.make_move((9, 9));
 
-    let best_move = find_best_move(&mut state, 2);
+    let best_move = find_best_move(&mut state, 2, &mut tt);
 
     // Should return some adjacent move
     assert!(best_move.is_some());
@@ -30,6 +33,7 @@ fn test_find_best_move_response() {
 #[test]
 fn test_find_best_move_winning_opportunity() {
     let mut state = GameState::new(19, 5);
+    let mut tt = TranspositionTable::new_default();
 
     // Set up winning opportunity for current player (Max)
     state.board.place_stone(9, 5, Player::Max);
@@ -38,7 +42,7 @@ fn test_find_best_move_winning_opportunity() {
     state.board.place_stone(9, 8, Player::Max);
     state.current_player = Player::Max;
 
-    let best_move = find_best_move(&mut state, 2);
+    let best_move = find_best_move(&mut state, 2, &mut tt);
 
     // Should find the winning move
     assert!(best_move.is_some());
@@ -51,6 +55,7 @@ fn test_find_best_move_winning_opportunity() {
 #[test]
 fn test_find_best_move_block_opponent() {
     let mut state = GameState::new(19, 5);
+    let mut tt = TranspositionTable::new_default();
 
     // Set up threat from opponent (Min has 4 in a row)
     state.board.place_stone(9, 5, Player::Min);
@@ -59,40 +64,48 @@ fn test_find_best_move_block_opponent() {
     state.board.place_stone(9, 8, Player::Min);
     state.current_player = Player::Max;
 
-    let best_move = find_best_move(&mut state, 2);
+    let best_move = find_best_move(&mut state, 2, &mut tt);
 
     // Should find a blocking move
     assert!(best_move.is_some());
     let (row, col) = best_move.unwrap();
     
-    // Updated expected behavior - AI now plays more strategically
-    assert!(row == 8 && col == 4);
+    println!("AI chose: ({}, {})", row, col);
+    
+    // AI should block the immediate threat at one of the ends
+    let valid_blocking_moves = vec![(9, 4), (9, 9)];
+    assert!(
+        valid_blocking_moves.contains(&(row, col)),
+        "AI chose ({}, {}) but should block the threat at one of: {:?}",
+        row, col, valid_blocking_moves
+    );
 }
 
 // TODO: Add a test to verify that find_best_move detects a capture opportunity and chooses the correct capturing move for the current player.
-// #[test]
-// fn test_find_best_move_capture_opportunity() {
-//     let mut state = GameState::new(19, 5);
-//
-//     // Set up capture opportunity
-//     state.board.place_stone(9, 9, Player::Max);
-//     state.board.place_stone(9, 10, Player::Min);
-//     state.board.place_stone(9, 11, Player::Min);
-//     state.current_player = Player::Max;
-//
-//     let best_move = find_best_move(&mut state, 2);
-//
-//     // Should find the capturing move
-//     assert!(best_move.is_some());
-//     let (row, col) = best_move.unwrap();
-//
-//     // Should be the capturing position
-//     assert_eq!((row, col), (9, 12));
-// }
+#[test]
+fn test_find_best_move_capture_opportunity() {
+    let mut state = GameState::new(19, 5);
+    let mut tt = TranspositionTable::new_default();
+    // Set up capture opportunity
+    state.board.place_stone(9, 9, Player::Max);
+    state.board.place_stone(9, 10, Player::Min);
+    state.board.place_stone(9, 11, Player::Min);
+    state.current_player = Player::Max;
+
+    let best_move = find_best_move(&mut state, 2, &mut tt);
+
+    // Should find the capturing move
+    assert!(best_move.is_some());
+    let (row, col) = best_move.unwrap();
+
+    // Should be the capturing position
+    assert_eq!((row, col), (9, 12));
+}
 
 #[test]
 fn test_find_best_move_no_moves() {
     let mut state = GameState::new(3, 3);
+    let mut tt = TranspositionTable::new_default();
 
     // Fill the board
     for i in 0..3 {
@@ -101,7 +114,7 @@ fn test_find_best_move_no_moves() {
         }
     }
 
-    let best_move = find_best_move(&mut state, 2);
+    let best_move = find_best_move(&mut state, 2, &mut tt);
 
     // Should return None when no moves available
     assert_eq!(best_move, None);
@@ -110,14 +123,15 @@ fn test_find_best_move_no_moves() {
 #[test]
 fn test_find_best_move_different_depths() {
     let mut state = GameState::new(19, 5);
+    let mut tt = TranspositionTable::new_default();
 
     // Set up a position
     state.board.place_stone(9, 9, Player::Max);
     state.board.place_stone(9, 10, Player::Min);
     state.current_player = Player::Max;
 
-    let move_depth1 = find_best_move(&mut state, 1);
-    let move_depth3 = find_best_move(&mut state, 3);
+    let move_depth1 = find_best_move(&mut state, 1, &mut tt);
+    let move_depth3 = find_best_move(&mut state, 3, &mut tt);
 
     // Both should return valid moves
     assert!(move_depth1.is_some());
@@ -130,25 +144,27 @@ fn test_find_best_move_different_depths() {
 #[test]
 fn test_find_best_move_player_alternation() {
     let mut state = GameState::new(19, 5);
+    let mut tt = TranspositionTable::new_default();
 
     // Test with Max player
     state.current_player = Player::Max;
     state.board.place_stone(9, 9, Player::Min); // Add opponent stone
 
-    let move_max = find_best_move(&mut state, 2);
+    let move_max = find_best_move(&mut state, 2, &mut tt);
     assert!(move_max.is_some());
 
     // Test with Min player
     state.current_player = Player::Min;
     state.board.place_stone(9, 10, Player::Max); // Add opponent stone
 
-    let move_min = find_best_move(&mut state, 2);
+    let move_min = find_best_move(&mut state, 2, &mut tt);
     assert!(move_min.is_some());
 }
 
 #[test]
 fn test_find_best_move_complex_position() {
     let mut state = GameState::new(19, 5);
+    let mut tt = TranspositionTable::new_default();
 
     // Create a complex position
     state.board.place_stone(9, 9, Player::Max);
@@ -159,7 +175,7 @@ fn test_find_best_move_complex_position() {
     state.board.place_stone(10, 10, Player::Min);
     state.current_player = Player::Max;
 
-    let best_move = find_best_move(&mut state, 2);
+    let best_move = find_best_move(&mut state, 2, &mut tt);
 
     // Should find some reasonable move
     assert!(best_move.is_some());
@@ -172,6 +188,7 @@ fn test_find_best_move_complex_position() {
 #[test]
 fn test_find_best_move_state_preservation() {
     let mut state = GameState::new(19, 5);
+    let mut tt = TranspositionTable::new_default();
 
     // Set up initial state
     state.board.place_stone(9, 9, Player::Max);
@@ -179,7 +196,7 @@ fn test_find_best_move_state_preservation() {
     let initial_hash = state.hash();
 
     // Find best move
-    let _best_move = find_best_move(&mut state, 2);
+    let _best_move = find_best_move(&mut state, 2, &mut tt);
 
     // State should be preserved
     assert_eq!(state.hash(), initial_hash);
@@ -190,14 +207,15 @@ fn test_find_best_move_state_preservation() {
 #[test]
 fn test_find_best_move_consistent_results() {
     let mut state = GameState::new(19, 5);
+    let mut tt = TranspositionTable::new_default();
 
     // Set up a deterministic position
     state.board.place_stone(9, 9, Player::Max);
     state.current_player = Player::Min;
 
     // Multiple calls should give same result
-    let move1 = find_best_move(&mut state, 2);
-    let move2 = find_best_move(&mut state, 2);
+    let move1 = find_best_move(&mut state, 2, &mut tt);
+    let move2 = find_best_move(&mut state, 2, &mut tt);
 
     assert_eq!(move1, move2);
 }
@@ -205,6 +223,7 @@ fn test_find_best_move_consistent_results() {
 #[test]
 fn test_find_best_move_edge_cases() {
     let mut state = GameState::new(19, 5);
+    let mut tt = TranspositionTable::new_default();
 
     // Fill most of the board leaving only a few moves
     for i in 0..19 {
@@ -219,7 +238,7 @@ fn test_find_best_move_edge_cases() {
     state.board.place_stone(9, 9, Player::Max);
     state.current_player = Player::Min;
 
-    let best_move = find_best_move(&mut state, 2);
+    let best_move = find_best_move(&mut state, 2, &mut tt);
 
     // Should find one of the few available moves
     assert!(best_move.is_some());
@@ -229,30 +248,31 @@ fn test_find_best_move_edge_cases() {
 }
 
 // TODO: Add a test to confirm that find_best_move selects the correct move to win the game via a capture when one pair away from a capture-win.
-// #[test]
-// fn test_find_best_move_capture_win() {
-//     let mut state = GameState::new(19, 5);
-//
-//     // Set up near-capture-win scenario
-//     state.max_captures = 4; // One away from winning
-//     state.board.place_stone(9, 9, Player::Max);
-//     state.board.place_stone(9, 10, Player::Min);
-//     state.board.place_stone(9, 11, Player::Min);
-//     state.current_player = Player::Max;
-//
-//     let best_move = find_best_move(&mut state, 2);
-//
-//     // Should find the winning capture
-//     assert_eq!(best_move, Some((9, 12)));
-// }
+#[test]
+fn test_find_best_move_capture_win() {
+    let mut state = GameState::new(19, 5);
+
+    // Set up near-capture-win scenario
+    state.max_captures = 4; // One away from winning
+    state.board.place_stone(9, 9, Player::Max);
+    state.board.place_stone(9, 10, Player::Min);
+    state.board.place_stone(9, 11, Player::Min);
+    state.current_player = Player::Max;
+    let mut tt = TranspositionTable::new_default();
+    let best_move = find_best_move(&mut state, 2, &mut tt);
+
+    // Should find the winning capture
+    assert_eq!(best_move, Some((9, 12)));
+}
 
 #[test]
 fn test_find_best_move_different_board_sizes() {
     let mut state13 = GameState::new(13, 5);
     let mut state15 = GameState::new(15, 5);
+    let mut tt = TranspositionTable::new_default();
 
-    let move13 = find_best_move(&mut state13, 2);
-    let move15 = find_best_move(&mut state15, 2);
+    let move13 = find_best_move(&mut state13, 2, &mut tt);
+    let move15 = find_best_move(&mut state15, 2, &mut tt);
 
     // Should find center moves for different board sizes
     assert_eq!(move13, Some((6, 6)));

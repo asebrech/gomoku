@@ -1,4 +1,4 @@
-use crate::{core::board::Player, core::state::GameState, interface::utils::find_best_move};
+use crate::{ai::transposition::TranspositionTable, core::board::Player, core::state::GameState, interface::utils::find_best_move};
 use std::io;
 
 pub fn new_game(board_size: usize, winning_condition: usize, depth: i32) {
@@ -20,7 +20,7 @@ pub fn new_game(board_size: usize, winning_condition: usize, depth: i32) {
         if state.current_player == human {
             handle_human_move(&mut state);
         } else if is_human_opponent {
-            handle_human_move(&mut state); // Alternate human player
+            handle_human_move(&mut state);
         } else {
             handle_ai_move(&mut state, depth);
         }
@@ -172,7 +172,8 @@ fn validate_human_move(state: &GameState, mv: (usize, usize)) -> Option<String> 
 
 fn handle_ai_move(state: &mut GameState, depth: i32) {
     println!("🤖 AI is thinking...");
-    if let Some(mv) = find_best_move(state, depth) {
+    let mut tt = TranspositionTable::new_default();
+    if let Some(mv) = find_best_move(state, depth, &mut tt) {
         println!("AI chooses: {:?}", mv);
         state.make_move(mv);
     } else {

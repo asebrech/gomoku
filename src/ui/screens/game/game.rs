@@ -1,7 +1,7 @@
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use bevy::prelude::*;
-use crate::{core::{board::Player, state::GameState}, interface::utils::find_best_move, ui::{app::{AppState, GameSettings}, screens::{game::{self, board::{BoardRoot, BoardUtils, PreviewDot}, settings::spawn_settings_panel}, utils::despawn_screen}}};
+use crate::{ai::transposition::TranspositionTable, core::{board::Player, state::GameState}, interface::utils::{find_best_move, find_best_move_timed}, ui::{app::{AppState, GameSettings}, screens::{game::{self, board::{BoardRoot, BoardUtils, PreviewDot}, settings::spawn_settings_panel}, utils::despawn_screen}}};
 
 // Game status resource
 #[derive(Resource, Default)]
@@ -200,6 +200,7 @@ pub fn process_next_round(
     mut game_status: ResMut<GameStatus>,
     mut ai_time: ResMut<AITimeTaken>,
     mut update_ai_time: EventWriter<UpdateAITimeDisplay>,
+    mut tt: ResMut<TranspositionTable>,
 ) {
     for _ in move_played.read() {
         // Check for game end first
@@ -225,7 +226,16 @@ pub fn process_next_round(
             
             // Only call find_best_move if game is not terminal
             if !game_state.is_terminal() {
-                let placement = find_best_move(&mut game_state, settings.ai_depth);
+                let placement = if let Some(time_limit_ms) = settings.time_limit {
+                    // Use time-based iterative deepening
+                    let time_limit = Duration::from_millis(time_limit_ms as u64);
+                    info!("AI using time-based search with {}ms limit", time_limit_ms);
+                    find_best_move_timed(&mut game_state, settings.ai_depth, time_limit, &mut tt)
+                } else {
+                    // Use depth-based iterative deepening
+                    info!("AI using depth-based search to depth {}", settings.ai_depth);
+                    find_best_move(&mut game_state, settings.ai_depth, &mut tt)
+                };
                 let elapsed_time = start_time.elapsed().as_millis();
                 ai_time.millis = elapsed_time;
                 update_ai_time.write(UpdateAITimeDisplay);
