@@ -1,3 +1,4 @@
+use gomoku::ai::transposition::TranspositionTable;
 use gomoku::core::board::Player;
 use gomoku::core::state::GameState;
 use gomoku::interface::utils::find_best_move;
@@ -69,9 +70,10 @@ fn test_ai_vs_ai_game() {
     let mut state = GameState::new(13, 5); // Smaller board for faster test
     let max_moves = 50;
     let mut move_count = 0;
+    let mut tt = TranspositionTable::new_default();
 
     while !state.is_terminal() && move_count < max_moves {
-        let best_move = find_best_move(&mut state, 2);
+        let best_move = find_best_move(&mut state, 2, &mut tt);
 
         if let Some(mv) = best_move {
             let current_player = state.current_player;
@@ -212,14 +214,21 @@ fn test_ai_decision_quality() {
     state.board.place_stone(9, 11, Player::Min);
     state.board.place_stone(9, 12, Player::Min);
     state.current_player = Player::Max;
+    let mut tt = TranspositionTable::new_default();
 
-    let best_move = find_best_move(&mut state, 3);
+    let best_move = find_best_move(&mut state, 3, &mut tt);
 
     // Should block the threat
     assert!(best_move.is_some());
     let (row, col) = best_move.unwrap();
-    // Updated expected behavior - AI now plays more strategically
-    assert!(row == 8 && col == 8);
+    
+    // AI should block the immediate threat at one of the ends
+    let valid_blocking_moves = vec![(9, 8), (9, 13)];
+    assert!(
+        valid_blocking_moves.contains(&(row, col)),
+        "AI chose ({}, {}) but should block the threat at one of: {:?}",
+        row, col, valid_blocking_moves
+    );
 }
 
 #[test]
@@ -230,12 +239,13 @@ fn test_performance_constraints() {
     state.board.place_stone(9, 9, Player::Max);
     state.board.place_stone(9, 10, Player::Min);
     state.current_player = Player::Max;
+    let mut tt = TranspositionTable::new_default();
 
     // AI should complete search in reasonable time
     use std::time::Instant;
     let start = Instant::now();
 
-    let _best_move = find_best_move(&mut state, 3);
+    let _best_move = find_best_move(&mut state, 3, &mut tt);
 
     let elapsed = start.elapsed();
 
@@ -270,7 +280,7 @@ fn test_edge_case_board_full() {
 fn test_simultaneous_threats() {
     let mut state = GameState::new(19, 5);
 
-    // Create multiple threats
+    // Create multiple threats that Min should try to block
     state.board.place_stone(9, 9, Player::Max);
     state.board.place_stone(9, 10, Player::Max);
     state.board.place_stone(9, 11, Player::Max);
@@ -281,12 +291,26 @@ fn test_simultaneous_threats() {
     state.board.place_stone(12, 9, Player::Max);
 
     state.current_player = Player::Min;
+    let mut tt = TranspositionTable::new_default();
 
-    // AI should prioritize blocking the more immediate threat
-    let best_move = find_best_move(&mut state, 3);
+    // Debug: Print the position
+    println!("Horizontal threat: (9,9), (9,10), (9,11), (9,12) - 4 in a row");
+    println!("Vertical threat: (9,9), (10,9), (11,9), (12,9) - 4 in a row");
+    println!("Critical blocking positions: (9,8), (9,13), (8,9), (13,9)");
+
+    // AI should prioritize blocking one of the immediate threats
+    let best_move = find_best_move(&mut state, 3, &mut tt);
     assert!(best_move.is_some());
 
     let (row, col) = best_move.unwrap();
-    // Updated expected behavior - AI now plays more strategically
-    assert!(row == 8 && col == 8);
+    println!("AI chose: ({}, {})", row, col);
+    
+    // The AI should block at least one of the critical threats
+    // Valid blocking moves are: (9,8), (9,13), (8,9), (13,9)
+    let valid_blocks = vec![(9, 8), (9, 13), (8, 9), (13, 9)];
+    assert!(
+        valid_blocks.contains(&(row, col)),
+        "AI chose ({}, {}) but should block one of the immediate threats: {:?}",
+        row, col, valid_blocks
+    );
 }
