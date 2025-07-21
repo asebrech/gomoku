@@ -45,7 +45,6 @@ impl GameState {
     }
 
     pub fn make_move(&mut self, mv: (usize, usize)) {
-        // Update hash for the move
         self.current_hash = self.zobrist_hash.update_hash_make_move(
             self.current_hash,
             mv.0,
@@ -58,7 +57,6 @@ impl GameState {
         let captures =
             CaptureHandler::detect_captures(&self.board, mv.0, mv.1, self.current_player);
         
-        // Update hash for captures before executing them
         if !captures.is_empty() {
             let captured_player = self.current_player.opponent();
             self.current_hash = self.zobrist_hash.update_hash_capture(
@@ -75,13 +73,10 @@ impl GameState {
     }
 
     pub fn undo_move(&mut self, move_: (usize, usize)) {
-        // The player who made the move we're undoing is the opponent of current player
         let move_player = self.current_player.opponent();
         
-        // First restore captured stones and update hash for them
         if let Some(last_captures) = self.capture_history.last() {
             if !last_captures.is_empty() {
-                // The captured player is the opponent of the player who made the move
                 let captured_player = move_player.opponent();
                 self.current_hash = self.zobrist_hash.update_hash_capture(
                     self.current_hash,
@@ -91,16 +86,14 @@ impl GameState {
             }
         }
 
-        // Remove the stone and update hash for the move removal
         self.board.remove_stone(move_.0, move_.1);
         self.current_hash = self.zobrist_hash.update_hash_undo_move(
             self.current_hash,
             move_.0,
             move_.1,
-            move_player, // The player who made the move we're undoing
+            move_player,
         );
 
-        // Switch back to the previous player
         self.current_player = move_player;
         self.winner = None;
 

@@ -14,7 +14,6 @@ pub fn minimax(
     let original_alpha = alpha;
     let hash_key = state.hash();
     
-    // Probe transposition table
     let tt_result = tt.probe(hash_key, depth, alpha, beta);
     if tt_result.cutoff {
         return tt_result.value.unwrap();
@@ -29,7 +28,6 @@ pub fn minimax(
     let mut moves = state.get_possible_moves();
     MoveOrdering::order_moves(state, &mut moves);
     
-    // Try the best move from TT first if available
     if let Some(best_move) = tt_result.best_move {
         if let Some(pos) = moves.iter().position(|&m| m == best_move) {
             moves.swap(0, pos);
@@ -75,7 +73,6 @@ pub fn minimax(
         }
     }
 
-    // Store in transposition table with appropriate entry type
     let entry_type = if value <= original_alpha {
         EntryType::UpperBound
     } else if value >= beta {

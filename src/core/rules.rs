@@ -24,7 +24,6 @@ impl WinChecker {
         for &(dx, dy) in directions.iter() {
             let mut count = 1;
 
-            // Forward direction
             let mut step = 1;
             loop {
                 let x = row as isize + dx as isize * step;
@@ -44,7 +43,6 @@ impl WinChecker {
                 }
             }
 
-            // Backward direction
             let mut step = 1;
             loop {
                 let x = row as isize - dx as isize * step;

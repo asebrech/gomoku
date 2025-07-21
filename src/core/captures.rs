@@ -26,7 +26,6 @@ impl CaptureHandler {
                 let actual_dx = dx as isize * multiplier as isize;
                 let actual_dy = dy as isize * multiplier as isize;
 
-                // Position 1 (first opponent)
                 let pos1_x = row as isize + actual_dx;
                 let pos1_y = col as isize + actual_dy;
                 if pos1_x < 0
@@ -41,7 +40,6 @@ impl CaptureHandler {
                     continue;
                 }
 
-                // Position 2 (second opponent)
                 let pos2_x = pos1_x + actual_dx;
                 let pos2_y = pos1_y + actual_dy;
                 if pos2_x < 0
@@ -56,7 +54,6 @@ impl CaptureHandler {
                     continue;
                 }
 
-                // Position 3 (player's closing stone)
                 let pos3_x = pos2_x + actual_dx;
                 let pos3_y = pos2_y + actual_dy;
                 if pos3_x < 0

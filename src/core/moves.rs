@@ -57,7 +57,7 @@ impl RuleValidator {
         let left_info = Self::scan_direction(board, row, col, player, -dr, -dc);
         let right_info = Self::scan_direction(board, row, col, player, dr, dc);
 
-        let total_stones = 1 + left_info.0 + right_info.0; // +1 for the hypothetical stone at (row, col)
+        let total_stones = 1 + left_info.0 + right_info.0;
         let left_open = left_info.1;
         let right_open = right_info.1;
 
@@ -96,20 +96,19 @@ impl RuleValidator {
 
             if Board::is_bit_set(player_bits, idx) {
                 if empty_found {
-                    break; // Gap in stones
+                    break;
                 }
                 stones += 1;
             } else if !Board::is_bit_set(&board.occupied, idx) {
-                // Empty position
                 if !empty_found && stones > 0 {
                     is_open = true;
                 }
                 empty_found = true;
                 if stones > 0 {
-                    break; // Only care about first empty space after stones
+                    break;
                 }
             } else if Board::is_bit_set(opponent_bits, idx) {
-                break; // Opponent stone blocks
+                break;
             }
         }
 

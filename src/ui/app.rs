@@ -92,25 +92,18 @@ impl GomokuApp {
                     name: Some("bevy.app".into()),
                     resolution: (1240., 720.).into(),
                     present_mode: PresentMode::AutoVsync,
-                    // Tells Wasm to resize the window according to the available canvas
                     fit_canvas_to_parent: true,
-                    // Tells Wasm not to override default event handling, like F5, Ctrl+R etc.
                     prevent_default_event_handling: false,
                     window_theme: Some(WindowTheme::Dark),
                     enabled_buttons: bevy::window::EnabledButtons {
                         maximize: false,
                         ..Default::default()
                     },
-                    // This will spawn an invisible window
-                    // The window will be made visible in the make_visible() system after 3 frames.
-                    // This is useful when you want to avoid the white window that shows up before the GPU is ready to render the app.
                     visible: false,
                     ..default()
                 }),
                 ..default()
             }),
-            //LogDiagnosticsPlugin::default(),
-            //FrameTimeDiagnosticsPlugin::default(),
         ));
 	}
 
@@ -126,7 +119,6 @@ impl GomokuApp {
 
 	fn init_plugins(&mut self) {
 		self.app
-        // Declare the game state, whose starting value is determined by the `Default` trait
         .init_state::<AppState>()
         .add_systems(Startup, setup)
 		        .add_systems(
@@ -135,7 +127,6 @@ impl GomokuApp {
                 make_visible,
             ),
         )
-        // Adds the plugins for each state
         .add_plugins((splash_plugin, menu_plugin, game_plugin));
 	}
 

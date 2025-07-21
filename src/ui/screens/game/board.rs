@@ -40,7 +40,6 @@ impl BoardUtils {
     fn draw_board(builder: &mut ChildSpawnerCommands, board_size: usize) {
         info!("Drawing board grid lines...");
         
-        // Vertical lines
         for i in 0..board_size {
             builder.spawn((
                 Node {
@@ -55,7 +54,6 @@ impl BoardUtils {
             ));
         }
         
-        // Horizontal lines
         for i in 0..board_size {
             builder.spawn((
                 Node {
@@ -92,7 +90,6 @@ impl BoardUtils {
                         GridCell { x, y },
                     ))
                     .with_children(|builder| {
-                        // Preview dot for showing possible moves
                         builder.spawn((
                             Node {
                                 position_type: PositionType::Absolute,

@@ -3,29 +3,21 @@ use bevy::prelude::*;
 
 use crate::ui::{app::AppState, screens::utils::despawn_screen};
 
-// This plugin will display a splash screen with Bevy logo for 1 second before switching to the menu
 pub fn splash_plugin(app: &mut App) {
-	// As this plugin is managing the splash screen, it will focus on the state `GameState::Splash`
 	app
-		// When entering the state, spawn everything needed for this screen
 		.add_systems(OnEnter(AppState::Splash), splash_setup)
-		// While in this state, run the `countdown` system
 		.add_systems(Update, countdown.run_if(in_state(AppState::Splash)))
-		// When exiting the state, despawn everything that was spawned for this screen
 		.add_systems(OnExit(AppState::Splash), despawn_screen::<OnSplashScreen>);
 }
 
-// Tag component used to tag entities added on the splash screen
 #[derive(Component)]
 struct OnSplashScreen;
 
-// Newtype to use a `Timer` for this screen as a resource
 #[derive(Resource, Deref, DerefMut)]
 struct SplashTimer(Timer);
 
 fn splash_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 	let icon = asset_server.load("le_cat.png");
-	// Display the logo
 	commands.spawn((
 		Node {
 			align_items: AlignItems::Center,
@@ -38,16 +30,13 @@ fn splash_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 		children![(
 			ImageNode::new(icon),
 			Node {
-				// This will set the logo to be 200px wide, and auto adjust its height
 				..default()
 			},
 		)],
 	));
-	// Insert the timer as a resource
 	commands.insert_resource(SplashTimer(Timer::from_seconds(0.2, TimerMode::Once)));
 }
 
-// Tick the timer, and change state when finished
 fn countdown(
 	mut game_state: ResMut<NextState<AppState>>,
 	time: Res<Time>,

@@ -8,41 +8,20 @@
 
     use crate::ui::{app::{AppState, GameSettings}, screens::utils::despawn_screen};
 
-    // This plugin manages the menu, with 5 different screens:
-    // - a main menu with "New Game", "Settings", "Quit"
-    // - a settings menu with two submenus and a back button
-    // - two settings screen with a setting that can be set and a back button
     pub fn menu_plugin(app: &mut App) {
         app
-            // At start, the menu is not enabled. This will be changed in `menu_setup` when
-            // entering the `GameState::Menu` state.
-            // Current screen in the menu is handled by an independent state from `GameState`
             .init_state::<MenuState>()
             .add_systems(OnEnter(AppState::Menu), menu_setup)
-            // Systems to handle the main menu screen
             .add_systems(OnEnter(MenuState::Main), main_menu_setup)
             .add_systems(OnExit(MenuState::Main), despawn_screen::<OnMainMenuScreen>)
-            // Systems to handle the settings menu screen
-            //.add_systems(OnEnter(MenuState::Settings), settings_menu_setup)
             .add_systems(
                 OnExit(MenuState::Settings),
                 despawn_screen::<OnSettingsMenuScreen>,
             )
-            // Systems to handle the display settings screen
-            /*.add_systems(
-                OnEnter(MenuState::SettingsDisplay),
-                display_settings_menu_setup,
-            )*/
-           /*.add_systems(
-                Update,
-                (setting_button::<DisplayQuality>.run_if(in_state(MenuState::SettingsDisplay)),),
-            )*/
             .add_systems(
                 OnExit(MenuState::SettingsDisplay),
                 despawn_screen::<OnDisplaySettingsMenuScreen>,
             )
-            // Systems to handle the sound settings screen
-            //.add_systems(OnEnter(MenuState::SettingsSound), sound_settings_menu_setup)
             .add_systems(
                 Update,
                 setting_button::<GameSettings>.run_if(in_state(MenuState::SettingsSound)),
@@ -51,14 +30,12 @@
                 OnExit(MenuState::SettingsSound),
                 despawn_screen::<OnSoundSettingsMenuScreen>,
             )
-            // Common systems to all screens that handles buttons behavior
             .add_systems(
                 Update,
                 (menu_action, button_system).run_if(in_state(AppState::Menu)),
             );
     }
 
-    // State used for the current menu screen
     #[derive(Clone, Copy, Default, Eq, PartialEq, Debug, Hash, States)]
     enum MenuState {
         Main,
@@ -70,19 +47,15 @@
         Disabled,
     }
 
-    // Tag component used to tag entities added on the main menu screen
     #[derive(Component)]
     struct OnMainMenuScreen;
 
-    // Tag component used to tag entities added on the settings menu screen
     #[derive(Component)]
     struct OnSettingsMenuScreen;
 
-    // Tag component used to tag entities added on the display settings menu screen
     #[derive(Component)]
     struct OnDisplaySettingsMenuScreen;
 
-    // Tag component used to tag entities added on the sound settings menu screen
     #[derive(Component)]
     struct OnSoundSettingsMenuScreen;
 
@@ -91,11 +64,9 @@
     const HOVERED_PRESSED_BUTTON: Color = Color::srgb(0.25, 0.65, 0.25);
     const PRESSED_BUTTON: Color = Color::srgb(0.35, 0.75, 0.35);
 
-    // Tag component used to mark which setting is currently selected
     #[derive(Component)]
     struct SelectedOption;
 
-    // All actions that can be triggered from a button click
     #[derive(Component)]
     enum MenuButtonAction {
 		Load,
@@ -106,7 +77,6 @@
         Quit,
     }
 
-    // This system handles changing all buttons color based on mouse interaction
     fn button_system(
         mut interaction_query: Query<
             (&Interaction, &mut BackgroundColor, Option<&SelectedOption>),
@@ -123,8 +93,6 @@
         }
     }
 
-    // This system updates the settings when a new value for a setting is selected, and marks
-    // the button as the one currently selected
     fn setting_button<T: Resource + Component + PartialEq + Copy>(
         interaction_query: Query<(&Interaction, &T, Entity), (Changed<Interaction>, With<Button>)>,
         selected_query: Single<(Entity, &mut BackgroundColor), With<SelectedOption>>,
@@ -174,10 +142,8 @@ fn main_menu_setup(mut commands: Commands) {
             OnMainMenuScreen,
         ))
         .with_children(|parent| {
-            // Title node
             insert_title_node(parent);
 
-            // Container for button groups
             parent
                 .spawn((
                     Node {
@@ -192,9 +158,7 @@ fn main_menu_setup(mut commands: Commands) {
                     BackgroundColor(CRIMSON.into()),
                 ))
                 .with_children(|parent| {
-                    // Load/Play buttons
                     insert_load_play_node(parent, button_node.clone(), button_text_font.clone());
-                    // Settings/Credits/Quit buttons
                     insert_settings_credit_quit_buttons(parent, button_node, button_text_font);
                 });
         });
@@ -214,7 +178,6 @@ fn insert_title_node(parent: &mut RelatedSpawnerCommands<'_, ChildOf>) {
             BackgroundColor(AZURE.into()),
         ))
         .with_children(|parent| {
-            // Game name
             parent.spawn((
                 Text::new("Mecha-Gomoku"),
                 TextFont {
@@ -239,7 +202,7 @@ fn insert_load_play_node(
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
                 justify_content: JustifyContent::Center,
-                margin: UiRect::bottom(Val::Px(20.0)), // Space between button groups
+                margin: UiRect::bottom(Val::Px(20.0)),
                 ..default()
             },
             BackgroundColor(BISQUE.into()),
@@ -303,11 +266,11 @@ fn insert_settings_credit_quit_buttons(
     parent
         .spawn((
             Node {
-                width: Val::Px(400.0), // Constrain width
+                width: Val::Px(400.0),
                 flex_direction: FlexDirection::Row,
                 align_items: AlignItems::Center,
                 justify_content: JustifyContent::Center,
-                column_gap: Val::Px(20.0), // Space between buttons
+                column_gap: Val::Px(20.0),
                 ..default()
             },
             BackgroundColor(PURPLE.into()),
@@ -319,7 +282,7 @@ fn insert_settings_credit_quit_buttons(
                     Button,
                     button_node.clone(),
                     BackgroundColor(NORMAL_BUTTON),
-                    MenuButtonAction::Play, // Adjust action if needed
+                    MenuButtonAction::Play,
                 ))
                 .with_children(|parent| {
                     parent.spawn((
