@@ -42,7 +42,7 @@ pub fn minimax_with_node_count(
     if depth <= 3 && !maximizing_player {
         let static_eval = Heuristic::evaluate(state, depth);
         let razor_margin = 150 * depth;
-        if static_eval + razor_margin < alpha {
+        if static_eval.saturating_add(razor_margin) < alpha {
             let razor_depth = depth - 1;
             if razor_depth <= 0 {
                 return (static_eval, nodes_evaluated);
@@ -61,7 +61,7 @@ pub fn minimax_with_node_count(
     if depth <= 2 && !maximizing_player && moves.len() > 4 {
         let static_eval = Heuristic::evaluate(state, depth);
         let futility_margin = 200 * depth;
-        if static_eval + futility_margin < alpha {
+        if static_eval.saturating_add(futility_margin) < alpha {
             return (static_eval, nodes_evaluated);
         }
     }
@@ -70,9 +70,9 @@ pub fn minimax_with_node_count(
     if depth >= 4 && moves.len() > 8 {
         let static_eval = Heuristic::evaluate(state, depth);
         let delta_margin = 300 + 50 * depth; // Larger margins for deeper searches
-        if maximizing_player && static_eval + delta_margin < alpha {
+        if maximizing_player && static_eval.saturating_add(delta_margin) < alpha {
             return (static_eval, nodes_evaluated);
-        } else if !maximizing_player && static_eval - delta_margin > beta {
+        } else if !maximizing_player && static_eval.saturating_sub(delta_margin) > beta {
             return (static_eval, nodes_evaluated);
         }
     }
@@ -84,9 +84,9 @@ pub fn minimax_with_node_count(
         
         // Only try null move if we're in a "good" position
         let should_try_null = if maximizing_player {
-            static_eval >= null_move_threshold + 100
+            static_eval >= null_move_threshold.saturating_add(100)
         } else {
-            static_eval <= null_move_threshold - 100
+            static_eval <= null_move_threshold.saturating_sub(100)
         };
         
         if should_try_null {
@@ -334,8 +334,8 @@ pub fn iterative_deepening_search(
             let (score, move_nodes) = if first_move && depth > 2 && best_score != i32::MIN && best_score != i32::MAX {
                 // Try narrow aspiration window first for aggressive pruning
                 let window = if depth >= 6 { 25 } else { 50 }; // Narrower windows for deeper searches
-                let asp_alpha = best_score - window;
-                let asp_beta = best_score + window;
+                let asp_alpha = best_score.saturating_sub(window);
+                let asp_beta = best_score.saturating_add(window);
                 
                 let (asp_score, asp_nodes) = minimax_with_node_count(
                     state,
@@ -352,8 +352,8 @@ pub fn iterative_deepening_search(
                     let (full_score, full_nodes) = minimax_with_node_count(
                         state,
                         depth - 1,
-                        best_score - wider_window,
-                        best_score + wider_window,
+                        best_score.saturating_sub(wider_window),
+                        best_score.saturating_add(wider_window),
                         state.current_player == crate::core::board::Player::Max,
                         tt,
                     );
