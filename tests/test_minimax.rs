@@ -1,5 +1,5 @@
-use gomoku::ai::minimax::minimax;
-use gomoku::ai::transposition::TranspositionTable;
+use gomoku::ai::minimax::{minimax, minimax_shared, parallel_iterative_deepening_search};
+use gomoku::ai::transposition::{TranspositionTable, SharedTranspositionTable};
 use gomoku::core::board::Player;
 use gomoku::core::state::GameState;
 
@@ -260,4 +260,208 @@ fn test_minimax_capture_win_detection() {
 
     // Should detect capture win opportunity
     assert!(score > 900_000);
+}
+
+// ==================== PARALLEL MINIMAX TESTS ====================
+
+#[test]
+fn test_minimax_shared_terminal_position() {
+    let mut state = GameState::new(19, 5);
+    let shared_tt = SharedTranspositionTable::new_default();
+
+    // Create a winning position
+    for i in 0..5 {
+        state.board.place_stone(9, 5 + i, Player::Max);
+    }
+    state.winner = Some(Player::Max);
+
+    let (score, _nodes) = minimax_shared(&mut state, 3, i32::MIN, i32::MAX, false, &shared_tt);
+
+    // Should return winning score
+    assert_eq!(score, 1_000_003);
+}
+
+#[test]
+fn test_minimax_shared_depth_zero() {
+    let mut state = GameState::new(19, 5);
+    let shared_tt = SharedTranspositionTable::new_default();
+
+    // Make a simple move
+    state.board.place_stone(9, 9, Player::Max);
+
+    let (score, _nodes) = minimax_shared(&mut state, 0, i32::MIN, i32::MAX, false, &shared_tt);
+
+    // Should return heuristic evaluation
+    assert!(score != i32::MIN && score != i32::MAX);
+}
+
+#[test]
+fn test_minimax_shared_maximizing_player() {
+    let mut state = GameState::new(19, 5);
+    let shared_tt = SharedTranspositionTable::new_default();
+
+    // Set up a position where Max has advantage
+    state.board.place_stone(9, 9, Player::Max);
+    state.board.place_stone(9, 8, Player::Max);
+    state.board.place_stone(9, 7, Player::Max);
+    state.current_player = Player::Max;
+
+    let (score, _nodes) = minimax_shared(&mut state, 2, i32::MIN, i32::MAX, true, &shared_tt);
+
+    // Should return positive score (favorable for Max)
+    assert!(score > 0);
+}
+
+#[test]
+fn test_minimax_shared_minimizing_player() {
+    let mut state = GameState::new(19, 5);
+    let shared_tt = SharedTranspositionTable::new_default();
+
+    // Set up a position where Min has advantage
+    state.board.place_stone(9, 9, Player::Min);
+    state.board.place_stone(9, 8, Player::Min);
+    state.board.place_stone(9, 7, Player::Min);
+    state.current_player = Player::Min;
+
+    let (score, _nodes) = minimax_shared(&mut state, 2, i32::MIN, i32::MAX, false, &shared_tt);
+
+    // Should return negative score (favorable for Min)
+    assert!(score < 0);
+}
+
+#[test]
+fn test_parallel_iterative_deepening_basic() {
+    let mut state = GameState::new(15, 5);
+
+    // Set up a simple position
+    state.make_move((7, 7)); // Center move
+    state.make_move((7, 8)); // Adjacent move
+
+    let result = parallel_iterative_deepening_search(&mut state, 3, None);
+
+    // Should find a valid move
+    assert!(result.best_move.is_some());
+    assert!(result.score != i32::MIN && result.score != i32::MAX);
+    assert!(result.depth_reached > 0);
+    assert!(result.nodes_searched > 0);
+}
+
+#[test]
+fn test_parallel_iterative_deepening_winning_position() {
+    let mut state = GameState::new(15, 5);
+
+    // Create a position where there's a clear winning move
+    state.make_move((7, 7));
+    state.make_move((6, 7));
+    state.make_move((7, 8));
+    state.make_move((6, 8));
+    state.make_move((7, 9));
+    state.make_move((6, 9));
+    state.make_move((7, 10));
+    // Now current player (Min) has a winning move
+
+    let result = parallel_iterative_deepening_search(&mut state, 4, None);
+
+    // Should find the winning move
+    assert!(result.best_move.is_some());
+    assert!(result.score.abs() > 900_000); // Close to mate value
+}
+
+#[test]
+fn test_parallel_iterative_deepening_time_limit() {
+    let mut state = GameState::new(15, 5);
+
+    // Set up a complex position
+    state.make_move((7, 7));
+    state.make_move((7, 8));
+    state.make_move((8, 7));
+    state.make_move((6, 8));
+
+    let time_limit = std::time::Duration::from_millis(100);
+    let start_time = std::time::Instant::now();
+    let result = parallel_iterative_deepening_search(&mut state, 10, Some(time_limit));
+    let elapsed = start_time.elapsed();
+
+    // Should respect time limit
+    assert!(elapsed <= std::time::Duration::from_millis(200)); // Small buffer
+    assert!(result.best_move.is_some());
+    assert!(result.depth_reached > 0);
+}
+
+#[test]
+fn test_minimax_shared_vs_sequential_consistency() {
+    let mut state = GameState::new(15, 5);
+
+    // Set up a deterministic position
+    state.board.place_stone(7, 7, Player::Max);
+    state.board.place_stone(7, 8, Player::Min);
+    state.current_player = Player::Max;
+
+    // Test sequential minimax
+    let mut tt_seq = TranspositionTable::new_default();
+    let (score_seq, _nodes_seq) = minimax(&mut state.clone(), 2, i32::MIN, i32::MAX, true, &mut tt_seq);
+
+    // Test shared minimax
+    let shared_tt = SharedTranspositionTable::new_default();
+    let (score_shared, _nodes_shared) = minimax_shared(&mut state, 2, i32::MIN, i32::MAX, true, &shared_tt);
+
+    // Should give same results
+    assert_eq!(score_seq, score_shared);
+}
+
+#[test]
+fn test_minimax_shared_state_preservation() {
+    let mut state = GameState::new(15, 5);
+    let shared_tt = SharedTranspositionTable::new_default();
+
+    // Make a move using proper state management
+    state.make_move((7, 7));
+    
+    // Record initial state after the move
+    let initial_hash = state.hash();
+    let initial_player = state.current_player;
+
+    // Run minimax_shared (should restore state)
+    let (_score, _nodes) = minimax_shared(&mut state, 2, i32::MIN, i32::MAX, false, &shared_tt);
+
+    // State should be preserved
+    assert_eq!(state.hash(), initial_hash);
+    assert_eq!(state.current_player, initial_player);
+}
+
+#[test]
+fn test_parallel_iterative_deepening_empty_moves() {
+    let mut state = GameState::new(3, 3);
+
+    // Fill the board (no moves available)
+    for i in 0..3 {
+        for j in 0..3 {
+            state.board.place_stone(i, j, Player::Max);
+        }
+    }
+
+    let result = parallel_iterative_deepening_search(&mut state, 2, None);
+
+    // Should handle no moves gracefully
+    assert_eq!(result.best_move, None);
+    assert_eq!(result.score, 0); // Draw score
+    assert_eq!(result.depth_reached, 0);
+    assert_eq!(result.nodes_searched, 0);
+}
+
+#[test]
+fn test_minimax_shared_captures_evaluation() {
+    let mut state = GameState::new(19, 5);
+    let shared_tt = SharedTranspositionTable::new_default();
+
+    // Set up position with capture opportunity
+    state.board.place_stone(9, 9, Player::Max);
+    state.board.place_stone(9, 10, Player::Min);
+    state.board.place_stone(9, 11, Player::Min);
+    state.current_player = Player::Max;
+
+    let (score, _nodes) = minimax_shared(&mut state, 2, i32::MIN, i32::MAX, true, &shared_tt);
+
+    // Should recognize capture opportunity
+    assert!(score > 0); // Favorable for Max
 }

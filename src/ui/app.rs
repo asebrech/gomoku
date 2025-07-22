@@ -113,7 +113,8 @@ impl GomokuApp {
 		.insert_resource(GameState::new(settings.board_size, settings.minimum_chain_to_win))
         .insert_resource(settings)
         .insert_resource(ColorScheme::new())
-        .init_resource::<TranspositionTable>();
+        .init_resource::<TranspositionTable>()
+        .init_resource::<crate::ai::transposition::SharedTranspositionTable>();
 
 	}
 
