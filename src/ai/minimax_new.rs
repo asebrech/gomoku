@@ -12,36 +12,37 @@ pub fn minimax(
     maximizing_player: bool,
     tt: &mut TranspositionTable,
 ) -> i32 {
-    minimax_with_node_count(state, depth, alpha, beta, maximizing_player, tt).0
+    minimax_with_pv(state, depth, alpha, beta, maximizing_player, tt, false)
 }
 
-pub fn minimax_with_node_count(
+pub fn minimax_with_pv(
     state: &mut GameState,
     depth: i32,
     mut alpha: i32,
     mut beta: i32,
     maximizing_player: bool,
     tt: &mut TranspositionTable,
-) -> (i32, u64) {
+    pv_node: bool,
+) -> i32 {
     let original_alpha = alpha;
     let hash_key = state.hash();
-    let mut nodes_evaluated = 1; // Count this node
     
+    // Don't use TT cutoff for PV nodes to ensure accuracy
     let tt_result = tt.probe(hash_key, depth, alpha, beta);
-    if tt_result.cutoff {
-        return (tt_result.value.unwrap(), nodes_evaluated);
+    if tt_result.cutoff && !pv_node {
+        return tt_result.value.unwrap();
     }
 
     if depth == 0 || state.is_terminal() {
         let eval = Heuristic::evaluate(state, depth);
-        tt.store_with_pv(hash_key, eval, depth, EntryType::Exact, None, false);
-        return (eval, nodes_evaluated);
+        tt.store_with_pv(hash_key, eval, depth, EntryType::Exact, None, pv_node);
+        return eval;
     }
 
     let mut moves = state.get_possible_moves();
     MoveOrdering::order_moves(state, &mut moves);
     
-    // Move TT best move to front for better move ordering (PV move from previous iteration)
+    // Prioritize TT move (often the PV move from previous iteration)
     if let Some(best_move) = tt_result.best_move {
         if let Some(pos) = moves.iter().position(|&m| m == best_move) {
             moves.swap(0, pos);
@@ -57,22 +58,22 @@ pub fn minimax_with_node_count(
         for move_ in moves {
             state.make_move(move_);
             
-            let (eval, child_nodes) = if first_move || depth <= 2 {
-                // Search first move (likely PV) and shallow searches with full window
-                minimax_with_node_count(state, depth - 1, alpha, beta, false, tt)
-            } else {
-                // Try null window search for other moves for speedup
-                let (null_eval, null_nodes) = minimax_with_node_count(state, depth - 1, alpha, alpha + 1, false, tt);
+            let eval = if pv_node && first_move {
+                // Search first move (PV move) with full window
+                minimax_with_pv(state, depth - 1, alpha, beta, false, tt, true)
+            } else if pv_node {
+                // Try null window search first for non-PV moves
+                let null_eval = minimax_with_pv(state, depth - 1, alpha, alpha + 1, false, tt, false);
                 if null_eval > alpha && null_eval < beta {
-                    // Re-search with full window if null window indicates this might be better
-                    let (full_eval, full_nodes) = minimax_with_node_count(state, depth - 1, alpha, beta, false, tt);
-                    (full_eval, null_nodes + full_nodes)
+                    // Re-search with full window if null window failed
+                    minimax_with_pv(state, depth - 1, alpha, beta, false, tt, true)
                 } else {
-                    (null_eval, null_nodes)
+                    null_eval
                 }
+            } else {
+                minimax_with_pv(state, depth - 1, alpha, beta, false, tt, false)
             };
             
-            nodes_evaluated += child_nodes;
             state.undo_move(move_);
             first_move = false;
             
@@ -91,22 +92,22 @@ pub fn minimax_with_node_count(
         for move_ in moves {
             state.make_move(move_);
             
-            let (eval, child_nodes) = if first_move || depth <= 2 {
-                // Search first move (likely PV) and shallow searches with full window
-                minimax_with_node_count(state, depth - 1, alpha, beta, true, tt)
-            } else {
-                // Try null window search for other moves for speedup
-                let (null_eval, null_nodes) = minimax_with_node_count(state, depth - 1, beta - 1, beta, true, tt);
+            let eval = if pv_node && first_move {
+                // Search first move (PV move) with full window
+                minimax_with_pv(state, depth - 1, alpha, beta, true, tt, true)
+            } else if pv_node {
+                // Try null window search first for non-PV moves
+                let null_eval = minimax_with_pv(state, depth - 1, beta - 1, beta, true, tt, false);
                 if null_eval > alpha && null_eval < beta {
-                    // Re-search with full window if null window indicates this might be better
-                    let (full_eval, full_nodes) = minimax_with_node_count(state, depth - 1, alpha, beta, true, tt);
-                    (full_eval, null_nodes + full_nodes)
+                    // Re-search with full window if null window failed
+                    minimax_with_pv(state, depth - 1, alpha, beta, true, tt, true)
                 } else {
-                    (null_eval, null_nodes)
+                    null_eval
                 }
+            } else {
+                minimax_with_pv(state, depth - 1, alpha, beta, true, tt, false)
             };
             
-            nodes_evaluated += child_nodes;
             state.undo_move(move_);
             first_move = false;
             
@@ -130,10 +131,8 @@ pub fn minimax_with_node_count(
         EntryType::Exact
     };
     
-    // Mark as PV node if we have an exact value (no cutoff occurred)
-    let is_pv = entry_type == EntryType::Exact;
-    tt.store_with_pv(hash_key, value, depth, entry_type, best_move, is_pv);
-    (value, nodes_evaluated)
+    tt.store_with_pv(hash_key, value, depth, entry_type, best_move, pv_node);
+    value
 }
 
 #[derive(Debug)]
@@ -196,7 +195,7 @@ pub fn iterative_deepening_search(
         let mut moves = state.get_possible_moves();
         MoveOrdering::order_moves(state, &mut moves);
         
-        // Prioritize best move from previous iteration (PV move) for better move ordering
+        // Use best move from previous iteration for move ordering (PV move)
         if let Some(prev_best) = best_move {
             if let Some(pos) = moves.iter().position(|&m| m == prev_best) {
                 moves.swap(0, pos);
@@ -217,49 +216,32 @@ pub fn iterative_deepening_search(
 
             state.make_move(mv);
             
-            // Use aspiration windows for the first move (expected PV move) at higher depths
-            let (score, move_nodes) = if first_move && depth > 3 && best_score != i32::MIN && best_score != i32::MAX {
-                // Try aspiration window search first
-                let window = 50;
-                let asp_alpha = best_score - window;
-                let asp_beta = best_score + window;
-                
-                let (asp_score, asp_nodes) = minimax_with_node_count(
-                    state,
-                    depth - 1,
-                    asp_alpha,
-                    asp_beta,
-                    state.current_player == crate::core::board::Player::Max,
-                    tt,
-                );
-                
-                // If aspiration window fails, re-search with full window
-                if asp_score <= asp_alpha || asp_score >= asp_beta {
-                    let (full_score, full_nodes) = minimax_with_node_count(
-                        state,
-                        depth - 1,
-                        i32::MIN,
-                        i32::MAX,
-                        state.current_player == crate::core::board::Player::Max,
-                        tt,
-                    );
-                    (full_score, asp_nodes + full_nodes)
-                } else {
-                    (asp_score, asp_nodes)
-                }
-            } else {
-                minimax_with_node_count(
+            let score = if first_move && depth > 1 {
+                // First move is expected to be PV move - search with full window and PV flag
+                minimax_with_pv(
                     state,
                     depth - 1,
                     i32::MIN,
                     i32::MAX,
                     state.current_player == crate::core::board::Player::Max,
                     tt,
+                    true, // This is a PV node
+                )
+            } else {
+                // Non-PV moves - regular search
+                minimax_with_pv(
+                    state,
+                    depth - 1,
+                    i32::MIN,
+                    i32::MAX,
+                    state.current_player == crate::core::board::Player::Max,
+                    tt,
+                    false,
                 )
             };
             
             state.undo_move(mv);
-            nodes_searched += move_nodes;
+            nodes_searched += 1;
             first_move = false;
 
             let is_better = if state.current_player == crate::core::board::Player::Max {
@@ -291,7 +273,7 @@ pub fn iterative_deepening_search(
 
         let depth_time = depth_start_time.elapsed();
         println!(
-            "🎯 PV-Search Depth {} completed in {:?}: best_move={:?}, score={}, nodes={}",
+            "🔍 Depth {} completed in {:?}: best_move={:?}, score={}, nodes={}",
             depth, depth_time, best_move, best_score, nodes_searched
         );
     }

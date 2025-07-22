@@ -1,6 +1,56 @@
 use std::collections::HashMap;
 use bevy::prelude::*;
 
+// Principal Variation Table for tracking best variation
+#[derive(Resource, Default)]
+pub struct PVTable {
+    pv_moves: Vec<Vec<(usize, usize)>>,
+    max_depth: usize,
+}
+
+impl PVTable {
+    pub fn new(max_depth: usize) -> Self {
+        let mut pv_moves = Vec::with_capacity(max_depth);
+        for _ in 0..max_depth {
+            pv_moves.push(Vec::with_capacity(max_depth));
+        }
+        Self { pv_moves, max_depth }
+    }
+    
+    pub fn clear(&mut self) {
+        for line in &mut self.pv_moves {
+            line.clear();
+        }
+    }
+    
+    pub fn store_pv(&mut self, depth: usize, mv: (usize, usize)) {
+        if depth < self.max_depth {
+            self.pv_moves[depth].clear();
+            self.pv_moves[depth].push(mv);
+            
+            // Copy the rest of the PV from the next depth
+            if depth + 1 < self.max_depth {
+                let next_moves: Vec<_> = self.pv_moves[depth + 1].clone();
+                for next_move in next_moves {
+                    self.pv_moves[depth].push(next_move);
+                }
+            }
+        }
+    }
+    
+    pub fn get_pv_moves(&self, depth: usize) -> &Vec<(usize, usize)> {
+        if depth < self.max_depth {
+            &self.pv_moves[depth]
+        } else {
+            &self.pv_moves[0] // Fallback to root
+        }
+    }
+    
+    pub fn get_first_pv_move(&self) -> Option<(usize, usize)> {
+        self.pv_moves.get(0)?.first().copied()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntryType {
     Exact,
@@ -16,6 +66,7 @@ pub struct TranspositionEntry {
     pub entry_type: EntryType,
     pub best_move: Option<(usize, usize)>,
     pub age: u32,
+    pub pv_node: bool, // Marks if this is a Principal Variation node
 }
 
 #[derive(Resource)]
@@ -45,6 +96,10 @@ impl TranspositionTable {
     }
     
     pub fn store(&mut self, key: u64, value: i32, depth: i32, entry_type: EntryType, best_move: Option<(usize, usize)>) {
+        self.store_with_pv(key, value, depth, entry_type, best_move, false);
+    }
+    
+    pub fn store_with_pv(&mut self, key: u64, value: i32, depth: i32, entry_type: EntryType, best_move: Option<(usize, usize)>, pv_node: bool) {
         if self.table.len() >= self.max_size {
             self.cleanup_old_entries();
         }
@@ -57,6 +112,7 @@ impl TranspositionTable {
             entry_type,
             best_move,
             age: current_age,
+            pv_node,
         };
         
         match self.table.get(&key) {
@@ -65,7 +121,8 @@ impl TranspositionTable {
                     self.collisions += 1;
                 }
                 
-                if depth > existing.depth || (depth == existing.depth && current_age >= existing.age) {
+                // Always replace if new entry is from PV or has higher depth
+                if pv_node || depth > existing.depth || (depth == existing.depth && current_age >= existing.age) {
                     self.table.insert(key, new_entry);
                 }
             }
@@ -110,14 +167,20 @@ impl TranspositionTable {
         TTResult::miss()
     }
     
-    pub fn get_best_move(&self, key: u64) -> Option<(usize, usize)> {
+    pub fn get_pv_move(&self, key: u64) -> Option<(usize, usize)> {
         self.table.get(&key).and_then(|entry| {
-            if entry.key == key {
+            if entry.key == key && entry.pv_node {
                 entry.best_move
             } else {
                 None
             }
         })
+    }
+    
+    pub fn is_pv_node(&self, key: u64) -> bool {
+        self.table.get(&key)
+            .map(|entry| entry.key == key && entry.pv_node)
+            .unwrap_or(false)
     }
     
     pub fn clear(&mut self) {
@@ -165,13 +228,13 @@ impl TranspositionTable {
         let original_size = self.table.len();
         
         self.table.retain(|_, entry| {
-            entry.age >= cutoff_age || entry.depth > 10
+            entry.age >= cutoff_age || entry.depth > 10 || entry.pv_node
         });
         
         if self.table.len() > self.max_size * 3 / 4 {
             let cutoff_age = current_age - 2;
             self.table.retain(|_, entry| {
-                entry.age >= cutoff_age && entry.depth > 5
+                (entry.age >= cutoff_age && entry.depth > 5) || entry.pv_node
             });
         }
         
