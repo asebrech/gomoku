@@ -15,7 +15,6 @@ pub mod core {
 }
 
 pub mod interface {
-    pub mod shell_game;
     pub mod utils;
 }
 

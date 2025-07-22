@@ -7,17 +7,6 @@ use super::{heuristic::Heuristic, move_ordering::MoveOrdering, transposition::{T
 pub fn minimax(
     state: &mut GameState,
     depth: i32,
-    alpha: i32,
-    beta: i32,
-    maximizing_player: bool,
-    tt: &mut TranspositionTable,
-) -> i32 {
-    minimax_with_node_count(state, depth, alpha, beta, maximizing_player, tt).0
-}
-
-pub fn minimax_with_node_count(
-    state: &mut GameState,
-    depth: i32,
     mut alpha: i32,
     mut beta: i32,
     maximizing_player: bool,
@@ -47,7 +36,7 @@ pub fn minimax_with_node_count(
             if razor_depth <= 0 {
                 return (static_eval, nodes_evaluated);
             }
-            let (razor_value, razor_nodes) = minimax_with_node_count(state, razor_depth, alpha, beta, maximizing_player, tt);
+            let (razor_value, razor_nodes) = minimax(state, razor_depth, alpha, beta, maximizing_player, tt);
             nodes_evaluated += razor_nodes;
             if razor_value < alpha {
                 return (razor_value, nodes_evaluated);
@@ -92,7 +81,7 @@ pub fn minimax_with_node_count(
         if should_try_null {
             let null_depth = depth - 3; // Aggressive reduction for null move
             if null_depth > 0 {
-                let (null_score, null_nodes) = minimax_with_node_count(
+                let (null_score, null_nodes) = minimax(
                     state, 
                     null_depth, 
                     alpha, 
@@ -134,13 +123,13 @@ pub fn minimax_with_node_count(
             
             let (eval, child_nodes) = if first_move || depth <= 2 {
                 // Search first move (likely PV) and shallow searches with full window
-                minimax_with_node_count(state, depth - 1, alpha, beta, false, tt)
+                minimax(state, depth - 1, alpha, beta, false, tt)
             } else if moves_searched <= 3 {
                 // Search first few moves with null window
-                let (null_eval, null_nodes) = minimax_with_node_count(state, depth - 1, alpha, alpha + 1, false, tt);
+                let (null_eval, null_nodes) = minimax(state, depth - 1, alpha, alpha + 1, false, tt);
                 if null_eval > alpha && null_eval < beta {
                     // Re-search with full window if null window indicates this might be better
-                    let (full_eval, full_nodes) = minimax_with_node_count(state, depth - 1, alpha, beta, false, tt);
+                    let (full_eval, full_nodes) = minimax(state, depth - 1, alpha, beta, false, tt);
                     (full_eval, null_nodes + full_nodes)
                 } else {
                     (null_eval, null_nodes)
@@ -150,11 +139,11 @@ pub fn minimax_with_node_count(
                 let reduction = if depth >= 4 && moves_searched > 6 { 2 } else { 1 };
                 let reduced_depth = (depth - 1 - reduction).max(0);
                 
-                let (lmr_eval, lmr_nodes) = minimax_with_node_count(state, reduced_depth, alpha, alpha + 1, false, tt);
+                let (lmr_eval, lmr_nodes) = minimax(state, reduced_depth, alpha, alpha + 1, false, tt);
                 
                 // If LMR search fails high, re-search with full depth and window
                 if lmr_eval > alpha && reduced_depth < depth - 1 {
-                    let (full_eval, full_nodes) = minimax_with_node_count(state, depth - 1, alpha, beta, false, tt);
+                    let (full_eval, full_nodes) = minimax(state, depth - 1, alpha, beta, false, tt);
                     (full_eval, lmr_nodes + full_nodes)
                 } else {
                     (lmr_eval, lmr_nodes)
@@ -183,13 +172,13 @@ pub fn minimax_with_node_count(
             
             let (eval, child_nodes) = if first_move || depth <= 2 {
                 // Search first move (likely PV) and shallow searches with full window
-                minimax_with_node_count(state, depth - 1, alpha, beta, true, tt)
+                minimax(state, depth - 1, alpha, beta, true, tt)
             } else if moves_searched <= 3 {
                 // Search first few moves with null window
-                let (null_eval, null_nodes) = minimax_with_node_count(state, depth - 1, beta - 1, beta, true, tt);
+                let (null_eval, null_nodes) = minimax(state, depth - 1, beta - 1, beta, true, tt);
                 if null_eval > alpha && null_eval < beta {
                     // Re-search with full window if null window indicates this might be better
-                    let (full_eval, full_nodes) = minimax_with_node_count(state, depth - 1, alpha, beta, true, tt);
+                    let (full_eval, full_nodes) = minimax(state, depth - 1, alpha, beta, true, tt);
                     (full_eval, null_nodes + full_nodes)
                 } else {
                     (null_eval, null_nodes)
@@ -199,11 +188,11 @@ pub fn minimax_with_node_count(
                 let reduction = if depth >= 4 && moves_searched > 6 { 2 } else { 1 };
                 let reduced_depth = (depth - 1 - reduction).max(0);
                 
-                let (lmr_eval, lmr_nodes) = minimax_with_node_count(state, reduced_depth, beta - 1, beta, true, tt);
+                let (lmr_eval, lmr_nodes) = minimax(state, reduced_depth, beta - 1, beta, true, tt);
                 
                 // If LMR search fails low, re-search with full depth and window
                 if lmr_eval < beta && reduced_depth < depth - 1 {
-                    let (full_eval, full_nodes) = minimax_with_node_count(state, depth - 1, alpha, beta, true, tt);
+                    let (full_eval, full_nodes) = minimax(state, depth - 1, alpha, beta, true, tt);
                     (full_eval, lmr_nodes + full_nodes)
                 } else {
                     (lmr_eval, lmr_nodes)
@@ -337,7 +326,7 @@ pub fn iterative_deepening_search(
                 let asp_alpha = best_score.saturating_sub(window);
                 let asp_beta = best_score.saturating_add(window);
                 
-                let (asp_score, asp_nodes) = minimax_with_node_count(
+                let (asp_score, asp_nodes) = minimax(
                     state,
                     depth - 1,
                     asp_alpha,
@@ -349,7 +338,7 @@ pub fn iterative_deepening_search(
                 // If aspiration window fails, re-search with wider window
                 if asp_score <= asp_alpha || asp_score >= asp_beta {
                     let wider_window = window * 3;
-                    let (full_score, full_nodes) = minimax_with_node_count(
+                    let (full_score, full_nodes) = minimax(
                         state,
                         depth - 1,
                         best_score.saturating_sub(wider_window),
@@ -362,7 +351,7 @@ pub fn iterative_deepening_search(
                     (asp_score, asp_nodes)
                 }
             } else {
-                minimax_with_node_count(
+                minimax(
                     state,
                     depth - 1,
                     i32::MIN,
