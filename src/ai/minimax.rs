@@ -7,8 +7,8 @@ use super::{heuristic::Heuristic, move_ordering::MoveOrdering, transposition::{T
 pub fn minimax(
     state: &mut GameState,
     depth: i32,
-    mut alpha: i32,
-    mut beta: i32,
+    alpha: i32,
+    beta: i32,
     maximizing_player: bool,
     tt: &mut TranspositionTable,
 ) -> i32 {
