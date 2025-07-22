@@ -38,7 +38,80 @@ pub fn minimax_with_node_count(
         return (eval, nodes_evaluated);
     }
 
+    // Razoring: At low depths, if position looks bad, reduce depth
+    if depth <= 3 && !maximizing_player {
+        let static_eval = Heuristic::evaluate(state, depth);
+        let razor_margin = 150 * depth;
+        if static_eval + razor_margin < alpha {
+            let razor_depth = depth - 1;
+            if razor_depth <= 0 {
+                return (static_eval, nodes_evaluated);
+            }
+            let (razor_value, razor_nodes) = minimax_with_node_count(state, razor_depth, alpha, beta, maximizing_player, tt);
+            nodes_evaluated += razor_nodes;
+            if razor_value < alpha {
+                return (razor_value, nodes_evaluated);
+            }
+        }
+    }
+
     let mut moves = state.get_possible_moves();
+    
+    // Futility pruning: If we can't improve alpha even with best case, skip this node
+    if depth <= 2 && !maximizing_player && moves.len() > 4 {
+        let static_eval = Heuristic::evaluate(state, depth);
+        let futility_margin = 200 * depth;
+        if static_eval + futility_margin < alpha {
+            return (static_eval, nodes_evaluated);
+        }
+    }
+
+    // Delta pruning: More aggressive pruning for deeper searches
+    if depth >= 4 && moves.len() > 8 {
+        let static_eval = Heuristic::evaluate(state, depth);
+        let delta_margin = 300 + 50 * depth; // Larger margins for deeper searches
+        if maximizing_player && static_eval + delta_margin < alpha {
+            return (static_eval, nodes_evaluated);
+        } else if !maximizing_player && static_eval - delta_margin > beta {
+            return (static_eval, nodes_evaluated);
+        }
+    }
+
+    // Null move pruning: Give opponent an extra move and see if position is still good
+    if depth >= 3 && !state.is_terminal() && moves.len() > 6 {
+        let static_eval = Heuristic::evaluate(state, depth);
+        let null_move_threshold = if maximizing_player { beta } else { alpha };
+        
+        // Only try null move if we're in a "good" position
+        let should_try_null = if maximizing_player {
+            static_eval >= null_move_threshold + 100
+        } else {
+            static_eval <= null_move_threshold - 100
+        };
+        
+        if should_try_null {
+            let null_depth = depth - 3; // Aggressive reduction for null move
+            if null_depth > 0 {
+                let (null_score, null_nodes) = minimax_with_node_count(
+                    state, 
+                    null_depth, 
+                    alpha, 
+                    beta, 
+                    !maximizing_player, 
+                    tt
+                );
+                nodes_evaluated += null_nodes;
+                
+                // If null move causes a cutoff, prune this branch
+                if maximizing_player && null_score >= beta {
+                    return (null_score, nodes_evaluated);
+                } else if !maximizing_player && null_score <= alpha {
+                    return (null_score, nodes_evaluated);
+                }
+            }
+        }
+    }
+    
     MoveOrdering::order_moves(state, &mut moves);
     
     // Move TT best move to front for better move ordering (PV move from previous iteration)
@@ -51,17 +124,19 @@ pub fn minimax_with_node_count(
     let mut best_move = None;
     let mut value;
     let mut first_move = true;
+    let mut moves_searched = 0;
 
     if maximizing_player {
         value = i32::MIN;
         for move_ in moves {
             state.make_move(move_);
+            moves_searched += 1;
             
             let (eval, child_nodes) = if first_move || depth <= 2 {
                 // Search first move (likely PV) and shallow searches with full window
                 minimax_with_node_count(state, depth - 1, alpha, beta, false, tt)
-            } else {
-                // Try null window search for other moves for speedup
+            } else if moves_searched <= 3 {
+                // Search first few moves with null window
                 let (null_eval, null_nodes) = minimax_with_node_count(state, depth - 1, alpha, alpha + 1, false, tt);
                 if null_eval > alpha && null_eval < beta {
                     // Re-search with full window if null window indicates this might be better
@@ -69,6 +144,20 @@ pub fn minimax_with_node_count(
                     (full_eval, null_nodes + full_nodes)
                 } else {
                     (null_eval, null_nodes)
+                }
+            } else {
+                // Late Move Reduction: Reduce depth for moves beyond the first few
+                let reduction = if depth >= 4 && moves_searched > 6 { 2 } else { 1 };
+                let reduced_depth = (depth - 1 - reduction).max(0);
+                
+                let (lmr_eval, lmr_nodes) = minimax_with_node_count(state, reduced_depth, alpha, alpha + 1, false, tt);
+                
+                // If LMR search fails high, re-search with full depth and window
+                if lmr_eval > alpha && reduced_depth < depth - 1 {
+                    let (full_eval, full_nodes) = minimax_with_node_count(state, depth - 1, alpha, beta, false, tt);
+                    (full_eval, lmr_nodes + full_nodes)
+                } else {
+                    (lmr_eval, lmr_nodes)
                 }
             };
             
@@ -90,12 +179,13 @@ pub fn minimax_with_node_count(
         value = i32::MAX;
         for move_ in moves {
             state.make_move(move_);
+            moves_searched += 1;
             
             let (eval, child_nodes) = if first_move || depth <= 2 {
                 // Search first move (likely PV) and shallow searches with full window
                 minimax_with_node_count(state, depth - 1, alpha, beta, true, tt)
-            } else {
-                // Try null window search for other moves for speedup
+            } else if moves_searched <= 3 {
+                // Search first few moves with null window
                 let (null_eval, null_nodes) = minimax_with_node_count(state, depth - 1, beta - 1, beta, true, tt);
                 if null_eval > alpha && null_eval < beta {
                     // Re-search with full window if null window indicates this might be better
@@ -103,6 +193,20 @@ pub fn minimax_with_node_count(
                     (full_eval, null_nodes + full_nodes)
                 } else {
                     (null_eval, null_nodes)
+                }
+            } else {
+                // Late Move Reduction: Reduce depth for moves beyond the first few
+                let reduction = if depth >= 4 && moves_searched > 6 { 2 } else { 1 };
+                let reduced_depth = (depth - 1 - reduction).max(0);
+                
+                let (lmr_eval, lmr_nodes) = minimax_with_node_count(state, reduced_depth, beta - 1, beta, true, tt);
+                
+                // If LMR search fails low, re-search with full depth and window
+                if lmr_eval < beta && reduced_depth < depth - 1 {
+                    let (full_eval, full_nodes) = minimax_with_node_count(state, depth - 1, alpha, beta, true, tt);
+                    (full_eval, lmr_nodes + full_nodes)
+                } else {
+                    (lmr_eval, lmr_nodes)
                 }
             };
             
@@ -203,6 +307,15 @@ pub fn iterative_deepening_search(
             }
         }
 
+        // Aggressive move pruning at root for deeper searches
+        if depth >= 8 && moves.len() > 8 {
+            moves.truncate(8); // Only consider top 8 moves at very deep searches  
+        } else if depth >= 6 && moves.len() > 12 {
+            moves.truncate(12); // Only consider top 12 moves at deep searches
+        } else if depth >= 4 && moves.len() > 16 {
+            moves.truncate(16); // Only consider top 16 moves at medium depths
+        }
+
         let mut all_moves_searched = true;
         let mut first_move = true;
         
@@ -218,9 +331,9 @@ pub fn iterative_deepening_search(
             state.make_move(mv);
             
             // Use aspiration windows for the first move (expected PV move) at higher depths
-            let (score, move_nodes) = if first_move && depth > 3 && best_score != i32::MIN && best_score != i32::MAX {
-                // Try aspiration window search first
-                let window = 50;
+            let (score, move_nodes) = if first_move && depth > 2 && best_score != i32::MIN && best_score != i32::MAX {
+                // Try narrow aspiration window first for aggressive pruning
+                let window = if depth >= 6 { 25 } else { 50 }; // Narrower windows for deeper searches
                 let asp_alpha = best_score - window;
                 let asp_beta = best_score + window;
                 
@@ -233,13 +346,14 @@ pub fn iterative_deepening_search(
                     tt,
                 );
                 
-                // If aspiration window fails, re-search with full window
+                // If aspiration window fails, re-search with wider window
                 if asp_score <= asp_alpha || asp_score >= asp_beta {
+                    let wider_window = window * 3;
                     let (full_score, full_nodes) = minimax_with_node_count(
                         state,
                         depth - 1,
-                        i32::MIN,
-                        i32::MAX,
+                        best_score - wider_window,
+                        best_score + wider_window,
                         state.current_player == crate::core::board::Player::Max,
                         tt,
                     );
