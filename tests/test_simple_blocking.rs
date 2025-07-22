@@ -1,7 +1,7 @@
 use gomoku::core::state::GameState;
 use gomoku::core::board::Player;
 use gomoku::interface::utils::{find_best_move, find_best_move_parallel};
-use gomoku::ai::transposition::TranspositionTable;
+use gomoku::ai::transposition::{TranspositionTable, SharedTranspositionTable};
 
 #[test]
 fn test_simple_immediate_threat() {
@@ -28,7 +28,8 @@ fn test_simple_immediate_threat() {
     let sequential_move = find_best_move(&mut state_seq, 4, None, &mut tt);
     
     let mut state_par = state.clone();
-    let parallel_move = find_best_move_parallel(&mut state_par, 4, None);
+    let shared_tt = SharedTranspositionTable::new_default();
+    let parallel_move = find_best_move_parallel(&mut state_par, 4, None, &shared_tt);
     
     println!("Sequential search result: {:?}", sequential_move);
     println!("Parallel search result: {:?}", parallel_move);

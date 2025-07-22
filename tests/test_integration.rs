@@ -1,4 +1,4 @@
-use gomoku::ai::transposition::TranspositionTable;
+use gomoku::ai::transposition::{TranspositionTable, SharedTranspositionTable};
 use gomoku::core::board::Player;
 use gomoku::core::state::GameState;
 use gomoku::interface::utils::{find_best_move, find_best_move_parallel};
@@ -9,10 +9,11 @@ fn test_find_best_move_first_move() {
 
     // Test both sequential and parallel implementations
     let mut tt = TranspositionTable::new_default();
+    let shared_tt = SharedTranspositionTable::new_default();
     let sequential_move = find_best_move(&mut state, 2, None, &mut tt);
     
     let mut state_copy = state.clone();
-    let parallel_move = find_best_move_parallel(&mut state_copy, 2, None);
+    let parallel_move = find_best_move_parallel(&mut state_copy, 2, None, &shared_tt);
 
     // Both should return center move for first move
     assert_eq!(sequential_move, Some((9, 9)));
@@ -23,12 +24,13 @@ fn test_find_best_move_first_move() {
 #[test]
 fn test_find_best_move_response() {
     let mut state = GameState::new(19, 5);
+    let shared_tt = SharedTranspositionTable::new_default();
 
     // Make first move
     state.make_move((9, 9));
 
     // Test parallel implementation with deeper search
-    let best_move = find_best_move_parallel(&mut state, 5, None);
+    let best_move = find_best_move_parallel(&mut state, 5, None, &shared_tt);
 
     // Should return some adjacent move
     assert!(best_move.is_some());
@@ -39,6 +41,7 @@ fn test_find_best_move_response() {
 #[test]
 fn test_find_best_move_winning_opportunity() {
     let mut state = GameState::new(19, 5);
+    let shared_tt = SharedTranspositionTable::new_default();
 
     // Set up winning opportunity for current player (Max)
     state.board.place_stone(9, 5, Player::Max);
@@ -48,7 +51,7 @@ fn test_find_best_move_winning_opportunity() {
     state.current_player = Player::Max;
 
     // Use parallel search for better analysis
-    let best_move = find_best_move_parallel(&mut state, 6, None);
+    let best_move = find_best_move_parallel(&mut state, 6, None, &shared_tt);
 
     // Should find the winning move
     assert!(best_move.is_some());
@@ -61,6 +64,7 @@ fn test_find_best_move_winning_opportunity() {
 #[test]
 fn test_find_best_move_block_opponent() {
     let mut state = GameState::new(19, 5);
+    let shared_tt = SharedTranspositionTable::new_default();
 
     // Set up threat from opponent (Min has 4 in a row)
     state.board.place_stone(9, 5, Player::Min);
@@ -69,7 +73,7 @@ fn test_find_best_move_block_opponent() {
     state.board.place_stone(9, 8, Player::Min);
     state.current_player = Player::Max;
 
-    let best_move = find_best_move_parallel(&mut state, 5, None);
+    let best_move = find_best_move_parallel(&mut state, 5, None, &shared_tt);
 
     // Should find a blocking move
     assert!(best_move.is_some());
@@ -139,6 +143,7 @@ fn test_find_best_move_capture_opportunity() {
 #[test]
 fn test_find_best_move_capture_opportunity_parallel() {
     let mut state = GameState::new(19, 5);
+    let shared_tt = SharedTranspositionTable::new_default();
     
     // Set up capture opportunity
     state.board.place_stone(9, 9, Player::Max);
@@ -146,7 +151,7 @@ fn test_find_best_move_capture_opportunity_parallel() {
     state.board.place_stone(9, 11, Player::Min);
     state.current_player = Player::Max;
 
-    let best_move = find_best_move_parallel(&mut state, 2, None);
+    let best_move = find_best_move_parallel(&mut state, 2, None, &shared_tt);
 
     // Should find the capturing move
     assert!(best_move.is_some());
@@ -179,13 +184,14 @@ fn test_find_best_move_no_moves_parallel() {
     let mut state = GameState::new(3, 3);
 
     // Fill the board
+    let shared_tt = SharedTranspositionTable::new_default();
     for i in 0..3 {
         for j in 0..3 {
             state.board.place_stone(i, j, Player::Max);
         }
     }
 
-    let best_move = find_best_move_parallel(&mut state, 2, None);
+    let best_move = find_best_move_parallel(&mut state, 2, None, &shared_tt);
 
     // Should return None when no moves available
     assert_eq!(best_move, None);
@@ -217,12 +223,13 @@ fn test_find_best_move_different_depths_parallel() {
     let mut state = GameState::new(19, 5);
 
     // Set up a position
+    let shared_tt = SharedTranspositionTable::new_default();
     state.board.place_stone(9, 9, Player::Max);
     state.board.place_stone(9, 10, Player::Min);
     state.current_player = Player::Max;
 
-    let move_depth1 = find_best_move_parallel(&mut state.clone(), 1, None);
-    let move_depth5 = find_best_move_parallel(&mut state.clone(), 5, None);
+    let move_depth1 = find_best_move_parallel(&mut state.clone(), 1, None, &shared_tt);
+    let move_depth5 = find_best_move_parallel(&mut state.clone(), 5, None, &shared_tt);
 
     // Both should return valid moves
     assert!(move_depth1.is_some());
@@ -257,17 +264,18 @@ fn test_find_best_move_player_alternation_parallel() {
     let mut state = GameState::new(19, 5);
 
     // Test with Max player
+    let shared_tt = SharedTranspositionTable::new_default();
     state.current_player = Player::Max;
     state.board.place_stone(9, 9, Player::Min); // Add opponent stone
 
-    let move_max = find_best_move_parallel(&mut state.clone(), 2, None);
+    let move_max = find_best_move_parallel(&mut state.clone(), 2, None, &shared_tt);
     assert!(move_max.is_some());
 
     // Test with Min player
     state.current_player = Player::Min;
     state.board.place_stone(9, 10, Player::Max); // Add opponent stone
 
-    let move_min = find_best_move_parallel(&mut state, 2, None);
+    let move_min = find_best_move_parallel(&mut state, 2, None, &shared_tt);
     assert!(move_min.is_some());
 }
 
@@ -300,6 +308,7 @@ fn test_find_best_move_complex_position_parallel() {
     let mut state = GameState::new(19, 5);
 
     // Create a complex position
+    let shared_tt = SharedTranspositionTable::new_default();
     state.board.place_stone(9, 9, Player::Max);
     state.board.place_stone(9, 10, Player::Min);
     state.board.place_stone(8, 9, Player::Max);
@@ -308,7 +317,7 @@ fn test_find_best_move_complex_position_parallel() {
     state.board.place_stone(10, 10, Player::Min);
     state.current_player = Player::Max;
 
-    let best_move = find_best_move_parallel(&mut state, 5, None);
+    let best_move = find_best_move_parallel(&mut state, 5, None, &shared_tt);
 
     // Should find some reasonable move
     assert!(best_move.is_some());
@@ -342,12 +351,13 @@ fn test_find_best_move_state_preservation_parallel() {
     let mut state = GameState::new(19, 5);
 
     // Set up initial state
+    let shared_tt = SharedTranspositionTable::new_default();
     state.board.place_stone(9, 9, Player::Max);
     state.current_player = Player::Min;
     let initial_hash = state.hash();
 
     // Find best move
-    let _best_move = find_best_move_parallel(&mut state, 2, None);
+    let _best_move = find_best_move_parallel(&mut state, 2, None, &shared_tt);
 
     // State should be preserved
     assert_eq!(state.hash(), initial_hash);
@@ -376,12 +386,13 @@ fn test_find_best_move_consistent_results_parallel() {
     let mut state = GameState::new(19, 5);
 
     // Set up a deterministic position
+    let shared_tt = SharedTranspositionTable::new_default();
     state.board.place_stone(9, 9, Player::Max);
     state.current_player = Player::Min;
 
     // Multiple calls should give same result
-    let move1 = find_best_move_parallel(&mut state.clone(), 2, None);
-    let move2 = find_best_move_parallel(&mut state, 2, None);
+    let move1 = find_best_move_parallel(&mut state.clone(), 2, None, &shared_tt);
+    let move2 = find_best_move_parallel(&mut state, 2, None, &shared_tt);
 
     assert_eq!(move1, move2);
 }
@@ -418,6 +429,7 @@ fn test_find_best_move_edge_cases_parallel() {
     let mut state = GameState::new(19, 5);
 
     // Fill most of the board leaving only a few moves
+    let shared_tt = SharedTranspositionTable::new_default();
     for i in 0..19 {
         for j in 0..19 {
             if (i, j) != (9, 9) && (i, j) != (9, 10) && (i, j) != (8, 9) {
@@ -430,7 +442,7 @@ fn test_find_best_move_edge_cases_parallel() {
     state.board.place_stone(9, 9, Player::Max);
     state.current_player = Player::Min;
 
-    let best_move = find_best_move_parallel(&mut state, 2, None);
+    let best_move = find_best_move_parallel(&mut state, 2, None, &shared_tt);
 
     // Should find one of the few available moves
     assert!(best_move.is_some());
@@ -462,13 +474,14 @@ fn test_find_best_move_capture_win_parallel() {
     let mut state = GameState::new(19, 5);
 
     // Set up near-capture-win scenario
+    let shared_tt = SharedTranspositionTable::new_default();
     state.max_captures = 4; // One away from winning
     state.board.place_stone(9, 9, Player::Max);
     state.board.place_stone(9, 10, Player::Min);
     state.board.place_stone(9, 11, Player::Min);
     state.current_player = Player::Max;
     
-    let best_move = find_best_move_parallel(&mut state, 2, None);
+    let best_move = find_best_move_parallel(&mut state, 2, None, &shared_tt);
 
     // Should find the winning capture
     assert_eq!(best_move, Some((9, 12)));
@@ -478,6 +491,7 @@ fn test_find_best_move_capture_win_parallel() {
 fn test_find_best_move_different_board_sizes() {
     let mut state13 = GameState::new(13, 5);
     let mut state15 = GameState::new(15, 5);
+    let shared_tt = SharedTranspositionTable::new_default();
     let mut tt = TranspositionTable::new_default();
 
     let move13 = find_best_move(&mut state13, 2, None,&mut tt);
@@ -492,9 +506,10 @@ fn test_find_best_move_different_board_sizes() {
 fn test_find_best_move_different_board_sizes_parallel() {
     let mut state13 = GameState::new(13, 5);
     let mut state15 = GameState::new(15, 5);
+    let shared_tt = SharedTranspositionTable::new_default();
 
-    let move13 = find_best_move_parallel(&mut state13, 2, None);
-    let move15 = find_best_move_parallel(&mut state15, 2, None);
+    let move13 = find_best_move_parallel(&mut state13, 2, None, &shared_tt);
+    let move15 = find_best_move_parallel(&mut state15, 2, None, &shared_tt);
 
     // Should find center moves for different board sizes
     assert_eq!(move13, Some((6, 6)));
@@ -506,6 +521,7 @@ fn test_parallel_vs_sequential_consistency() {
     let mut state = GameState::new(15, 5);
     
     // Set up a complex middle-game position
+    let shared_tt = SharedTranspositionTable::new_default();
     let moves = vec![
         (7, 7), (8, 8), (6, 6), (9, 9), 
         (7, 8), (8, 7), (6, 8), (8, 6),
@@ -522,7 +538,7 @@ fn test_parallel_vs_sequential_consistency() {
     
     let mut tt = TranspositionTable::new_default();
     let sequential_result = find_best_move(&mut state_seq, 4, None, &mut tt);
-    let parallel_result = find_best_move_parallel(&mut state_par, 5, None);
+    let parallel_result = find_best_move_parallel(&mut state_par, 5, None, &shared_tt);
     
     // Both should find valid moves
     assert!(sequential_result.is_some());
@@ -543,6 +559,7 @@ fn test_parallel_performance_on_complex_position() {
     let mut state = GameState::new(15, 5);
     
     // Create a complex tactical position
+    let shared_tt = SharedTranspositionTable::new_default();
     let setup_moves = vec![
         (7, 7), (7, 8), (8, 7), (8, 8),
         (6, 6), (6, 9), (9, 6), (9, 9),
@@ -554,7 +571,7 @@ fn test_parallel_performance_on_complex_position() {
     }
     
     let start_time = std::time::Instant::now();
-    let result = find_best_move_parallel(&mut state, 6, Some(std::time::Duration::from_millis(2000)));
+    let result = find_best_move_parallel(&mut state, 6, Some(std::time::Duration::from_millis(2000)), &shared_tt);
     let elapsed = start_time.elapsed();
     
     println!("Parallel search on complex position:");

@@ -1,6 +1,7 @@
 use gomoku::core::state::GameState;
 use gomoku::core::board::Player;
 use gomoku::interface::utils::find_best_move_parallel;
+use gomoku::ai::transposition::SharedTranspositionTable;
 
 #[test]
 fn test_parallel_winning_move_detection() {
@@ -8,6 +9,7 @@ fn test_parallel_winning_move_detection() {
     
     // Set up a position where there's an immediate winning move
     // Max has 4 in a row and can complete 5 in a row
+    let shared_tt = SharedTranspositionTable::new_default();
     state.board.place_stone(7, 6, Player::Max);
     state.board.place_stone(7, 7, Player::Max);
     state.board.place_stone(7, 8, Player::Max);
@@ -19,7 +21,7 @@ fn test_parallel_winning_move_detection() {
     
     state.current_player = Player::Max;
     
-    let best_move = find_best_move_parallel(&mut state, 6, None);
+    let best_move = find_best_move_parallel(&mut state, 6, None, &shared_tt);
     
     println!("Position: Max has 4 in a row at (7,6-9), needs to complete at (7,5) or (7,10)");
     println!("Best move found: {:?}", best_move);
@@ -43,6 +45,7 @@ fn test_parallel_blocking_move_detection() {
     let mut state = GameState::new(15, 5);
     
     // Set up a position where Min has 4 in a row and Max must block
+    let shared_tt = SharedTranspositionTable::new_default();
     state.board.place_stone(7, 6, Player::Min);
     state.board.place_stone(7, 7, Player::Min);
     state.board.place_stone(7, 8, Player::Min);
@@ -54,7 +57,7 @@ fn test_parallel_blocking_move_detection() {
     
     state.current_player = Player::Max;
     
-    let best_move = find_best_move_parallel(&mut state, 6, None);
+    let best_move = find_best_move_parallel(&mut state, 6, None, &shared_tt);
     
     println!("Position: Min has 4 in a row at (7,6-9), Max must block at (7,5) or (7,10)");
     println!("Best move found: {:?}", best_move);
@@ -71,6 +74,7 @@ fn test_parallel_blocking_move_detection() {
 #[test]
 fn test_parallel_race_condition_stress() {
     // Run multiple parallel searches with winning positions to try to trigger race conditions
+    let shared_tt = SharedTranspositionTable::new_default();
     for i in 0..10 {
         let mut state = GameState::new(15, 5);
         
@@ -87,7 +91,7 @@ fn test_parallel_race_condition_stress() {
         
         state.current_player = Player::Max;
         
-        let best_move = find_best_move_parallel(&mut state, 6, None);
+        let best_move = find_best_move_parallel(&mut state, 6, None, &shared_tt);
         
         // Should always find a winning move
         assert!(best_move.is_some(), "Iteration {}: Should find a winning move", i);
@@ -110,6 +114,7 @@ fn test_parallel_multiple_winning_moves() {
     let mut state = GameState::new(15, 5);
     
     // Create a position with multiple winning moves to see if parallel search is consistent
+    let shared_tt = SharedTranspositionTable::new_default();
     state.board.place_stone(7, 7, Player::Max);
     state.board.place_stone(7, 8, Player::Max);
     state.board.place_stone(7, 9, Player::Max);
@@ -126,7 +131,7 @@ fn test_parallel_multiple_winning_moves() {
     // Run multiple times to check for consistency
     let mut moves = Vec::new();
     for _ in 0..5 {
-        let best_move = find_best_move_parallel(&mut state.clone(), 6, None);
+        let best_move = find_best_move_parallel(&mut state.clone(), 6, None, &shared_tt);
         assert!(best_move.is_some(), "Should always find a winning move");
         moves.push(best_move.unwrap());
     }

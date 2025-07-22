@@ -1,7 +1,7 @@
 use gomoku::core::state::GameState;
 use gomoku::core::board::Player;
 use gomoku::interface::utils::{find_best_move, find_best_move_parallel};
-use gomoku::ai::transposition::TranspositionTable;
+use gomoku::ai::transposition::{TranspositionTable, SharedTranspositionTable};
 
 #[test]
 fn test_diagonal_blocking_bug_sequential() {
@@ -58,6 +58,7 @@ fn test_diagonal_blocking_bug_sequential() {
 #[test]
 fn test_diagonal_blocking_bug_parallel() {
     let mut state = GameState::new(19, 5);
+    let shared_tt = SharedTranspositionTable::new_default();
     
     // Recreate the exact position from the screenshot
     state.board.place_stone(8, 7, Player::Min); // Black stone (top-left of diagonal)
@@ -71,7 +72,7 @@ fn test_diagonal_blocking_bug_parallel() {
     // It's white's turn and they MUST block the diagonal
     state.current_player = Player::Max;
     
-    let best_move = find_best_move_parallel(&mut state, 6, None);
+    let best_move = find_best_move_parallel(&mut state, 6, None, &shared_tt);
     
     println!("Parallel search result: {:?}", best_move);
     
@@ -108,6 +109,7 @@ fn test_diagonal_blocking_bug_parallel() {
 #[test]
 fn test_sequential_vs_parallel_consistency_diagonal() {
     let mut state = GameState::new(19, 5);
+    let shared_tt = SharedTranspositionTable::new_default();
     
     // Same position
     state.board.place_stone(8, 7, Player::Min);
@@ -119,7 +121,7 @@ fn test_sequential_vs_parallel_consistency_diagonal() {
     
     let mut tt = TranspositionTable::new_default();
     let sequential_move = find_best_move(&mut state.clone(), 6, None, &mut tt);
-    let parallel_move = find_best_move_parallel(&mut state, 6, None);
+    let parallel_move = find_best_move_parallel(&mut state, 6, None, &shared_tt);
     
     println!("Sequential result: {:?}", sequential_move);
     println!("Parallel result: {:?}", parallel_move);
@@ -176,6 +178,7 @@ fn test_three_in_a_row_diagonal_blocking_sequential() {
 #[test] 
 fn test_three_in_a_row_diagonal_blocking_parallel() {
     let mut state = GameState::new(19, 5);
+    let shared_tt = SharedTranspositionTable::new_default();
     
     // Create position where black has 3 in diagonal with both ends open
     state.board.place_stone(8, 7, Player::Min);
@@ -185,7 +188,7 @@ fn test_three_in_a_row_diagonal_blocking_parallel() {
     
     state.current_player = Player::Max; // White's turn
     
-    let best_move = find_best_move_parallel(&mut state, 6, None);
+    let best_move = find_best_move_parallel(&mut state, 6, None, &shared_tt);
     
     println!("Parallel search for 3-in-a-row threat: {:?}", best_move);
     
@@ -228,7 +231,8 @@ fn test_realistic_game_scenario() {
     let sequential_move = find_best_move(&mut state_seq, 6, None, &mut tt);
     
     let mut state_par = state.clone();
-    let parallel_move = find_best_move_parallel(&mut state_par, 6, None);
+    let shared_tt = SharedTranspositionTable::new_default();
+    let parallel_move = find_best_move_parallel(&mut state_par, 6, None, &shared_tt);
     
     println!("Sequential search result: {:?}", sequential_move);
     println!("Parallel search result: {:?}", parallel_move);
@@ -273,7 +277,8 @@ fn test_with_more_noise() {
         let mut tt = TranspositionTable::new_default();
         find_best_move(&mut state.clone(), 6, None, &mut tt)
     };
-    let parallel_move = find_best_move_parallel(&mut state, 6, None);
+    let shared_tt = SharedTranspositionTable::new_default();
+    let parallel_move = find_best_move_parallel(&mut state, 6, None, &shared_tt);
     
     println!("With noise - Sequential: {:?}, Parallel: {:?}", sequential_move, parallel_move);
     
