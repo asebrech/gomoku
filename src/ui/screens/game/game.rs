@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use bevy::prelude::*;
-use crate::{ai::transposition::{TranspositionTable, SharedTranspositionTable}, core::{board::Player, state::GameState}, interface::utils::{find_best_move, find_best_move_parallel}, ui::{app::{AppState, GameSettings}, screens::{game::{self, board::{BoardRoot, BoardUtils, PreviewDot}, settings::spawn_settings_panel}, utils::despawn_screen}}};
+use crate::{ai::transposition::{TranspositionTable, SharedTranspositionTable}, core::{board::Player, state::GameState}, interface::utils::{find_best_move, find_best_move_parallel, find_best_move_parallel_enhanced}, ui::{app::{AppState, GameSettings}, screens::{game::{board::{BoardRoot, BoardUtils, PreviewDot}, settings::spawn_settings_panel}, utils::despawn_screen}}};
 
 // Game status resource
 #[derive(Resource, Default)]
@@ -230,20 +230,26 @@ pub fn process_next_round(
                 let placement = if let Some(time_limit_ms) = settings.time_limit {
                     // Use time-based iterative deepening
                     let time_limit = Duration::from_millis(time_limit_ms as u64);
-                    info!("AI using parallel time-based search with {}ms limit", time_limit_ms);
+                    info!("AI using time-based search with {}ms limit", time_limit_ms);
                     
-                    // Use parallel search for deeper depths
-                    if settings.ai_depth > 4 {
+                    // Use enhanced parallel search for deeper depths (8+), parallel for medium (5-7), standard for shallow (1-4)
+                    if settings.ai_depth >= 8 {
+                        info!("Using enhanced parallel search for depth {}", settings.ai_depth);
+                        find_best_move_parallel_enhanced(&mut game_state, settings.ai_depth, Some(time_limit), &shared_tt)
+                    } else if settings.ai_depth > 4 {
                         find_best_move_parallel(&mut game_state, settings.ai_depth, Some(time_limit), &shared_tt)
                     } else {
                         find_best_move(&mut game_state, settings.ai_depth, Some(time_limit), &mut tt)
                     }
                 } else {
                     // Use depth-based iterative deepening
-                    info!("AI using parallel depth-based search to depth {}", settings.ai_depth);
+                    info!("AI using depth-based search to depth {}", settings.ai_depth);
                     
-                    // Use parallel search for deeper depths
-                    if settings.ai_depth > 4 {
+                    // Use enhanced parallel search for deeper depths (8+), parallel for medium (5-7), standard for shallow (1-4)
+                    if settings.ai_depth >= 8 {
+                        info!("Using enhanced parallel search for depth {}", settings.ai_depth);
+                        find_best_move_parallel_enhanced(&mut game_state, settings.ai_depth, None, &shared_tt)
+                    } else if settings.ai_depth > 4 {
                         find_best_move_parallel(&mut game_state, settings.ai_depth, None, &shared_tt)
                     } else {
                         find_best_move(&mut game_state, settings.ai_depth, None, &mut tt)

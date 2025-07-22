@@ -1,4 +1,4 @@
-use crate::ai::{minimax::{iterative_deepening_search, parallel_iterative_deepening_search_with_tt}, transposition::{TranspositionTable, SharedTranspositionTable}};
+use crate::ai::{minimax::{iterative_deepening_search, iterative_deepening_enhanced, parallel_iterative_deepening_search_with_tt, parallel_iterative_deepening_enhanced}, transposition::{TranspositionTable, SharedTranspositionTable}};
 use crate::core::state::GameState;
 use std::time::Duration;
 
@@ -7,6 +7,18 @@ pub fn find_best_move(state: &mut GameState, depth: i32, time_limit: Option<Dura
     
     println!(
         "🧠 Iterative deepening completed: depth={}, score={}, nodes={}, time={:?}",
+        result.depth_reached, result.score, result.nodes_searched, result.time_elapsed
+    );
+    
+    result.best_move
+}
+
+// Enhanced AI search with killer moves and history heuristic for deeper searches
+pub fn find_best_move_enhanced(state: &mut GameState, depth: i32, time_limit: Option<Duration>, tt: &mut TranspositionTable) -> Option<(usize, usize)> {
+    let result = iterative_deepening_enhanced(state, depth, time_limit, tt);
+    
+    println!(
+        "🚀 Enhanced search completed: depth={}, score={}, nodes={}, time={:?}",
         result.depth_reached, result.score, result.nodes_searched, result.time_elapsed
     );
     
@@ -27,6 +39,18 @@ pub fn find_best_move_parallel(state: &mut GameState, depth: i32, time_limit: Op
     
     println!(
         "🧵 Parallel search completed: depth={}, score={}, nodes={}, time={:?}",
+        result.depth_reached, result.score, result.nodes_searched, result.time_elapsed
+    );
+    
+    result.best_move
+}
+
+// Enhanced parallel AI search with killer moves and history heuristic - the best of both worlds!
+pub fn find_best_move_parallel_enhanced(state: &mut GameState, depth: i32, time_limit: Option<Duration>, shared_tt: &SharedTranspositionTable) -> Option<(usize, usize)> {
+    let result = parallel_iterative_deepening_enhanced(state, depth, time_limit, shared_tt);
+    
+    println!(
+        "🚀🧵 Enhanced Parallel search completed: depth={}, score={}, nodes={}, time={:?}",
         result.depth_reached, result.score, result.nodes_searched, result.time_elapsed
     );
     
