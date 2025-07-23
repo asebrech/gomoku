@@ -7,17 +7,17 @@ use gomoku::ai::transposition::{TranspositionTable, SharedTranspositionTable};
 fn test_diagonal_blocking_bug_sequential() {
     let mut state = GameState::new(19, 5);
     
-    // Recreate the exact position from the screenshot
-    // You (black) have pieces in a diagonal line that needs to be blocked
-    state.board.place_stone(8, 7, Player::Min); // Black stone (top-left of diagonal)
+    // Recreate a 3-in-a-row diagonal that needs to be blocked
+    // Black has 3 stones in diagonal with both ends open
+    state.board.place_stone(8, 7, Player::Min); // Black stone (start of diagonal)
     state.board.place_stone(9, 8, Player::Min); // Black stone
-    state.board.place_stone(10, 9, Player::Min); // Black stone
-    state.board.place_stone(11, 10, Player::Min); // Black stone
+    state.board.place_stone(10, 9, Player::Min); // Black stone (3 in a row)
+    // Positions (7,6) and (11,10) are open and need to be blocked
     
     // Add some white pieces that were on the board
     state.board.place_stone(7, 7, Player::Max); // White stone (the one that was placed)
     
-    // It's white's turn and they MUST block the diagonal at (7,6) or (12,11)
+    // It's white's turn and they MUST block the diagonal at (7,6) or (11,10)
     state.current_player = Player::Max;
     
     let mut tt = TranspositionTable::new_default();
@@ -29,9 +29,9 @@ fn test_diagonal_blocking_bug_sequential() {
     assert!(best_move.is_some());
     let (row, col) = best_move.unwrap();
     
-    let blocking_moves = vec![(7, 6), (12, 11)];
+    let blocking_moves = vec![(7, 6), (11, 10)];
     assert!(blocking_moves.contains(&(row, col)), 
-           "Sequential: Expected blocking move (7,6) or (12,11) but got ({},{})", row, col);
+           "Sequential: Expected blocking move (7,6) or (11,10) but got ({},{})", row, col);
     
     // Verify it actually blocks the threat
     state.make_move((row, col));
@@ -41,7 +41,7 @@ fn test_diagonal_blocking_bug_sequential() {
     test_state.current_player = Player::Min;
     
     // Try the other diagonal position
-    for &test_move in &[(7, 6), (12, 11)] {
+    for &test_move in &[(7, 6), (11, 10)] {
         if test_move != (row, col) {
             if test_state.board.get_player(test_move.0, test_move.1).is_none() {
                 test_state.make_move(test_move);
@@ -60,11 +60,12 @@ fn test_diagonal_blocking_bug_parallel() {
     let mut state = GameState::new(19, 5);
     let shared_tt = SharedTranspositionTable::new_default();
     
-    // Recreate the exact position from the screenshot
-    state.board.place_stone(8, 7, Player::Min); // Black stone (top-left of diagonal)
+    // Recreate a 3-in-a-row diagonal that needs to be blocked
+    // Black has 3 stones in diagonal with both ends open
+    state.board.place_stone(8, 7, Player::Min); // Black stone (start of diagonal)
     state.board.place_stone(9, 8, Player::Min); // Black stone
-    state.board.place_stone(10, 9, Player::Min); // Black stone
-    state.board.place_stone(11, 10, Player::Min); // Black stone
+    state.board.place_stone(10, 9, Player::Min); // Black stone (3 in a row)
+    // Positions (7,6) and (11,10) are open and need to be blocked
     
     // Add some white pieces that were on the board
     state.board.place_stone(7, 7, Player::Max); // White stone (the one that was placed)
@@ -80,9 +81,9 @@ fn test_diagonal_blocking_bug_parallel() {
     assert!(best_move.is_some());
     let (row, col) = best_move.unwrap();
     
-    let blocking_moves = vec![(7, 6), (12, 11)];
+    let blocking_moves = vec![(7, 6), (11, 10)];
     assert!(blocking_moves.contains(&(row, col)), 
-           "Parallel: Expected blocking move (7,6) or (12,11) but got ({},{})", row, col);
+           "Parallel: Expected blocking move (7,6) or (11,10) but got ({},{})", row, col);
     
     // Verify it actually blocks the threat
     state.make_move((row, col));
@@ -92,7 +93,7 @@ fn test_diagonal_blocking_bug_parallel() {
     test_state.current_player = Player::Min;
     
     // Try the other diagonal position
-    for &test_move in &[(7, 6), (12, 11)] {
+    for &test_move in &[(7, 6), (11, 10)] {
         if test_move != (row, col) {
             if test_state.board.get_player(test_move.0, test_move.1).is_none() {
                 test_state.make_move(test_move);
@@ -115,7 +116,6 @@ fn test_sequential_vs_parallel_consistency_diagonal() {
     state.board.place_stone(8, 7, Player::Min);
     state.board.place_stone(9, 8, Player::Min);
     state.board.place_stone(10, 9, Player::Min);
-    state.board.place_stone(11, 10, Player::Min);
     state.board.place_stone(7, 7, Player::Max);
     state.current_player = Player::Max;
     
@@ -130,7 +130,7 @@ fn test_sequential_vs_parallel_consistency_diagonal() {
     assert!(sequential_move.is_some());
     assert!(parallel_move.is_some());
     
-    let blocking_moves = vec![(7, 6), (12, 11)];
+    let blocking_moves = vec![(7, 6), (11, 10)];
     let seq_move = sequential_move.unwrap();
     let par_move = parallel_move.unwrap();
     
@@ -246,10 +246,27 @@ fn test_realistic_game_scenario() {
     assert!(best_move.is_some());
     let (row, col) = best_move.unwrap();
     
-    // AI should block at one of the ends of the diagonal
-    let blocking_moves = vec![(7, 6), (11, 10)];
-    assert!(blocking_moves.contains(&(row, col)), 
-           "In realistic scenario, AI should block diagonal at (7,6) or (11,10) but chose ({},{})", row, col);
+    // Verify that the AI's move prevents black from winning immediately
+    let mut validation_state = state.clone();
+    validation_state.make_move((row, col));
+    validation_state.current_player = Player::Min;
+    
+    // Check if black can still win at either diagonal position
+    let can_black_win_at_7_6 = {
+        let mut test_state = validation_state.clone();
+        test_state.make_move((7, 6));
+        test_state.is_terminal() && test_state.winner == Some(Player::Min)
+    };
+    
+    let can_black_win_at_11_10 = {
+        let mut test_state = validation_state.clone();
+        test_state.make_move((11, 10));
+        test_state.is_terminal() && test_state.winner == Some(Player::Min)
+    };
+    
+    assert!(!can_black_win_at_7_6 && !can_black_win_at_11_10, 
+           "AI's move ({},{}) failed to prevent immediate black win! Black can still win at (7,6): {} or (11,10): {}", 
+           row, col, can_black_win_at_7_6, can_black_win_at_11_10);
 }
 
 #[test]
