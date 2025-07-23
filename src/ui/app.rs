@@ -47,7 +47,7 @@ impl GameSettings {
 			ai_depth: 10, // Increased since iterative deepening can handle higher depths
 			alpha_beta_enabled: true,
 			versus_ai: true,
-			time_limit: Some(500) // 1000ms (1 second) time limit for AI by default
+			time_limit: Some(5000) // 1000ms (1 second) time limit for AI by default
 		}
 	}
 }
