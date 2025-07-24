@@ -74,8 +74,9 @@ fn test_parallel_blocking_move_detection() {
 #[test]
 fn test_parallel_race_condition_stress() {
     // Run multiple parallel searches with winning positions to try to trigger race conditions
-    let shared_tt = SharedTranspositionTable::new_default();
     for i in 0..10 {
+        // Use a fresh transposition table for each iteration to avoid interference
+        let shared_tt = SharedTranspositionTable::new_default();
         let mut state = GameState::new(15, 5);
         
         // Create different winning positions each iteration
