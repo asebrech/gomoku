@@ -40,7 +40,6 @@
     enum MenuState {
         Main,
         Settings,
-		Load,
         SettingsDisplay,
         SettingsSound,
         #[default]
@@ -69,11 +68,8 @@
 
     #[derive(Component)]
     enum MenuButtonAction {
-		Load,
         Play,
         Settings,
-        SettingsSound,
-        BackToMainMenu,
         Quit,
     }
 
@@ -329,14 +325,7 @@ fn insert_settings_credit_quit_buttons(
                         game_state.set(AppState::Game);
                         menu_state.set(MenuState::Disabled);
                     }
-					MenuButtonAction::Load => {
-						menu_state.set(MenuState::Load);
-                    }
                     MenuButtonAction::Settings => menu_state.set(MenuState::Settings),
-                    MenuButtonAction::SettingsSound => {
-                        menu_state.set(MenuState::SettingsSound);
-                    }
-                    MenuButtonAction::BackToMainMenu => menu_state.set(MenuState::Main),
                 }
             }
         }

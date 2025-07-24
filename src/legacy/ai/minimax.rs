@@ -2,16 +2,15 @@ use crate::core::state::GameState;
 use std::cmp::{max, min};
 use std::time::{Duration, Instant};
 
-use super::{heuristic::Heuristic, move_ordering::MoveOrdering, transposition::{SharedTranspositionTable, EntryType}};
+use crate::ai::{heuristic::Heuristic, move_ordering::MoveOrdering, transposition::{TranspositionTable, EntryType}};
 
-// Thread-safe minimax function that works with SharedTranspositionTable
-pub fn minimax_shared(
+pub fn minimax(
     state: &mut GameState,
     depth: i32,
     mut alpha: i32,
     mut beta: i32,
     maximizing_player: bool,
-    tt: &SharedTranspositionTable,
+    tt: &mut TranspositionTable,
 ) -> (i32, u64) {
     let original_alpha = alpha;
     let hash_key = state.hash();
@@ -37,7 +36,7 @@ pub fn minimax_shared(
             if razor_depth <= 0 {
                 return (static_eval, nodes_evaluated);
             }
-            let (razor_value, razor_nodes) = minimax_shared(state, razor_depth, alpha, beta, maximizing_player, tt);
+            let (razor_value, razor_nodes) = minimax(state, razor_depth, alpha, beta, maximizing_player, tt);
             nodes_evaluated += razor_nodes;
             if razor_value < alpha {
                 return (razor_value, nodes_evaluated);
@@ -82,7 +81,7 @@ pub fn minimax_shared(
         if should_try_null {
             let null_depth = depth - 3; // Aggressive reduction for null move
             if null_depth > 0 {
-                let (null_score, null_nodes) = minimax_shared(
+                let (null_score, null_nodes) = minimax(
                     state, 
                     null_depth, 
                     alpha, 
@@ -124,13 +123,13 @@ pub fn minimax_shared(
             
             let (eval, child_nodes) = if first_move || depth <= 2 {
                 // Search first move (likely PV) and shallow searches with full window
-                minimax_shared(state, depth - 1, alpha, beta, false, tt)
+                minimax(state, depth - 1, alpha, beta, false, tt)
             } else if moves_searched <= 3 {
                 // Search first few moves with null window
-                let (null_eval, null_nodes) = minimax_shared(state, depth - 1, alpha, alpha + 1, false, tt);
+                let (null_eval, null_nodes) = minimax(state, depth - 1, alpha, alpha + 1, false, tt);
                 if null_eval > alpha && null_eval < beta {
                     // Re-search with full window if null window indicates this might be better
-                    let (full_eval, full_nodes) = minimax_shared(state, depth - 1, alpha, beta, false, tt);
+                    let (full_eval, full_nodes) = minimax(state, depth - 1, alpha, beta, false, tt);
                     (full_eval, null_nodes + full_nodes)
                 } else {
                     (null_eval, null_nodes)
@@ -140,11 +139,11 @@ pub fn minimax_shared(
                 let reduction = if depth >= 4 && moves_searched > 6 { 2 } else { 1 };
                 let reduced_depth = (depth - 1 - reduction).max(0);
                 
-                let (lmr_eval, lmr_nodes) = minimax_shared(state, reduced_depth, alpha, alpha + 1, false, tt);
+                let (lmr_eval, lmr_nodes) = minimax(state, reduced_depth, alpha, alpha + 1, false, tt);
                 
                 // If LMR search fails high, re-search with full depth and window
                 if lmr_eval > alpha && reduced_depth < depth - 1 {
-                    let (full_eval, full_nodes) = minimax_shared(state, depth - 1, alpha, beta, false, tt);
+                    let (full_eval, full_nodes) = minimax(state, depth - 1, alpha, beta, false, tt);
                     (full_eval, lmr_nodes + full_nodes)
                 } else {
                     (lmr_eval, lmr_nodes)
@@ -173,13 +172,13 @@ pub fn minimax_shared(
             
             let (eval, child_nodes) = if first_move || depth <= 2 {
                 // Search first move (likely PV) and shallow searches with full window
-                minimax_shared(state, depth - 1, alpha, beta, true, tt)
+                minimax(state, depth - 1, alpha, beta, true, tt)
             } else if moves_searched <= 3 {
                 // Search first few moves with null window
-                let (null_eval, null_nodes) = minimax_shared(state, depth - 1, beta - 1, beta, true, tt);
+                let (null_eval, null_nodes) = minimax(state, depth - 1, beta - 1, beta, true, tt);
                 if null_eval > alpha && null_eval < beta {
                     // Re-search with full window if null window indicates this might be better
-                    let (full_eval, full_nodes) = minimax_shared(state, depth - 1, alpha, beta, true, tt);
+                    let (full_eval, full_nodes) = minimax(state, depth - 1, alpha, beta, true, tt);
                     (full_eval, null_nodes + full_nodes)
                 } else {
                     (null_eval, null_nodes)
@@ -189,11 +188,11 @@ pub fn minimax_shared(
                 let reduction = if depth >= 4 && moves_searched > 6 { 2 } else { 1 };
                 let reduced_depth = (depth - 1 - reduction).max(0);
                 
-                let (lmr_eval, lmr_nodes) = minimax_shared(state, reduced_depth, beta - 1, beta, true, tt);
+                let (lmr_eval, lmr_nodes) = minimax(state, reduced_depth, beta - 1, beta, true, tt);
                 
                 // If LMR search fails low, re-search with full depth and window
                 if lmr_eval < beta && reduced_depth < depth - 1 {
-                    let (full_eval, full_nodes) = minimax_shared(state, depth - 1, alpha, beta, true, tt);
+                    let (full_eval, full_nodes) = minimax(state, depth - 1, alpha, beta, true, tt);
                     (full_eval, lmr_nodes + full_nodes)
                 } else {
                     (lmr_eval, lmr_nodes)
@@ -239,22 +238,11 @@ pub struct SearchResult {
     pub time_elapsed: Duration,
 }
 
-// Multi-threaded iterative deepening search using root-level parallelization
-pub fn parallel_iterative_deepening_search(
+pub fn iterative_deepening_search(
     state: &mut GameState,
     max_depth: i32,
     time_limit: Option<Duration>,
-) -> SearchResult {
-    let shared_tt = SharedTranspositionTable::new_default();
-    parallel_iterative_deepening_search_with_tt(state, max_depth, time_limit, &shared_tt)
-}
-
-// Multi-threaded iterative deepening search with provided transposition table
-pub fn parallel_iterative_deepening_search_with_tt(
-    state: &mut GameState,
-    max_depth: i32,
-    time_limit: Option<Duration>,
-    shared_tt: &SharedTranspositionTable,
+    tt: &mut TranspositionTable,
 ) -> SearchResult {
     let start_time = Instant::now();
     let mut best_move = None;
@@ -266,8 +254,8 @@ pub fn parallel_iterative_deepening_search_with_tt(
     let mut nodes_searched = 0u64;
     let mut depth_reached = 0;
 
-    // Advance age for each search to help with replacement policy
-    shared_tt.advance_age();
+    // Advance transposition table age for this search
+    tt.advance_age();
 
     // Check if there are any possible moves at all
     let initial_moves = state.get_possible_moves();
@@ -291,6 +279,13 @@ pub fn parallel_iterative_deepening_search_with_tt(
             }
         }
 
+        let mut iteration_best_move = None;
+        let mut iteration_best_score = if state.current_player == crate::core::board::Player::Max {
+            i32::MIN
+        } else {
+            i32::MAX
+        };
+
         let mut moves = state.get_possible_moves();
         MoveOrdering::order_moves(state, &mut moves);
         
@@ -310,14 +305,77 @@ pub fn parallel_iterative_deepening_search_with_tt(
             moves.truncate(16); // Only consider top 16 moves at medium depths
         }
 
-        // For shallow depths (1-3), use sequential search to avoid overhead
-        let (iteration_best_move, iteration_best_score, depth_nodes, all_moves_searched) = if depth <= 3 {
-            search_moves_sequential(state, &moves, depth, best_score, &shared_tt, time_limit, start_time)
-        } else {
-            search_moves_parallel(state, &moves, depth, best_score, &shared_tt, time_limit, start_time)
-        };
+        let mut all_moves_searched = true;
+        let mut first_move = true;
+        
+        for mv in moves {
+            // Check time limit during move iteration
+            if let Some(limit) = time_limit {
+                if start_time.elapsed() >= limit {
+                    all_moves_searched = false;
+                    break;
+                }
+            }
 
-        nodes_searched += depth_nodes;
+            state.make_move(mv);
+            
+            // Use aspiration windows for the first move (expected PV move) at higher depths
+            let (score, move_nodes) = if first_move && depth > 2 && best_score != i32::MIN && best_score != i32::MAX {
+                // Try narrow aspiration window first for aggressive pruning
+                let window = if depth >= 6 { 25 } else { 50 }; // Narrower windows for deeper searches
+                let asp_alpha = best_score.saturating_sub(window);
+                let asp_beta = best_score.saturating_add(window);
+                
+                let (asp_score, asp_nodes) = minimax(
+                    state,
+                    depth - 1,
+                    asp_alpha,
+                    asp_beta,
+                    state.current_player == crate::core::board::Player::Max,
+                    tt,
+                );
+                
+                // If aspiration window fails, re-search with wider window
+                if asp_score <= asp_alpha || asp_score >= asp_beta {
+                    let wider_window = window * 3;
+                    let (full_score, full_nodes) = minimax(
+                        state,
+                        depth - 1,
+                        best_score.saturating_sub(wider_window),
+                        best_score.saturating_add(wider_window),
+                        state.current_player == crate::core::board::Player::Max,
+                        tt,
+                    );
+                    (full_score, asp_nodes + full_nodes)
+                } else {
+                    (asp_score, asp_nodes)
+                }
+            } else {
+                minimax(
+                    state,
+                    depth - 1,
+                    i32::MIN,
+                    i32::MAX,
+                    state.current_player == crate::core::board::Player::Max,
+                    tt,
+                )
+            };
+            
+            state.undo_move(mv);
+            nodes_searched += move_nodes;
+            first_move = false;
+
+            let is_better = if state.current_player == crate::core::board::Player::Max {
+                score > iteration_best_score
+            } else {
+                score < iteration_best_score
+            };
+
+            if is_better {
+                iteration_best_score = score;
+                iteration_best_move = Some(mv);
+            }
+        }
 
         // Only update best result if we completed the full depth search
         if all_moves_searched {
@@ -336,8 +394,8 @@ pub fn parallel_iterative_deepening_search_with_tt(
 
         let depth_time = depth_start_time.elapsed();
         println!(
-            "🧵 Parallel Depth {} completed in {:?}: best_move={:?}, score={}, nodes={}, all_moves_searched={}",
-            depth, depth_time, best_move, best_score, nodes_searched, all_moves_searched
+            "🎯 PV-Search Depth {} completed in {:?}: best_move={:?}, score={}, nodes={}",
+            depth, depth_time, best_move, best_score, nodes_searched
         );
     }
 
@@ -348,162 +406,4 @@ pub fn parallel_iterative_deepening_search_with_tt(
         nodes_searched,
         time_elapsed: start_time.elapsed(),
     }
-}
-
-// Sequential search for shallow depths
-fn search_moves_sequential(
-    state: &mut GameState,
-    moves: &[(usize, usize)],
-    depth: i32,
-    best_score: i32,
-    shared_tt: &SharedTranspositionTable,
-    time_limit: Option<Duration>,
-    start_time: Instant,
-) -> (Option<(usize, usize)>, i32, u64, bool) {
-    let mut iteration_best_move = None;
-    let mut iteration_best_score = if state.current_player == crate::core::board::Player::Max {
-        i32::MIN
-    } else {
-        i32::MAX
-    };
-    let mut total_nodes = 0u64;
-    let mut all_moves_searched = true;
-    let mut first_move = true;
-
-    for &mv in moves {
-        // Check time limit during move iteration
-        if let Some(limit) = time_limit {
-            if start_time.elapsed() >= limit {
-                all_moves_searched = false;
-                break;
-            }
-        }
-
-        state.make_move(mv);
-        
-        let (score, move_nodes) = if first_move && depth > 2 && best_score != i32::MIN && best_score != i32::MAX {
-            // Use aspiration windows for the first move (expected PV move) at higher depths
-            let window = 50;
-            let asp_alpha = best_score.saturating_sub(window);
-            let asp_beta = best_score.saturating_add(window);
-            
-            let (asp_score, asp_nodes) = minimax_shared(
-                state,
-                depth - 1,
-                asp_alpha,
-                asp_beta,
-                state.current_player == crate::core::board::Player::Max,
-                shared_tt,
-            );
-            
-            // If aspiration window fails, re-search with wider window
-            if asp_score <= asp_alpha || asp_score >= asp_beta {
-                let wider_window = window * 3;
-                let (full_score, full_nodes) = minimax_shared(
-                    state,
-                    depth - 1,
-                    best_score.saturating_sub(wider_window),
-                    best_score.saturating_add(wider_window),
-                    state.current_player == crate::core::board::Player::Max,
-                    shared_tt,
-                );
-                (full_score, asp_nodes + full_nodes)
-            } else {
-                (asp_score, asp_nodes)
-            }
-        } else {
-            minimax_shared(
-                state,
-                depth - 1,
-                i32::MIN,
-                i32::MAX,
-                state.current_player == crate::core::board::Player::Max,
-                shared_tt,
-            )
-        };
-        
-        state.undo_move(mv);
-        total_nodes += move_nodes;
-        first_move = false;
-
-        let is_better = if state.current_player == crate::core::board::Player::Max {
-            score > iteration_best_score
-        } else {
-            score < iteration_best_score
-        };
-
-        if is_better {
-            iteration_best_score = score;
-            iteration_best_move = Some(mv);
-        }
-    }
-
-    (iteration_best_move, iteration_best_score, total_nodes, all_moves_searched)
-}
-
-// Parallel search for deeper depths
-fn search_moves_parallel(
-    state: &mut GameState,
-    moves: &[(usize, usize)],
-    depth: i32,
-    _best_score: i32,
-    shared_tt: &SharedTranspositionTable,
-    time_limit: Option<Duration>,
-    start_time: Instant,
-) -> (Option<(usize, usize)>, i32, u64, bool) {
-    use rayon::prelude::*;
-    
-    let mut iteration_best_move = None;
-    let mut iteration_best_score = if state.current_player == crate::core::board::Player::Max {
-        i32::MIN
-    } else {
-        i32::MAX
-    };
-    
-    // Use parallel iterator to search moves concurrently
-    let results: Vec<_> = moves.par_iter().map(|&mv| {
-        // Check time limit during move iteration
-        if let Some(limit) = time_limit {
-            if start_time.elapsed() >= limit {
-                return None; // Skip this move if time limit exceeded
-            }
-        }
-        
-        // Clone the state for this thread
-        let mut local_state = state.clone();
-        local_state.make_move(mv);
-        
-        let is_maximizing = local_state.current_player == crate::core::board::Player::Max;
-        let (score, move_nodes) = minimax_shared(
-            &mut local_state,
-            depth - 1,
-            i32::MIN,
-            i32::MAX,
-            is_maximizing,
-            shared_tt,
-        );
-        
-        Some((mv, score, move_nodes))
-    }).filter_map(|result| result).collect();
-    
-    let mut total_nodes = 0u64;
-    let all_moves_searched = results.len() == moves.len();
-    
-    // Find the best move from results
-    for (mv, score, move_nodes) in results {
-        total_nodes += move_nodes;
-        
-        let is_better = if state.current_player == crate::core::board::Player::Max {
-            score > iteration_best_score
-        } else {
-            score < iteration_best_score
-        };
-        
-        if is_better {
-            iteration_best_score = score;
-            iteration_best_move = Some(mv);
-        }
-    }
-    
-    (iteration_best_move, iteration_best_score, total_nodes, all_moves_searched)
 }

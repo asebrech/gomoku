@@ -1,7 +1,8 @@
 use gomoku::ai::transposition::{TranspositionTable, SharedTranspositionTable};
 use gomoku::core::board::Player;
 use gomoku::core::state::GameState;
-use gomoku::interface::utils::{find_best_move, find_best_move_parallel};
+use gomoku::interface::utils::find_best_move as find_best_move_parallel;
+use gomoku::legacy::interface::utils::find_best_move;
 
 #[test]
 fn test_find_best_move_first_move() {

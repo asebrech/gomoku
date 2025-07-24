@@ -18,6 +18,8 @@ pub mod interface {
     pub mod utils;
 }
 
+pub mod legacy;
+
 pub mod ui {
     pub mod app;
     pub mod display {

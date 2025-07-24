@@ -1,5 +1,5 @@
-use gomoku::ai::transposition::TranspositionTable;
-use gomoku::ai::minimax::iterative_deepening_search;
+use gomoku::ai::transposition::{SharedTranspositionTable, TranspositionTable};
+use gomoku::ai::minimax::{parallel_iterative_deepening_search_with_tt};
 use gomoku::core::state::GameState;
 use gomoku::core::board::Player;
 use gomoku::interface::utils::{find_best_move};
@@ -8,14 +8,14 @@ use std::time::Duration;
 #[test]
 fn test_iterative_deepening_basic() {
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = SharedTranspositionTable::new_default();
     
     // Make a few moves to create a non-trivial position
     state.make_move((7, 7)); // Center
     state.make_move((7, 8)); // Adjacent
     state.make_move((7, 6)); // Other side
     
-    let result = iterative_deepening_search(&mut state, 3, None, &mut tt);
+    let result = parallel_iterative_deepening_search_with_tt(&mut state, 3, None, &mut tt);
     
     assert!(result.best_move.is_some());
     assert!(result.depth_reached > 0);
@@ -27,14 +27,14 @@ fn test_iterative_deepening_basic() {
 #[test]
 fn test_iterative_deepening_time_limit() {
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = SharedTranspositionTable::new_default();
     
     // Make a few moves
     state.make_move((7, 7));
     state.make_move((7, 8));
     
     let time_limit = Duration::from_millis(100);
-    let result = iterative_deepening_search(&mut state, 10, Some(time_limit), &mut tt);
+    let result = parallel_iterative_deepening_search_with_tt(&mut state, 10, Some(time_limit), &mut tt);
     
     assert!(result.best_move.is_some());
     assert!(result.time_elapsed <= Duration::from_millis(150)); // Allow some margin
@@ -44,7 +44,7 @@ fn test_iterative_deepening_time_limit() {
 #[test]
 fn test_find_best_move_iterative() {
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = SharedTranspositionTable::new_default();
     
     // Make some moves
     state.make_move((7, 7));
@@ -58,7 +58,7 @@ fn test_find_best_move_iterative() {
 #[test]
 fn test_find_best_move_timed() {
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = SharedTranspositionTable::new_default();
     
     // Make some moves
     state.make_move((7, 7));
@@ -73,7 +73,7 @@ fn test_find_best_move_timed() {
 #[test]
 fn test_early_termination_on_win() {
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = SharedTranspositionTable::new_default();
     
     // Create a position where there's an immediate winning move
     // Set up a line of 4 for the current player
@@ -86,7 +86,7 @@ fn test_early_termination_on_win() {
     state.make_move((7, 10)); // Max - now has 4 in a row
     
     // Min should find the blocking move immediately
-    let result = iterative_deepening_search(&mut state, 5, None, &mut tt);
+    let result = parallel_iterative_deepening_search_with_tt(&mut state, 5, None, &mut tt);
     
     assert!(result.best_move.is_some());
     // Should find the winning/blocking move quickly
@@ -97,7 +97,7 @@ fn test_early_termination_on_win() {
 #[test]
 fn test_complex_board_with_short_time_limit() {
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = SharedTranspositionTable::new_default();
     
     // Create a complex tactical position with NO immediate wins
     // Strategy: Create only 2-stone groups separated by opponent stones
@@ -190,7 +190,7 @@ fn test_complex_board_with_short_time_limit() {
     println!("Immediate win available: {}, Must defend: {}", has_immediate_win, must_defend);
     
     let start_time = std::time::Instant::now();
-    let result = iterative_deepening_search(&mut state, 10, Some(time_limit), &mut tt);
+    let result = parallel_iterative_deepening_search_with_tt(&mut state, 10, Some(time_limit), &mut tt);
     let actual_time = start_time.elapsed();
     
     println!("Search completed in {:?} (measured externally)", actual_time);
@@ -220,7 +220,7 @@ fn test_complex_board_with_short_time_limit() {
 #[test]
 fn test_500ms_time_limit() {
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = SharedTranspositionTable::new_default();
     
     // Make a few moves
     state.make_move((7, 7));
@@ -229,7 +229,7 @@ fn test_500ms_time_limit() {
     
     // Short time limit (500ms) like in real game
     let time_limit = Duration::from_millis(500);
-    let result = iterative_deepening_search(&mut state, 10, Some(time_limit), &mut tt);
+    let result = parallel_iterative_deepening_search_with_tt(&mut state, 10, Some(time_limit), &mut tt);
     
     // Should still find a move
     assert!(result.best_move.is_some());
@@ -250,7 +250,7 @@ fn test_500ms_time_limit() {
 #[test]
 fn test_progressive_depth_improvement() {
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = SharedTranspositionTable::new_default();
     
     // Create a position with tactical elements
     state.make_move((7, 7));
@@ -258,7 +258,7 @@ fn test_progressive_depth_improvement() {
     state.make_move((7, 6));
     state.make_move((8, 7));
     
-    let result = iterative_deepening_search(&mut state, 5, None, &mut tt);
+    let result = parallel_iterative_deepening_search_with_tt(&mut state, 5, None, &mut tt);
     
     // Should reach the full depth
     assert_eq!(result.depth_reached, 5);
@@ -272,8 +272,8 @@ fn test_progressive_depth_improvement() {
 #[test]
 fn test_time_vs_depth_consistency() {
     let mut state = GameState::new(15, 5);
-    let mut tt1 = TranspositionTable::new_default();
-    let mut tt2 = TranspositionTable::new_default();
+    let mut tt1 = SharedTranspositionTable::new_default();
+    let mut tt2 = SharedTranspositionTable::new_default();
     
     // Make some moves
     state.make_move((7, 7));
@@ -281,11 +281,11 @@ fn test_time_vs_depth_consistency() {
     state.make_move((8, 7));
     
     // Test with depth limit
-    let depth_result = iterative_deepening_search(&mut state, 3, None, &mut tt1);
+    let depth_result = parallel_iterative_deepening_search_with_tt(&mut state, 3, None, &mut tt1);
     
     // Test with generous time limit that should allow reaching the same depth
     let time_limit = Duration::from_millis(5000); // 5 seconds should be plenty
-    let time_result = iterative_deepening_search(&mut state, 10, Some(time_limit), &mut tt2);
+    let time_result = parallel_iterative_deepening_search_with_tt(&mut state, 10, Some(time_limit), &mut tt2);
     
     // Both should find moves
     assert!(depth_result.best_move.is_some());
@@ -301,7 +301,7 @@ fn test_time_vs_depth_consistency() {
 #[test]
 fn test_winning_position_early_termination() {
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = SharedTranspositionTable::new_default();
     
     // Set up a position where current player can win immediately
     // Create 4 in a row for current player (Max)
@@ -313,7 +313,7 @@ fn test_winning_position_early_termination() {
     
     state.current_player = Player::Max;
     
-    let result = iterative_deepening_search(&mut state, 5, None, &mut tt);
+    let result = parallel_iterative_deepening_search_with_tt(&mut state, 5, None, &mut tt);
     
     // Should find the winning move
     assert!(result.best_move.is_some());
@@ -335,7 +335,7 @@ fn test_winning_position_early_termination() {
 #[test]
 fn test_defensive_play_under_pressure() {
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = SharedTranspositionTable::new_default();
     
     // Set up a position where opponent (Max) has 4 in a row
     state.board.place_stone(7, 7, Player::Max);
@@ -348,7 +348,7 @@ fn test_defensive_play_under_pressure() {
     
     // Use a 500ms time limit to test under pressure
     let time_limit = Duration::from_millis(500);
-    let result = iterative_deepening_search(&mut state, 6, Some(time_limit), &mut tt);
+    let result = parallel_iterative_deepening_search_with_tt(&mut state, 6, Some(time_limit), &mut tt);
     
     // Should find the blocking move
     assert!(result.best_move.is_some());
@@ -366,7 +366,7 @@ fn test_defensive_play_under_pressure() {
 #[test]
 fn test_transposition_table_benefits() {
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = SharedTranspositionTable::new_default();
     
     // Create a position
     state.make_move((7, 7));
@@ -374,10 +374,10 @@ fn test_transposition_table_benefits() {
     state.make_move((8, 7));
     
     // First search to populate transposition table
-    let first_result = iterative_deepening_search(&mut state, 4, None, &mut tt);
+    let first_result = parallel_iterative_deepening_search_with_tt(&mut state, 4, None, &mut tt);
     
     // Second search should benefit from transposition table
-    let second_result = iterative_deepening_search(&mut state, 4, None, &mut tt);
+    let second_result = parallel_iterative_deepening_search_with_tt(&mut state, 4, None, &mut tt);
     
     // Both should find the same move (or equally good moves)
     assert!(first_result.best_move.is_some());
@@ -401,7 +401,7 @@ fn test_transposition_table_benefits() {
 #[test]
 fn test_very_complex_board_500ms() {
     let mut state = GameState::new(19, 5); // Larger board
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = SharedTranspositionTable::new_default();
     
     // Create an even more complex board with many stones scattered around
     let moves = [
@@ -425,7 +425,7 @@ fn test_very_complex_board_500ms() {
     
     // 500ms time limit - this should reproduce the issue you mentioned
     let time_limit = Duration::from_millis(500);
-    let result = iterative_deepening_search(&mut state, 8, Some(time_limit), &mut tt);
+    let result = parallel_iterative_deepening_search_with_tt(&mut state, 8, Some(time_limit), &mut tt);
     
     // Should still find a move
     assert!(result.best_move.is_some());
@@ -463,7 +463,7 @@ fn test_very_complex_board_500ms() {
 #[test]
 fn test_game_like_conditions() {
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = SharedTranspositionTable::new_default();
     
     // Simulate a mid-game situation with realistic stone placement
     let realistic_moves = [
@@ -489,7 +489,7 @@ fn test_game_like_conditions() {
     
     // Test with game-like 500ms time limit
     let time_limit = Duration::from_millis(500);
-    let result = iterative_deepening_search(&mut state, 6, Some(time_limit), &mut tt);
+    let result = parallel_iterative_deepening_search_with_tt(&mut state, 6, Some(time_limit), &mut tt);
     
     // Basic assertions
     assert!(result.best_move.is_some(), "Should find a move");

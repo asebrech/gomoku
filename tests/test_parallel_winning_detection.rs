@@ -1,6 +1,6 @@
 use gomoku::core::state::GameState;
 use gomoku::core::board::Player;
-use gomoku::interface::utils::find_best_move_parallel;
+use gomoku::interface::utils::find_best_move;
 use gomoku::ai::transposition::SharedTranspositionTable;
 
 #[test]
@@ -21,7 +21,7 @@ fn test_parallel_winning_move_detection() {
     
     state.current_player = Player::Max;
     
-    let best_move = find_best_move_parallel(&mut state, 6, None, &shared_tt);
+    let best_move = find_best_move(&mut state, 6, None, &shared_tt);
     
     println!("Position: Max has 4 in a row at (7,6-9), needs to complete at (7,5) or (7,10)");
     println!("Best move found: {:?}", best_move);
@@ -57,7 +57,7 @@ fn test_parallel_blocking_move_detection() {
     
     state.current_player = Player::Max;
     
-    let best_move = find_best_move_parallel(&mut state, 6, None, &shared_tt);
+    let best_move = find_best_move(&mut state, 6, None, &shared_tt);
     
     println!("Position: Min has 4 in a row at (7,6-9), Max must block at (7,5) or (7,10)");
     println!("Best move found: {:?}", best_move);
@@ -92,7 +92,7 @@ fn test_parallel_race_condition_stress() {
         
         state.current_player = Player::Max;
         
-        let best_move = find_best_move_parallel(&mut state, 6, None, &shared_tt);
+        let best_move = find_best_move(&mut state, 6, None, &shared_tt);
         
         // Should always find a winning move
         assert!(best_move.is_some(), "Iteration {}: Should find a winning move", i);
@@ -132,7 +132,7 @@ fn test_parallel_multiple_winning_moves() {
     // Run multiple times to check for consistency
     let mut moves = Vec::new();
     for _ in 0..5 {
-        let best_move = find_best_move_parallel(&mut state.clone(), 6, None, &shared_tt);
+        let best_move = find_best_move(&mut state.clone(), 6, None, &shared_tt);
         assert!(best_move.is_some(), "Should always find a winning move");
         moves.push(best_move.unwrap());
     }

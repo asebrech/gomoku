@@ -100,7 +100,7 @@ fn spawn_setting_row(builder: &mut ChildSpawnerCommands, label: &str, value: &st
         });
 }
 
-fn spawn_timer_row(builder: &mut ChildSpawnerCommands, label: &str, value: &str) {
+fn spawn_timer_row(builder: &mut ChildSpawnerCommands, label: &str, _value: &str) {
     builder
         .spawn((
             Node {

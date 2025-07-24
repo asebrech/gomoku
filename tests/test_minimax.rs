@@ -1,4 +1,5 @@
-use gomoku::ai::minimax::{minimax, minimax_shared, parallel_iterative_deepening_search};
+use gomoku::ai::minimax::{minimax_shared as minimax, parallel_iterative_deepening_search};
+use gomoku::legacy::ai::minimax::{minimax as minimax_single};
 use gomoku::ai::transposition::{TranspositionTable, SharedTranspositionTable};
 use gomoku::core::board::Player;
 use gomoku::core::state::GameState;
@@ -6,7 +7,7 @@ use gomoku::core::state::GameState;
 #[test]
 fn test_minimax_terminal_position() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = SharedTranspositionTable::new_default();
 
     // Create a winning position
     for i in 0..5 {
@@ -23,7 +24,7 @@ fn test_minimax_terminal_position() {
 #[test]
 fn test_minimax_depth_zero() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = SharedTranspositionTable::new_default();
 
     // Make a simple move
     state.board.place_stone(9, 9, Player::Max);
@@ -37,7 +38,7 @@ fn test_minimax_depth_zero() {
 #[test]
 fn test_minimax_maximizing_player() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = SharedTranspositionTable::new_default();
 
     // Set up a position where Max has advantage
     state.board.place_stone(9, 9, Player::Max);
@@ -54,7 +55,7 @@ fn test_minimax_maximizing_player() {
 #[test]
 fn test_minimax_minimizing_player() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = SharedTranspositionTable::new_default();
 
     // Set up a position where Min has advantage
     state.board.place_stone(9, 9, Player::Min);
@@ -71,7 +72,7 @@ fn test_minimax_minimizing_player() {
 #[test]
 fn test_minimax_alpha_beta_pruning() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = SharedTranspositionTable::new_default();
 
     // Create a position with multiple moves
     state.board.place_stone(9, 9, Player::Max);
@@ -87,7 +88,7 @@ fn test_minimax_alpha_beta_pruning() {
 #[test]
 fn test_minimax_transposition_table_usage() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = SharedTranspositionTable::new_default();
 
     // Make initial move
     state.board.place_stone(9, 9, Player::Max);
@@ -105,8 +106,8 @@ fn test_minimax_transposition_table_usage() {
 #[test]
 fn test_minimax_different_depths() {
     let mut state = GameState::new(19, 5);
-    let mut tt1 = TranspositionTable::new_default();
-    let mut tt2 = TranspositionTable::new_default();
+    let mut tt1 = SharedTranspositionTable::new_default();
+    let mut tt2 = SharedTranspositionTable::new_default();
 
     // Create a non-terminal position
     state.board.place_stone(9, 9, Player::Max);
@@ -124,7 +125,7 @@ fn test_minimax_different_depths() {
 #[test]
 fn test_minimax_winning_position_detection() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = SharedTranspositionTable::new_default();
 
     // Create a position where Max can win in one move
     for i in 0..4 {
@@ -141,7 +142,7 @@ fn test_minimax_winning_position_detection() {
 #[test]
 fn test_minimax_losing_position_detection() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = SharedTranspositionTable::new_default();
 
     // Create a position where Min can win in one move
     for i in 0..4 {
@@ -158,7 +159,7 @@ fn test_minimax_losing_position_detection() {
 #[test]
 fn test_minimax_state_restoration() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = SharedTranspositionTable::new_default();
 
     // Make a move using proper state management
     state.make_move((9, 9));
@@ -179,7 +180,7 @@ fn test_minimax_state_restoration() {
 #[test]
 fn test_minimax_captures_evaluation() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = SharedTranspositionTable::new_default();
 
     // Set up position with capture opportunity
     state.board.place_stone(9, 9, Player::Max);
@@ -196,7 +197,7 @@ fn test_minimax_captures_evaluation() {
 #[test]
 fn test_minimax_empty_moves() {
     let mut state = GameState::new(3, 3);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = SharedTranspositionTable::new_default();
 
     // Fill the board (no moves available)
     for i in 0..3 {
@@ -214,7 +215,7 @@ fn test_minimax_empty_moves() {
 #[test]
 fn test_minimax_alternating_players() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = SharedTranspositionTable::new_default();
 
     // Start with Max to move
     state.board.place_stone(9, 9, Player::Max);
@@ -230,7 +231,7 @@ fn test_minimax_alternating_players() {
 #[test]
 fn test_minimax_pruning_efficiency() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = SharedTranspositionTable::new_default();
 
     // Create a position with many possible moves
     state.board.place_stone(9, 9, Player::Max);
@@ -247,7 +248,7 @@ fn test_minimax_pruning_efficiency() {
 #[test]
 fn test_minimax_capture_win_detection() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = SharedTranspositionTable::new_default();
 
     // Set up near-capture-win scenario
     state.max_captures = 4; // One pair away from winning
@@ -275,7 +276,7 @@ fn test_minimax_shared_terminal_position() {
     }
     state.winner = Some(Player::Max);
 
-    let (score, _nodes) = minimax_shared(&mut state, 3, i32::MIN, i32::MAX, false, &shared_tt);
+    let (score, _nodes) = minimax(&mut state, 3, i32::MIN, i32::MAX, false, &shared_tt);
 
     // Should return winning score
     assert_eq!(score, 1_000_003);
@@ -289,7 +290,7 @@ fn test_minimax_shared_depth_zero() {
     // Make a simple move
     state.board.place_stone(9, 9, Player::Max);
 
-    let (score, _nodes) = minimax_shared(&mut state, 0, i32::MIN, i32::MAX, false, &shared_tt);
+    let (score, _nodes) = minimax(&mut state, 0, i32::MIN, i32::MAX, false, &shared_tt);
 
     // Should return heuristic evaluation
     assert!(score != i32::MIN && score != i32::MAX);
@@ -306,7 +307,7 @@ fn test_minimax_shared_maximizing_player() {
     state.board.place_stone(9, 7, Player::Max);
     state.current_player = Player::Max;
 
-    let (score, _nodes) = minimax_shared(&mut state, 2, i32::MIN, i32::MAX, true, &shared_tt);
+    let (score, _nodes) = minimax(&mut state, 2, i32::MIN, i32::MAX, true, &shared_tt);
 
     // Should return positive score (favorable for Max)
     assert!(score > 0);
@@ -323,7 +324,7 @@ fn test_minimax_shared_minimizing_player() {
     state.board.place_stone(9, 7, Player::Min);
     state.current_player = Player::Min;
 
-    let (score, _nodes) = minimax_shared(&mut state, 2, i32::MIN, i32::MAX, false, &shared_tt);
+    let (score, _nodes) = minimax(&mut state, 2, i32::MIN, i32::MAX, false, &shared_tt);
 
     // Should return negative score (favorable for Min)
     assert!(score < 0);
@@ -399,11 +400,11 @@ fn test_minimax_shared_vs_sequential_consistency() {
 
     // Test sequential minimax
     let mut tt_seq = TranspositionTable::new_default();
-    let (score_seq, _nodes_seq) = minimax(&mut state.clone(), 2, i32::MIN, i32::MAX, true, &mut tt_seq);
+    let (score_seq, _nodes_seq) = minimax_single(&mut state.clone(), 2, i32::MIN, i32::MAX, true, &mut tt_seq);
 
     // Test shared minimax
     let shared_tt = SharedTranspositionTable::new_default();
-    let (score_shared, _nodes_shared) = minimax_shared(&mut state, 2, i32::MIN, i32::MAX, true, &shared_tt);
+    let (score_shared, _nodes_shared) = minimax(&mut state, 2, i32::MIN, i32::MAX, true, &shared_tt);
 
     // Should give same results
     assert_eq!(score_seq, score_shared);
@@ -422,7 +423,7 @@ fn test_minimax_shared_state_preservation() {
     let initial_player = state.current_player;
 
     // Run minimax_shared (should restore state)
-    let (_score, _nodes) = minimax_shared(&mut state, 2, i32::MIN, i32::MAX, false, &shared_tt);
+    let (_score, _nodes) = minimax(&mut state, 2, i32::MIN, i32::MAX, false, &shared_tt);
 
     // State should be preserved
     assert_eq!(state.hash(), initial_hash);
@@ -460,7 +461,7 @@ fn test_minimax_shared_captures_evaluation() {
     state.board.place_stone(9, 11, Player::Min);
     state.current_player = Player::Max;
 
-    let (score, _nodes) = minimax_shared(&mut state, 2, i32::MIN, i32::MAX, true, &shared_tt);
+    let (score, _nodes) = minimax(&mut state, 2, i32::MIN, i32::MAX, true, &shared_tt);
 
     // Should recognize capture opportunity
     assert!(score > 0); // Favorable for Max

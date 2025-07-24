@@ -1,5 +1,6 @@
 use gomoku::core::state::GameState;
-use gomoku::ai::minimax::{parallel_iterative_deepening_search, iterative_deepening_search};
+use gomoku::ai::minimax::parallel_iterative_deepening_search;
+use gomoku::legacy::ai::minimax::iterative_deepening_search;
 use gomoku::ai::transposition::TranspositionTable;
 use std::time::Duration;
 

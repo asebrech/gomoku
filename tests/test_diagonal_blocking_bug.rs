@@ -1,7 +1,9 @@
 use gomoku::core::state::GameState;
 use gomoku::core::board::Player;
-use gomoku::interface::utils::{find_best_move, find_best_move_parallel};
+use gomoku::interface::utils::find_best_move as find_best_move_parallel;
+use gomoku::legacy::interface::utils::find_best_move;
 use gomoku::ai::transposition::{TranspositionTable, SharedTranspositionTable};
+
 
 #[test]
 fn test_diagonal_blocking_bug_sequential() {

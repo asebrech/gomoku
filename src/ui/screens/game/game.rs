@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use bevy::prelude::*;
-use crate::{ai::transposition::{TranspositionTable, SharedTranspositionTable}, core::{board::Player, state::GameState}, interface::utils::{find_best_move, find_best_move_parallel}, ui::{app::{AppState, GameSettings}, screens::{game::{self, board::{BoardRoot, BoardUtils, PreviewDot}, settings::spawn_settings_panel}, utils::despawn_screen}}};
+use crate::{ai::transposition::SharedTranspositionTable, core::{board::Player, state::GameState}, interface::utils::find_best_move, ui::{app::{AppState, GameSettings}, screens::{game::{board::{BoardRoot, BoardUtils, PreviewDot}, settings::spawn_settings_panel}, utils::despawn_screen}}};
 
 // Game status resource
 #[derive(Resource, Default)]
@@ -15,7 +15,7 @@ pub enum GameStatus {
 #[derive(Component)]
 pub struct OnGameScreen;
 #[derive(Component)]
-pub struct Stone(Player);
+pub struct Stone;
 #[derive(Component)]
 pub struct AvailableArea;
 #[derive(Event)]
@@ -26,9 +26,7 @@ pub struct StonePlacement {
 #[derive(Event)]
 pub struct MovePlayed;
 #[derive(Event)]
-pub struct GameEnded {
-    winner: Option<Player>,
-}
+pub struct GameEnded;
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct GridCell {
     pub x: usize,
@@ -155,7 +153,7 @@ pub fn place_stone(
                 builder.spawn((
                     BoardUtils::stone_node(ev.x, ev.y, BoardUtils::STONE_SIZE),
                     BackgroundColor(color),
-                    Stone(player),
+                    Stone,
                     BorderRadius::all(Val::Percent(50.0)),
                     ZIndex(20),
                     OnGameScreen,
@@ -200,14 +198,13 @@ pub fn process_next_round(
     mut game_status: ResMut<GameStatus>,
     mut ai_time: ResMut<AITimeTaken>,
     mut update_ai_time: EventWriter<UpdateAITimeDisplay>,
-    mut tt: ResMut<TranspositionTable>,
     shared_tt: Res<SharedTranspositionTable>,
 ) {
     for _ in move_played.read() {
         // Check for game end first
         if game_state.is_terminal() {
             let winner = game_state.check_winner();
-            game_event.write(GameEnded { winner });
+            game_event.write(GameEnded);
             *game_status = GameStatus::GameOver;
             
             match winner {
@@ -231,23 +228,11 @@ pub fn process_next_round(
                     // Use time-based iterative deepening
                     let time_limit = Duration::from_millis(time_limit_ms as u64);
                     info!("AI using parallel time-based search with {}ms limit", time_limit_ms);
-                    
-                    // Use parallel search for deeper depths
-                    if settings.ai_depth > 4 {
-                        find_best_move_parallel(&mut game_state, settings.ai_depth, Some(time_limit), &shared_tt)
-                    } else {
-                        find_best_move(&mut game_state, settings.ai_depth, Some(time_limit), &mut tt)
-                    }
+                    find_best_move(&mut game_state, settings.ai_depth, Some(time_limit), &shared_tt)
                 } else {
                     // Use depth-based iterative deepening
                     info!("AI using parallel depth-based search to depth {}", settings.ai_depth);
-                    
-                    // Use parallel search for deeper depths
-                    if settings.ai_depth > 4 {
-                        find_best_move_parallel(&mut game_state, settings.ai_depth, None, &shared_tt)
-                    } else {
-                        find_best_move(&mut game_state, settings.ai_depth, None, &mut tt)
-                    }
+                    find_best_move(&mut game_state, settings.ai_depth, None, &shared_tt)
                 };
                 let elapsed_time = start_time.elapsed().as_millis();
                 ai_time.millis = elapsed_time;
@@ -260,7 +245,7 @@ pub fn process_next_round(
                     // AI has no moves but game isn't terminal - this shouldn't happen
                     // But if it does, it means the game is likely a draw
                     println!("AI has no valid moves available");
-                    game_event.write(GameEnded { winner: None });
+                    game_event.write(GameEnded);
                     *game_status = GameStatus::GameOver;
                 }
             }
