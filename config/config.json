@@ -1,0 +1,67 @@
+{
+	"assets": {
+		"backgrounds": {
+			"splash": "backgrounds/login/gomoku-splash.png",
+			"main_menu": "backgrounds/dolphin/frame_0001.png",
+			"game": "backgrounds/game-board.png"
+		},
+		"icons": {
+			"logo": "logo/gomoku-logo.png",
+			"volume_up": "icons/volume-up.png",
+			"volume_down": "icons/volume-down.png",
+			"settings": "icons/settings.png",
+			"synthwave": {
+				"play": "icons/synthwave/play_icon.png"
+			}
+		},
+		"sounds": {
+			"menu_theme": "sound/menu-theme.mp3",
+			"button_click": "sound/button-click.wav",
+			"stone_place": "sound/stone-place.wav",
+			"game_win": "sound/victory.wav"
+		},
+		"animations": {
+			"main_menu_frames": {
+				"path_pattern": "backgrounds/dolphin/frame_{:04}.png",
+				"frame_count": 120,
+				"fps": 15
+			}
+		}
+	},
+	"colors": {
+		"primary": { "r": 1.0, "g": 0.0, "b": 1.0, "a": 1.0 },
+		"secondary": { "r": 0.0, "g": 1.0, "b": 1.0, "a": 1.0 },
+		"accent": { "r": 1.0, "g": 0.2, "b": 0.8, "a": 1.0 },
+		"background": { "r": 0.05, "g": 0.0, "b": 0.15, "a": 1.0 },
+		"surface": { "r": 0.1, "g": 0.0, "b": 0.2, "a": 1.0 },
+		"text_primary": { "r": 0.0, "g": 1.0, "b": 1.0, "a": 1.0 },
+		"text_secondary": { "r": 1.0, "g": 0.0, "b": 1.0, "a": 1.0 },
+		"button_normal": { "r": 0.2, "g": 0.0, "b": 0.4, "a": 1.0 },
+		"button_hovered": { "r": 0.4, "g": 0.0, "b": 0.6, "a": 1.0 },
+		"button_pressed": { "r": 1.0, "g": 0.2, "b": 0.8, "a": 1.0 }
+	},
+	"ui": {
+		"loading_messages": {
+			"0-10": "Initializing...",
+			"11-25": "Loading songs...",
+			"26-40": "Cloning heuristic...",
+			"41-60": "Using Minimax Algorithm...",
+			"61-80": "Importing neo-cat...",
+			"81-95": "Renaming variables...",
+			"96-99": "Changing headers names...",
+			"100": "Complete!"
+		},
+		"font_sizes": {
+			"title": 32.0,
+			"subtitle": 18.0,
+			"button": 28.0,
+			"loading": 20.0,
+			"percentage": 16.0
+		}
+	},
+	"game": {
+		"board_size": 15,
+		"win_condition": 5,
+		"ai_difficulty": "medium"
+	}
+}
