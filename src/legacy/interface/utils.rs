@@ -1,5 +1,5 @@
 use crate::legacy::ai::minimax::iterative_deepening_search;
-use crate::ai::transposition::TranspositionTable;
+use crate::legacy::ai::transposition::TranspositionTable;
 use crate::core::state::GameState;
 use std::time::Duration;
 

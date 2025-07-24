@@ -1,4 +1,4 @@
-use gomoku::ai::transposition::{TranspositionTable, EntryType};
+use gomoku::legacy::ai::transposition::{TranspositionTable, EntryType};
 
 #[test]
 fn test_transposition_table_creation() {

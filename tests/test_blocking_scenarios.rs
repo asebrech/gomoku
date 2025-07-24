@@ -3,7 +3,8 @@ use gomoku::core::board::Player;
 use gomoku::interface::utils::find_best_move as find_best_move_parallel;
 use gomoku::legacy::interface::utils::find_best_move;
 
-use gomoku::ai::transposition::{TranspositionTable, SharedTranspositionTable};
+use gomoku::legacy::ai::transposition::TranspositionTable;
+use gomoku::ai::transposition::SharedTranspositionTable;
 
 #[test]
 fn test_simple_blocking_scenario() {

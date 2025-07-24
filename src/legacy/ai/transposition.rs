@@ -1,6 +1,55 @@
-use std::sync::{Arc, atomic::{AtomicU32, AtomicU64, Ordering}};
-use dashmap::DashMap;
+use std::collections::HashMap;
 use bevy::prelude::*;
+
+// Principal Variation Table for tracking best variation
+#[derive(Resource, Default)]
+pub struct PVTable {
+    pv_moves: Vec<Vec<(usize, usize)>>,
+    max_depth: usize,
+}
+
+impl PVTable {
+    pub fn new(max_depth: usize) -> Self {
+        let mut pv_moves = Vec::with_capacity(max_depth);
+        for _ in 0..max_depth {
+            pv_moves.push(Vec::with_capacity(max_depth));
+        }
+        Self { pv_moves, max_depth }
+    }
+    
+    pub fn clear(&mut self) {
+        for line in &mut self.pv_moves {
+            line.clear();
+        }
+    }
+    
+    pub fn store_pv(&mut self, depth: usize, mv: (usize, usize)) {
+        if depth < self.max_depth {
+            self.pv_moves[depth].clear();
+            self.pv_moves[depth].push(mv);
+            
+            // Copy the rest of the PV from the next depth
+            if depth + 1 < self.max_depth {
+                let next_moves: Vec<_> = self.pv_moves[depth + 1].clone();
+                for next_move in next_moves {
+                    self.pv_moves[depth].push(next_move);
+                }
+            }
+        }
+    }
+    
+    pub fn get_pv_moves(&self, depth: usize) -> &Vec<(usize, usize)> {
+        if depth < self.max_depth {
+            &self.pv_moves[depth]
+        } else {
+            &self.pv_moves[0] // Fallback to root
+        }
+    }
+    
+    pub fn get_first_pv_move(&self) -> Option<(usize, usize)> {
+        self.pv_moves.get(0)?.first().copied()
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntryType {
@@ -20,26 +69,25 @@ pub struct TranspositionEntry {
     pub pv_node: bool, // Marks if this is a Principal Variation node
 }
 
-// Thread-safe transposition table using DashMap for multi-threaded search
 #[derive(Resource)]
-pub struct SharedTranspositionTable {
-    table: Arc<DashMap<u64, TranspositionEntry>>,
-    current_age: Arc<AtomicU32>,
+pub struct TranspositionTable {
+    table: HashMap<u64, TranspositionEntry>,
+    current_age: u32,
     max_size: usize,
-    hits: Arc<AtomicU64>,
-    misses: Arc<AtomicU64>,
-    collisions: Arc<AtomicU64>,
+    hits: u64,
+    misses: u64,
+    collisions: u64,
 }
 
-impl SharedTranspositionTable {
+impl TranspositionTable {
     pub fn new(max_size: usize) -> Self {
         Self {
-            table: Arc::new(DashMap::with_capacity(max_size.min(1024 * 1024))),
-            current_age: Arc::new(AtomicU32::new(0)),
+            table: HashMap::with_capacity(max_size.min(1024 * 1024)),
+            current_age: 0,
             max_size,
-            hits: Arc::new(AtomicU64::new(0)),
-            misses: Arc::new(AtomicU64::new(0)),
-            collisions: Arc::new(AtomicU64::new(0)),
+            hits: 0,
+            misses: 0,
+            collisions: 0,
         }
     }
     
@@ -47,16 +95,16 @@ impl SharedTranspositionTable {
         Self::new(1_000_000)
     }
     
-    pub fn store(&self, key: u64, value: i32, depth: i32, entry_type: EntryType, best_move: Option<(usize, usize)>) {
+    pub fn store(&mut self, key: u64, value: i32, depth: i32, entry_type: EntryType, best_move: Option<(usize, usize)>) {
         self.store_with_pv(key, value, depth, entry_type, best_move, false);
     }
     
-    pub fn store_with_pv(&self, key: u64, value: i32, depth: i32, entry_type: EntryType, best_move: Option<(usize, usize)>, pv_node: bool) {
+    pub fn store_with_pv(&mut self, key: u64, value: i32, depth: i32, entry_type: EntryType, best_move: Option<(usize, usize)>, pv_node: bool) {
         if self.table.len() >= self.max_size {
             self.cleanup_old_entries();
         }
         
-        let current_age = self.current_age.load(Ordering::Relaxed);
+        let current_age = self.current_age;
         let new_entry = TranspositionEntry {
             key,
             value,
@@ -67,29 +115,32 @@ impl SharedTranspositionTable {
             pv_node,
         };
         
-        // Use DashMap's insert_if to handle concurrent access efficiently
-        self.table.entry(key).and_modify(|existing| {
-            if existing.key != key {
-                self.collisions.fetch_add(1, Ordering::Relaxed);
+        match self.table.get(&key) {
+            Some(existing) => {
+                if existing.key != key {
+                    self.collisions += 1;
+                }
+                
+                // Always replace if new entry is from PV or has higher depth
+                if pv_node || depth > existing.depth || (depth == existing.depth && current_age >= existing.age) {
+                    self.table.insert(key, new_entry);
+                }
             }
-            
-            // Always replace if new entry is from PV or has higher depth
-            if pv_node || depth > existing.depth || (depth == existing.depth && current_age >= existing.age) {
-                *existing = new_entry.clone();
+            None => {
+                self.table.insert(key, new_entry);
             }
-        }).or_insert(new_entry);
+        }
     }
     
-    pub fn probe(&self, key: u64, depth: i32, alpha: i32, beta: i32) -> TTResult {
-        if let Some(entry_ref) = self.table.get(&key) {
-            let entry = entry_ref.value();
+    pub fn probe(&mut self, key: u64, depth: i32, alpha: i32, beta: i32) -> TTResult {
+        if let Some(entry) = self.table.get(&key) {
             if entry.key != key {
-                self.collisions.fetch_add(1, Ordering::Relaxed);
-                self.misses.fetch_add(1, Ordering::Relaxed);
+                self.collisions += 1;
+                self.misses += 1;
                 return TTResult::miss();
             }
             
-            self.hits.fetch_add(1, Ordering::Relaxed);
+            self.hits += 1;
             
             if entry.depth >= depth {
                 match entry.entry_type {
@@ -112,13 +163,12 @@ impl SharedTranspositionTable {
             return TTResult::hit_move_only(entry.best_move);
         }
         
-        self.misses.fetch_add(1, Ordering::Relaxed);
+        self.misses += 1;
         TTResult::miss()
     }
     
     pub fn get_pv_move(&self, key: u64) -> Option<(usize, usize)> {
-        self.table.get(&key).and_then(|entry_ref| {
-            let entry = entry_ref.value();
+        self.table.get(&key).and_then(|entry| {
             if entry.key == key && entry.pv_node {
                 entry.best_move
             } else {
@@ -129,28 +179,25 @@ impl SharedTranspositionTable {
     
     pub fn is_pv_node(&self, key: u64) -> bool {
         self.table.get(&key)
-            .map(|entry_ref| {
-                let entry = entry_ref.value();
-                entry.key == key && entry.pv_node
-            })
+            .map(|entry| entry.key == key && entry.pv_node)
             .unwrap_or(false)
     }
     
-    pub fn clear(&self) {
+    pub fn clear(&mut self) {
         self.table.clear();
-        self.current_age.store(0, Ordering::Relaxed);
-        self.hits.store(0, Ordering::Relaxed);
-        self.misses.store(0, Ordering::Relaxed);
-        self.collisions.store(0, Ordering::Relaxed);
+        self.current_age = 0;
+        self.hits = 0;
+        self.misses = 0;
+        self.collisions = 0;
     }
     
-    pub fn advance_age(&self) {
-        self.current_age.fetch_add(1, Ordering::Relaxed);
+    pub fn advance_age(&mut self) {
+        self.current_age += 1;
     }
     
     pub fn hit_rate(&self) -> f64 {
-        let hits = self.hits.load(Ordering::Relaxed);
-        let misses = self.misses.load(Ordering::Relaxed);
+        let hits = self.hits;
+        let misses = self.misses;
         let total = hits + misses;
         if total == 0 {
             0.0
@@ -165,14 +212,14 @@ impl SharedTranspositionTable {
     
     pub fn get_stats(&self) -> (u64, u64, u64) {
         (
-            self.hits.load(Ordering::Relaxed),
-            self.misses.load(Ordering::Relaxed),
-            self.collisions.load(Ordering::Relaxed),
+            self.hits,
+            self.misses,
+            self.collisions,
         )
     }
     
-    fn cleanup_old_entries(&self) {
-        let current_age = self.current_age.load(Ordering::Relaxed);
+    fn cleanup_old_entries(&mut self) {
+        let current_age = self.current_age;
         if current_age < 10 {
             return;
         }
@@ -193,25 +240,12 @@ impl SharedTranspositionTable {
         
         let cleaned = original_size - self.table.len();
         if cleaned > 0 {
-            println!("Cleaned {} old entries from shared transposition table", cleaned);
+            println!("Cleaned {} old entries from transposition table", cleaned);
         }
     }
 }
 
-impl Clone for SharedTranspositionTable {
-    fn clone(&self) -> Self {
-        Self {
-            table: Arc::clone(&self.table),
-            current_age: Arc::clone(&self.current_age),
-            max_size: self.max_size,
-            hits: Arc::clone(&self.hits),
-            misses: Arc::clone(&self.misses),
-            collisions: Arc::clone(&self.collisions),
-        }
-    }
-}
-
-impl Default for SharedTranspositionTable {
+impl Default for TranspositionTable {
     fn default() -> Self {
         Self::new_default()
     }
@@ -241,9 +275,3 @@ impl TTResult {
         Self { value: None, best_move, cutoff: false }
     }
 }
-
-
-
-
-
-

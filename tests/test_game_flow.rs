@@ -1,4 +1,5 @@
-use gomoku::ai::transposition::{SharedTranspositionTable, TranspositionTable};
+use gomoku::ai::transposition::SharedTranspositionTable;
+use gomoku::legacy::ai::transposition::TranspositionTable;
 use gomoku::core::board::Player;
 use gomoku::core::state::GameState;
 use gomoku::interface::utils::find_best_move;

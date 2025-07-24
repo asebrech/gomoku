@@ -1,4 +1,5 @@
-use gomoku::ai::transposition::{SharedTranspositionTable, TranspositionTable};
+use gomoku::ai::transposition::SharedTranspositionTable;
+use gomoku::legacy::ai::transposition::TranspositionTable;
 use gomoku::ai::minimax::{parallel_iterative_deepening_search_with_tt};
 use gomoku::core::state::GameState;
 use gomoku::core::board::Player;

@@ -1,6 +1,7 @@
 use gomoku::ai::minimax::{minimax_shared as minimax, parallel_iterative_deepening_search};
 use gomoku::legacy::ai::minimax::{minimax as minimax_single};
-use gomoku::ai::transposition::{TranspositionTable, SharedTranspositionTable};
+use gomoku::legacy::ai::transposition::TranspositionTable;
+use gomoku::ai::transposition::SharedTranspositionTable;
 use gomoku::core::board::Player;
 use gomoku::core::state::GameState;
 

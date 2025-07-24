@@ -2,7 +2,8 @@ use crate::core::state::GameState;
 use std::cmp::{max, min};
 use std::time::{Duration, Instant};
 
-use crate::ai::{heuristic::Heuristic, move_ordering::MoveOrdering, transposition::{TranspositionTable, EntryType}};
+use crate::ai::{heuristic::Heuristic, move_ordering::MoveOrdering};
+use crate::legacy::ai::transposition::{TranspositionTable, EntryType};
 
 pub fn minimax(
     state: &mut GameState,

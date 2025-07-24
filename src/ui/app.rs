@@ -4,7 +4,6 @@ use bevy::window::{PresentMode, WindowTheme};
 use bevy::color::palettes::css::CRIMSON;
 
 use crate::core::state::GameState;
-use crate::ai::transposition::TranspositionTable;
 use crate::ui::display::display::make_visible;
 use crate::ui::screens::game::game::game_plugin;
 use crate::ui::screens::menu::menu_plugin;
@@ -113,7 +112,6 @@ impl GomokuApp {
 		.insert_resource(GameState::new(settings.board_size, settings.minimum_chain_to_win))
         .insert_resource(settings)
         .insert_resource(ColorScheme::new())
-        .init_resource::<TranspositionTable>()
         .init_resource::<crate::ai::transposition::SharedTranspositionTable>();
 
 	}
