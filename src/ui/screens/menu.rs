@@ -279,46 +279,11 @@
     ) {
         let colors = &config.colors;
         
-        // Create tracked assets system
-        let mut tracked_assets = TrackedAssets::new();
-        
-        // Load splash background (contains logo)
+        // PRIORITY LOAD: Load splash background first with high priority
         let splash_bg = asset_server.load(&config.assets.backgrounds.splash);
-        tracked_assets.add_image(splash_bg.clone());
         
-        // Load logo for main menu
-        let logo_handle = asset_server.load(&config.assets.icons.logo);
-        tracked_assets.add_image(logo_handle.clone());
-        
-        // Load audio
-        let background_music: Handle<AudioSource> = asset_server.load(&config.assets.sounds.menu_theme);
-        tracked_assets.add_audio(background_music);
-        
-        // Load all video frames
-        let mut video_frames = Vec::new();
-        let animation_config = &config.assets.animations.main_menu_frames;
-        for i in 1..=animation_config.frame_count {
-            let frame_path = config.get_animation_frame_path(i);
-            let frame_handle = asset_server.load(frame_path);
-            tracked_assets.add_image(frame_handle.clone());
-            video_frames.push(frame_handle);
-        }
-        
-        // Store resources
-        commands.insert_resource(VideoFrames { 
-            frames: video_frames,
-            all_loaded: false,
-        });
-        commands.insert_resource(PreloadedAssets {
-            logo: logo_handle,
-        });
-        
-        // Set total assets count from tracked system
-        loading_progress.total_assets = tracked_assets.total_count;
-        commands.insert_resource(tracked_assets);
-        
-        // Create splash screen UI
-        commands
+        // Create splash screen UI immediately with placeholder
+        let _splash_entity = commands
             .spawn((
                 Node {
                     width: Val::Percent(100.0),
@@ -329,11 +294,11 @@
                     position_type: PositionType::Relative,
                     ..default()
                 },
-                BackgroundColor(Color::NONE),
+                BackgroundColor(colors.background.clone().into()), // Show themed background immediately
                 OnSplashScreen,
             ))
             .with_children(|parent| {
-                // Splash background image (contains the logo)
+                // Splash background image (will appear as soon as it loads)
                 parent.spawn((
                     Node {
                         position_type: PositionType::Absolute,
@@ -343,7 +308,8 @@
                         height: Val::Percent(100.0),
                         ..default()
                     },
-                    ImageNode::new(splash_bg),
+                    ImageNode::new(splash_bg.clone()),
+                    SplashBackground, // Tag for updating when loaded
                 ));
 
                 // Loading UI positioned at bottom center
@@ -420,7 +386,47 @@
                             },
                         ));
                     });
-            });
+            }).id();
+        
+        // Now create tracked assets system for remaining assets
+        let mut tracked_assets = TrackedAssets::new();
+        
+        // Add splash background to tracking (already loading)
+        tracked_assets.add_image(splash_bg);
+        
+        // Load logo for main menu
+        let logo_handle = asset_server.load(&config.assets.icons.logo);
+        tracked_assets.add_image(logo_handle.clone());
+        
+        // Load audio
+        let background_music: Handle<AudioSource> = asset_server.load(&config.assets.sounds.menu_theme);
+        tracked_assets.add_audio(background_music);
+        
+        // Load all video frames (these can load in background)
+        let mut video_frames = Vec::new();
+        let animation_config = &config.assets.animations.main_menu_frames;
+        for i in 1..=animation_config.frame_count {
+            let frame_path = config.get_animation_frame_path(i);
+            let frame_handle = asset_server.load(frame_path);
+            tracked_assets.add_image(frame_handle.clone());
+            video_frames.push(frame_handle);
+        }
+        
+        // Store resources
+        commands.insert_resource(VideoFrames { 
+            frames: video_frames,
+            all_loaded: false,
+        });
+        commands.insert_resource(PreloadedAssets {
+            logo: logo_handle,
+        });
+        
+        // Set total assets count from tracked system
+        let total_count = tracked_assets.total_count;
+        loading_progress.total_assets = total_count;
+        commands.insert_resource(tracked_assets);
+        
+        println!("🚀 Priority loading: Splash background loading first, {} total assets to follow", total_count);
     }
 
     fn loading_progress_system(
@@ -558,6 +564,9 @@
     
     #[derive(Component)]
     struct FadeOverlay;
+
+    #[derive(Component)]
+    struct SplashBackground;
 
 fn main_menu_setup(
     mut commands: Commands, 
