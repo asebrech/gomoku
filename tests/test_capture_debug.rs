@@ -3,7 +3,7 @@ use gomoku::core::captures::CaptureHandler;
 
 #[test]
 fn debug_capture_scenario() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
 
     println!("=== Setting up proper capture scenario ===");
     

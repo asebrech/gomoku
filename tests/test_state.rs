@@ -3,7 +3,7 @@ use gomoku::core::state::GameState;
 
 #[test]
 fn test_game_state_creation() {
-    let state = GameState::new(19, 5);
+    let state = GameState::new(19, 5, 5);
 
     assert_eq!(state.board.size, 19);
     assert_eq!(state.win_condition, 5);
@@ -17,7 +17,7 @@ fn test_game_state_creation() {
 
 #[test]
 fn test_first_move_only_center() {
-    let state = GameState::new(19, 5);
+    let state = GameState::new(19, 5, 5);
     let moves = state.get_possible_moves();
 
     assert_eq!(moves.len(), 1);
@@ -26,7 +26,7 @@ fn test_first_move_only_center() {
 
 #[test]
 fn test_make_move_basic() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
 
     // Make first move
     state.make_move((9, 9));
@@ -42,7 +42,7 @@ fn test_make_move_basic() {
 
 #[test]
 fn test_make_move_with_capture() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
 
     // Set up capture scenario using proper move mechanics
     state.make_move((9, 9)); // Max
@@ -62,7 +62,7 @@ fn test_make_move_with_capture() {
 
 #[test]
 fn test_undo_move_basic() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
 
     // Make move
     state.make_move((9, 9));
@@ -78,7 +78,7 @@ fn test_undo_move_basic() {
 
 #[test]
 fn test_undo_move_with_capture() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
 
     // Set up capture scenario using proper move mechanics
     state.make_move((9, 9)); // Max
@@ -103,7 +103,7 @@ fn test_undo_move_with_capture() {
 
 #[test]
 fn test_is_terminal_no_moves() {
-    let mut state = GameState::new(3, 3);
+    let mut state = GameState::new(3, 3, 5);
 
     // Fill the board
     for i in 0..3 {
@@ -117,7 +117,7 @@ fn test_is_terminal_no_moves() {
 
 #[test]
 fn test_is_terminal_winner_exists() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
 
     // Create winning condition
     for i in 0..5 {
@@ -130,7 +130,7 @@ fn test_is_terminal_winner_exists() {
 
 #[test]
 fn test_check_winner() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
 
     assert_eq!(state.check_winner(), None);
 
@@ -140,8 +140,8 @@ fn test_check_winner() {
 
 #[test]
 fn test_hash_consistency() {
-    let mut state1 = GameState::new(19, 5);
-    let mut state2 = GameState::new(19, 5);
+    let mut state1 = GameState::new(19, 5, 5);
+    let mut state2 = GameState::new(19, 5, 5);
 
     // Same states should have same hash
     assert_eq!(state1.hash(), state2.hash());
@@ -159,7 +159,7 @@ fn test_hash_consistency() {
 
 #[test]
 fn test_capture_win_detection() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
 
     // Set captures to winning amount
     state.max_captures = 5;
@@ -174,7 +174,7 @@ fn test_capture_win_detection() {
 
 #[test]
 fn test_winning_by_line() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
 
     // Place first 4 stones
     for i in 0..4 {
@@ -192,7 +192,7 @@ fn test_winning_by_line() {
 // TODO: Update capture handling logic in GameState so it supports detecting and tracking multiple simultaneous captures in one move. Test currently fails.
 #[test]
 fn test_multiple_captures_same_move() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
 
     // Set up multiple capture scenario in different directions
     // First set up horizontal capture: X-O-O-X
@@ -218,8 +218,8 @@ fn test_multiple_captures_same_move() {
 
 #[test]
 fn test_game_state_different_sizes() {
-    let state15 = GameState::new(15, 5);
-    let state19 = GameState::new(19, 5);
+    let state15 = GameState::new(15, 5, 5);
+    let state19 = GameState::new(19, 5, 5);
 
     assert_eq!(state15.board.size, 15);
     assert_eq!(state19.board.size, 19);
@@ -233,7 +233,7 @@ fn test_game_state_different_sizes() {
 
 #[test]
 fn test_complex_game_sequence() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
 
     // Play a sequence of moves
     let moves = vec![
@@ -260,7 +260,7 @@ fn test_complex_game_sequence() {
 
 #[test]
 fn test_capture_history_tracking() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
 
     // Make moves without capture
     state.make_move((9, 9));

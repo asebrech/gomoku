@@ -2,7 +2,7 @@ use crate::{ai::transposition::TranspositionTable, core::board::Player, core::st
 use std::io;
 
 pub fn new_game(board_size: usize, winning_condition: usize, depth: i32) {
-    let mut state = GameState::new(board_size, winning_condition);
+    let mut state = GameState::new(board_size, winning_condition, 10); // Default to 10 captures for shell game
     let (human, opponent, is_human_opponent) = choose_sides();
 
     loop {

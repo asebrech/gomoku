@@ -109,6 +109,34 @@
     #[derive(Component)]
     struct VolumeDisplay;
 
+    #[derive(Component, Clone, Debug)]
+    enum SettingControl {
+        BoardSize,
+        WinCondition,
+        AIDifficulty,
+        PairCaptures,
+        Fullscreen,
+        Vsync,
+        VolumeControl,
+        AudioMute,
+    }
+
+    #[derive(Component)]
+    struct SettingDisplay {
+        setting_type: SettingDisplayType,
+    }
+
+    #[derive(Debug, Clone)]
+    enum SettingDisplayType {
+        BoardSizeValue,
+        WinConditionValue,
+        PairCapturesValue,
+        FullscreenToggle,
+        VsyncToggle,
+        MutedToggle,
+        AIDifficultyButton(String), // Store the difficulty level this button represents
+    }
+
     pub fn menu_plugin(app: &mut App) {
         app
             .init_state::<MenuState>()
@@ -117,6 +145,7 @@
             .add_systems(OnEnter(AppState::Menu), menu_setup)
             .add_systems(OnEnter(MenuState::Splash), splash_screen_setup)
             .add_systems(OnEnter(MenuState::Main), (main_menu_setup, setup_audio_if_needed))
+            .add_systems(OnEnter(MenuState::Settings), (settings_menu_setup, force_settings_display_update))
             .add_systems(OnExit(MenuState::Splash), despawn_screen::<OnSplashScreen>)
             .add_systems(OnExit(MenuState::Main), despawn_screen::<OnMainMenuScreen>)
             .add_systems(
@@ -150,7 +179,9 @@
                     button_system, 
                     animate_video_background, 
                     handle_volume_control, 
-                    update_volume_display
+                    update_volume_display,
+                    handle_settings_controls,
+                    update_settings_display,
                 ).run_if(in_state(AppState::Menu).and(not(in_state(MenuState::Splash)))),
             );
     }
@@ -210,14 +241,85 @@
 
     fn button_system(
         mut interaction_query: Query<
-            (&Interaction, &mut BackgroundColor, &mut BorderColor, Option<&SelectedOption>),
+            (&Interaction, &mut BackgroundColor, &mut BorderColor, Option<&SelectedOption>, Option<&SettingControl>, Option<&SettingDisplay>),
             (Changed<Interaction>, With<Button>),
         >,
         config: Res<GameConfig>,
     ) {
         let colors = &config.colors;
         
-        for (interaction, mut background_color, mut border_color, selected) in &mut interaction_query {
+        for (interaction, mut background_color, mut border_color, selected, setting_control, setting_display) in &mut interaction_query {
+            // Handle settings controls with special hover behavior
+            if let Some(setting_control) = setting_control {
+                match *interaction {
+                    Interaction::Hovered => {
+                        // For settings buttons, slightly brighten on hover but don't override the base color
+                        let current_color = background_color.0;
+                        let rgba = current_color.to_srgba();
+                        let brightened = Color::srgba(
+                            (rgba.red + 0.1).min(1.0),
+                            (rgba.green + 0.1).min(1.0),
+                            (rgba.blue + 0.1).min(1.0),
+                            rgba.alpha
+                        );
+                        *background_color = BackgroundColor(brightened);
+                        *border_color = BorderColor(colors.accent.clone().into());
+                    },
+                    Interaction::Pressed => {
+                        // On press, slightly darken
+                        let current_color = background_color.0;
+                        let rgba = current_color.to_srgba();
+                        let darkened = Color::srgba(
+                            (rgba.red - 0.1).max(0.0),
+                            (rgba.green - 0.1).max(0.0),
+                            (rgba.blue - 0.1).max(0.0),
+                            rgba.alpha
+                        );
+                        *background_color = BackgroundColor(darkened);
+                        *border_color = BorderColor(colors.accent.clone().into());
+                    },
+                    Interaction::None => {
+                        // Restore the proper base color based on setting state
+                        let base_color = match setting_control {
+                            SettingControl::Fullscreen => {
+                                let (fullscreen, _) = config.get_display_settings();
+                                if fullscreen { colors.button_pressed.clone() } else { colors.button_normal.clone() }
+                            },
+                            SettingControl::Vsync => {
+                                let (_, vsync) = config.get_display_settings();
+                                if vsync { colors.button_pressed.clone() } else { colors.button_normal.clone() }
+                            },
+                            SettingControl::AudioMute => {
+                                let (_, muted) = config.get_audio_settings();
+                                if muted { colors.button_pressed.clone() } else { colors.button_normal.clone() }
+                            },
+                            SettingControl::AIDifficulty => {
+                                // Check if this specific difficulty button should be highlighted
+                                if let Some(setting_display) = setting_display {
+                                    if let SettingDisplayType::AIDifficultyButton(difficulty_level) = &setting_display.setting_type {
+                                        let (_, _, ai_difficulty, _) = config.get_game_settings();
+                                        if ai_difficulty.to_lowercase() == difficulty_level.to_lowercase() {
+                                            colors.accent.clone()
+                                        } else {
+                                            colors.button_normal.clone()
+                                        }
+                                    } else {
+                                        colors.button_normal.clone()
+                                    }
+                                } else {
+                                    colors.button_normal.clone()
+                                }
+                            },
+                            _ => colors.button_normal.clone(),
+                        };
+                        *background_color = BackgroundColor(base_color.into());
+                        *border_color = BorderColor(colors.secondary.clone().into());
+                    }
+                }
+                continue;
+            }
+            
+            // Handle regular menu buttons
             match (*interaction, selected) {
                 (Interaction::Pressed, _) | (Interaction::None, Some(_)) => {
                     *background_color = BackgroundColor(colors.accent.clone().into());
@@ -928,6 +1030,328 @@ fn main_menu_setup(
         });
 }
 
+fn settings_menu_setup(
+    mut commands: Commands,
+    config: Res<GameConfig>,
+    asset_server: Res<AssetServer>,
+    video_frames: Option<Res<VideoFrames>>,
+) {
+    let colors = &config.colors;
+    
+    // Get the already loaded video frames for background
+    let video_frame_handles = if let Some(frames) = video_frames.as_ref() {
+        frames.frames.clone()
+    } else {
+        // Fallback: load frames if somehow not available
+        let mut frames = Vec::new();
+        for i in 1..=config.assets.animations.main_menu_frames.frame_count {
+            let frame_path = config.get_animation_frame_path(i);
+            frames.push(asset_server.load(frame_path));
+        }
+        frames
+    };
+
+    commands
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                flex_direction: FlexDirection::Column,
+                position_type: PositionType::Relative,
+                ..default()
+            },
+            BackgroundColor(Color::NONE),
+            OnSettingsMenuScreen,
+        ))
+        .with_children(|parent| {
+            // Video background using frame sequence
+            if !video_frame_handles.is_empty() {
+                parent.spawn((
+                    Node {
+                        position_type: PositionType::Absolute,
+                        top: Val::Px(0.0),
+                        left: Val::Px(0.0),
+                        width: Val::Percent(100.0),
+                        height: Val::Percent(100.0),
+                        ..default()
+                    },
+                    ImageNode::new(video_frame_handles[0].clone()),
+                    VideoBackground {
+                        current_frame: 0,
+                        timer: Timer::from_seconds(1.0 / 15.0, TimerMode::Repeating),
+                        total_frames: 120,
+                    },
+                ));
+            }
+
+            // Dark overlay for better text readability
+            parent.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    top: Val::Px(0.0),
+                    left: Val::Px(0.0),
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(100.0),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.5)),
+            ));
+
+            // Main settings container
+            parent
+                .spawn((
+                    Node {
+                        width: Val::Px(800.0),
+                        height: Val::Auto,
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::Center,
+                        justify_content: JustifyContent::FlexStart,
+                        padding: UiRect::all(Val::Px(40.0)),
+                        border: UiRect::all(Val::Px(2.0)),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.8)),
+                    BorderColor(colors.accent.clone().into()),
+                ))
+                .with_children(|parent| {
+                    // Title
+                    parent.spawn((
+                        Text::new("⚙️ SETTINGS"),
+                        TextFont {
+                            font_size: config.ui.font_sizes.title,
+                            ..default()
+                        },
+                        TextColor(colors.accent.clone().into()),
+                        Node {
+                            margin: UiRect::bottom(Val::Px(30.0)),
+                            ..default()
+                        },
+                    ));
+
+                    // Settings tabs container
+                    parent
+                        .spawn((
+                            Node {
+                                width: Val::Percent(100.0),
+                                height: Val::Auto,
+                                flex_direction: FlexDirection::Row,
+                                align_items: AlignItems::FlexStart,
+                                justify_content: JustifyContent::SpaceBetween,
+                                column_gap: Val::Px(40.0),
+                                ..default()
+                            },
+                        ))
+                        .with_children(|parent| {
+                            // Audio Settings Column
+                            create_settings_column(
+                                parent,
+                                "🔊 AUDIO",
+                                &[
+                                    ("Volume", SettingType::VolumeSlider),
+                                    ("Muted", SettingType::AudioMute),
+                                ],
+                                &config,
+                            );
+
+                            // Game Settings Column
+                            create_settings_column(
+                                parent,
+                                "🎮 GAME",
+                                &[
+                                    ("Board Size", SettingType::BoardSize),
+                                    ("Win Condition", SettingType::WinCondition),
+                                    ("Pair Captures", SettingType::PairCaptures),
+                                    ("AI Difficulty", SettingType::AIDifficulty),
+                                ],
+                                &config,
+                            );
+
+                            // Display Settings Column
+                            create_settings_column(
+                                parent,
+                                "🖥️ DISPLAY",
+                                &[
+                                    ("Fullscreen", SettingType::Fullscreen),
+                                    ("VSync", SettingType::VSync),
+                                ],
+                                &config,
+                            );
+                        });
+
+                    // Bottom buttons
+                    parent
+                        .spawn((
+                            Node {
+                                width: Val::Percent(100.0),
+                                flex_direction: FlexDirection::Row,
+                                align_items: AlignItems::Center,
+                                justify_content: JustifyContent::Center,
+                                margin: UiRect::top(Val::Px(40.0)),
+                                column_gap: Val::Px(20.0),
+                                ..default()
+                            },
+                        ))
+                        .with_children(|parent| {
+                            // Back to Main Menu button
+                            parent
+                                .spawn((
+                                    Button,
+                                    Node {
+                                        width: Val::Px(200.0),
+                                        height: Val::Px(50.0),
+                                        justify_content: JustifyContent::Center,
+                                        align_items: AlignItems::Center,
+                                        border: UiRect::all(Val::Px(2.0)),
+                                        ..default()
+                                    },
+                                    BackgroundColor(colors.button_normal.clone().into()),
+                                    BorderColor(colors.secondary.clone().into()),
+                                    MenuButtonAction::BackToMainMenu,
+                                ))
+                                .with_children(|parent| {
+                                    parent.spawn((
+                                        Text::new("← BACK TO MENU"),
+                                        TextFont {
+                                            font_size: config.ui.font_sizes.button,
+                                            ..default()
+                                        },
+                                        TextColor(colors.text_primary.clone().into()),
+                                    ));
+                                });
+                        });
+                });
+        });
+}
+
+#[derive(Debug, Clone)]
+enum SettingType {
+    VolumeSlider,
+    AudioMute,
+    BoardSize,
+    WinCondition,
+    AIDifficulty,
+    PairCaptures,
+    Fullscreen,
+    VSync,
+}
+
+fn create_settings_column(
+    parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
+    title: &str,
+    settings: &[(&str, SettingType)],
+    config: &GameConfig,
+) {
+    let colors = &config.colors;
+    
+    parent
+        .spawn((
+            Node {
+                width: Val::Px(220.0),
+                height: Val::Auto,
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::FlexStart,
+                padding: UiRect::all(Val::Px(20.0)),
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.1, 0.0, 0.2, 0.7)),
+            BorderColor(colors.secondary.clone().into()),
+        ))
+        .with_children(|parent| {
+            // Column title
+            parent.spawn((
+                Text::new(title),
+                TextFont {
+                    font_size: 20.0,
+                    ..default()
+                },
+                TextColor(colors.text_secondary.clone().into()),
+                Node {
+                    margin: UiRect::bottom(Val::Px(20.0)),
+                    ..default()
+                },
+            ));
+
+            // Settings items
+            for (label, setting_type) in settings {
+                create_setting_item(parent, label, setting_type, config);
+            }
+        });
+}
+
+fn create_setting_item(
+    parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
+    label: &str,
+    setting_type: &SettingType,
+    config: &GameConfig,
+) {
+    let colors = &config.colors;
+    
+    parent
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Auto,
+                flex_direction: FlexDirection::Column,
+                margin: UiRect::bottom(Val::Px(15.0)),
+                ..default()
+            },
+        ))
+        .with_children(|parent| {
+            // Label
+            parent.spawn((
+                Text::new(label.to_string()),
+                TextFont {
+                    font_size: 14.0,
+                    ..default()
+                },
+                TextColor(colors.text_primary.clone().into()),
+                Node {
+                    margin: UiRect::bottom(Val::Px(5.0)),
+                    ..default()
+                },
+            ));
+
+            // Control based on setting type
+            match setting_type {
+                SettingType::VolumeSlider => {
+                    let (volume, muted) = config.get_audio_settings();
+                    create_volume_control(parent, volume, muted, colors);
+                }
+                SettingType::AudioMute => {
+                    let (_, muted) = config.get_audio_settings();
+                    create_toggle_control(parent, muted, "Muted", colors);
+                }
+                SettingType::BoardSize => {
+                    let (board_size, _, _, _) = config.get_game_settings();
+                    create_number_selector(parent, board_size, 15, 19, "BoardSize", colors);
+                }
+                SettingType::WinCondition => {
+                    let (_, win_condition, _, _) = config.get_game_settings();
+                    create_number_selector(parent, win_condition, 4, 6, "WinCondition", colors);
+                }
+                SettingType::AIDifficulty => {
+                    let (_, _, ai_difficulty, _) = config.get_game_settings();
+                    create_difficulty_selector(parent, &ai_difficulty, colors);
+                }
+                SettingType::PairCaptures => {
+                    let (_, _, _, pair_captures) = config.get_game_settings();
+                    create_number_selector(parent, pair_captures, 5, 20, "PairCaptures", colors);
+                }
+                SettingType::Fullscreen => {
+                    let (fullscreen, _) = config.get_display_settings();
+                    create_toggle_control(parent, fullscreen, "Fullscreen", colors);
+                }
+                SettingType::VSync => {
+                    let (_, vsync) = config.get_display_settings();
+                    create_toggle_control(parent, vsync, "VSync", colors);
+                }
+            }
+        });
+}
+
 fn create_menu_button(
     parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
     text: &str,
@@ -1257,3 +1681,473 @@ fn create_menu_button_with_icon(
             }
         }
     }
+
+    fn handle_settings_controls(
+        settings_query: Query<(&Interaction, &SettingControl), (Changed<Interaction>, With<Button>)>,
+        ai_difficulty_query: Query<(&Interaction, &Children, &SettingControl), (Changed<Interaction>, With<Button>)>,
+        text_query: Query<&Text>,
+        mut config: ResMut<GameConfig>,
+        mut audio_sink_query: Query<&mut AudioSink>,
+        game_audio: Option<Res<GameAudio>>,
+    ) {
+        // Handle all settings controls
+        for (interaction, setting_control) in settings_query.iter() {
+            if *interaction == Interaction::Pressed {
+                match setting_control {
+                    SettingControl::BoardSize => {
+                        let (current_board_size, win_condition, ai_difficulty, pair_captures) = config.get_game_settings();
+                        let new_board_size = if current_board_size < 19 { current_board_size + 1 } else { 15 };
+                        if let Err(e) = config.save_game_settings(new_board_size, win_condition, ai_difficulty, pair_captures) {
+                            println!("Failed to save board size: {}", e);
+                        } else {
+                            println!("Board size changed to: {}", new_board_size);
+                        }
+                    }
+                    SettingControl::WinCondition => {
+                        let (board_size, current_win_condition, ai_difficulty, pair_captures) = config.get_game_settings();
+                        let new_win_condition = if current_win_condition < 6 { current_win_condition + 1 } else { 4 };
+                        if let Err(e) = config.save_game_settings(board_size, new_win_condition, ai_difficulty, pair_captures) {
+                            println!("Failed to save win condition: {}", e);
+                        } else {
+                            println!("Win condition changed to: {}", new_win_condition);
+                        }
+                    }
+                    SettingControl::PairCaptures => {
+                        let (board_size, win_condition, ai_difficulty, current_pair_captures) = config.get_game_settings();
+                        let new_pair_captures = if current_pair_captures < 20 { current_pair_captures + 1 } else { 5 };
+                        if let Err(e) = config.save_game_settings(board_size, win_condition, ai_difficulty, new_pair_captures) {
+                            println!("Failed to save pair captures: {}", e);
+                        } else {
+                            println!("Pair captures to win changed to: {}", new_pair_captures);
+                        }
+                    }
+                    SettingControl::Fullscreen => {
+                        let (current_fullscreen, vsync) = config.get_display_settings();
+                        let new_fullscreen = !current_fullscreen;
+                        if let Err(e) = config.save_display_settings(new_fullscreen, vsync) {
+                            println!("Failed to save fullscreen setting: {}", e);
+                        } else {
+                            println!("Fullscreen changed to: {}", new_fullscreen);
+                        }
+                    }
+                    SettingControl::Vsync => {
+                        let (fullscreen, current_vsync) = config.get_display_settings();
+                        let new_vsync = !current_vsync;
+                        if let Err(e) = config.save_display_settings(fullscreen, new_vsync) {
+                            println!("Failed to save vsync setting: {}", e);
+                        } else {
+                            println!("VSync changed to: {}", new_vsync);
+                        }
+                    }
+                    SettingControl::AudioMute => {
+                        let (volume, current_muted) = config.get_audio_settings();
+                        let new_muted = !current_muted;
+                        if let Err(e) = config.save_audio_settings(volume, new_muted) {
+                            println!("Failed to save mute setting: {}", e);
+                        } else {
+                            println!("Audio muted changed to: {}", new_muted);
+                            
+                            // Apply the mute change to the audio sink immediately
+                            let effective_volume = if new_muted { 0.0 } else { volume };
+                            if let Some(audio) = game_audio.as_ref() {
+                                if let Some(entity) = audio.music_entity {
+                                    if let Ok(mut sink) = audio_sink_query.get_mut(entity) {
+                                        sink.set_volume(Volume::Linear(effective_volume));
+                                        println!("Updated AudioSink volume to: {} (muted: {})", effective_volume, new_muted);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    _ => {} // Other controls handled elsewhere
+                }
+            }
+        }
+
+        // Handle AI difficulty selection (special case with text content)
+        for (interaction, children, setting_control) in ai_difficulty_query.iter() {
+            if *interaction == Interaction::Pressed && matches!(setting_control, SettingControl::AIDifficulty) {
+                if let Some(child) = children.first() {
+                    if let Ok(text) = text_query.get(*child) {
+                        let (board_size, win_condition, _, pair_captures) = config.get_game_settings();
+                        let new_difficulty = text.0.to_lowercase();
+                        if let Err(e) = config.save_game_settings(board_size, win_condition, new_difficulty.clone(), pair_captures) {
+                            println!("Failed to save AI difficulty: {}", e);
+                        } else {
+                            println!("AI difficulty changed to: {}", new_difficulty);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn update_settings_display(
+        config: Res<GameConfig>,
+        mut query_set: ParamSet<(
+            Query<(&SettingDisplay, &mut Text), Without<Button>>,
+            Query<(&SettingDisplay, &mut BackgroundColor, &Children), With<Button>>,
+            Query<&mut Text>,
+        )>,
+    ) {
+        if config.is_changed() {
+            update_settings_display_internal(&config, &mut query_set);
+        }
+    }
+
+    fn force_settings_display_update(
+        config: Res<GameConfig>,
+        mut query_set: ParamSet<(
+            Query<(&SettingDisplay, &mut Text), Without<Button>>,
+            Query<(&SettingDisplay, &mut BackgroundColor, &Children), With<Button>>,
+            Query<&mut Text>,
+        )>,
+    ) {
+        // Force update settings display when entering settings menu
+        update_settings_display_internal(&config, &mut query_set);
+    }
+
+    fn update_settings_display_internal(
+        config: &GameConfig,
+        query_set: &mut ParamSet<(
+            Query<(&SettingDisplay, &mut Text), Without<Button>>,
+            Query<(&SettingDisplay, &mut BackgroundColor, &Children), With<Button>>,
+            Query<&mut Text>,
+        )>,
+    ) {
+            let (board_size, win_condition, ai_difficulty, pair_captures) = config.get_game_settings();
+            let (fullscreen, vsync) = config.get_display_settings();
+            let (_, muted) = config.get_audio_settings();
+            let colors = &config.colors;
+
+            // Update value displays (text elements with SettingDisplay)
+            for (setting_display, mut text) in query_set.p0().iter_mut() {
+                match &setting_display.setting_type {
+                    SettingDisplayType::BoardSizeValue => {
+                        text.0 = board_size.to_string();
+                    }
+                    SettingDisplayType::WinConditionValue => {
+                        text.0 = win_condition.to_string();
+                    }
+                    SettingDisplayType::PairCapturesValue => {
+                        text.0 = pair_captures.to_string();
+                    }
+                    _ => {}
+                }
+            }
+
+            // Collect button update data first
+            let mut button_updates = Vec::new();
+            for (setting_display, mut bg_color, children) in query_set.p1().iter_mut() {
+                match &setting_display.setting_type {
+                    SettingDisplayType::FullscreenToggle => {
+                        button_updates.push((children[0], if fullscreen { "ON" } else { "OFF" }));
+                        *bg_color = BackgroundColor(if fullscreen { 
+                            colors.accent.clone() 
+                        } else { 
+                            colors.button_normal.clone() 
+                        }.into());
+                    }
+                    SettingDisplayType::VsyncToggle => {
+                        button_updates.push((children[0], if vsync { "ON" } else { "OFF" }));
+                        *bg_color = BackgroundColor(if vsync { 
+                            colors.accent.clone() 
+                        } else { 
+                            colors.button_normal.clone() 
+                        }.into());
+                    }
+                    SettingDisplayType::MutedToggle => {
+                        button_updates.push((children[0], if muted { "ON" } else { "OFF" }));
+                        *bg_color = BackgroundColor(if muted { 
+                            colors.accent.clone() 
+                        } else { 
+                            colors.button_normal.clone() 
+                        }.into());
+                    }
+                    SettingDisplayType::AIDifficultyButton(difficulty_level) => {
+                        let is_selected = ai_difficulty.to_lowercase() == difficulty_level.to_lowercase();
+                        *bg_color = BackgroundColor(if is_selected { 
+                            colors.accent.clone() 
+                        } else { 
+                            colors.button_normal.clone() 
+                        }.into());
+                    }
+                    _ => {}
+                }
+            }
+
+            // Apply text updates to button children
+            for (entity, text_value) in button_updates {
+                if let Ok(mut text) = query_set.p2().get_mut(entity) {
+                    text.0 = text_value.to_string();
+                }
+            }
+        }
+
+    fn create_volume_control(
+        parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
+        volume: f32,
+        muted: bool,
+        colors: &crate::ui::config::ColorConfig,
+    ) {
+        parent
+            .spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    height: Val::Px(30.0),
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    justify_content: JustifyContent::SpaceBetween,
+                    ..default()
+                },
+            ))
+            .with_children(|parent| {
+                // Volume down button
+                parent.spawn((
+                    Button,
+                    Node {
+                        width: Val::Px(25.0),
+                        height: Val::Px(25.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        border: UiRect::all(Val::Px(1.0)),
+                        ..default()
+                    },
+                    BackgroundColor(colors.button_normal.clone().into()),
+                    BorderColor(colors.secondary.clone().into()),
+                    VolumeDown,
+                )).with_children(|parent| {
+                    parent.spawn((
+                        Text::new("-"),
+                        TextFont { font_size: 14.0, ..default() },
+                        TextColor(colors.text_primary.clone().into()),
+                    ));
+                });
+
+                // Volume display
+                let volume_text = if muted {
+                    "MUTED".to_string()
+                } else {
+                    format!("{}%", (volume * 100.0) as u32)
+                };
+                parent.spawn((
+                    Text::new(volume_text),
+                    TextFont { font_size: 12.0, ..default() },
+                    TextColor(colors.text_secondary.clone().into()),
+                    VolumeDisplay,
+                    Node {
+                        width: Val::Px(60.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                ));
+
+                // Volume up button
+                parent.spawn((
+                    Button,
+                    Node {
+                        width: Val::Px(25.0),
+                        height: Val::Px(25.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        border: UiRect::all(Val::Px(1.0)),
+                        ..default()
+                    },
+                    BackgroundColor(colors.button_normal.clone().into()),
+                    BorderColor(colors.secondary.clone().into()),
+                    VolumeUp,
+                )).with_children(|parent| {
+                    parent.spawn((
+                        Text::new("+"),
+                        TextFont { font_size: 14.0, ..default() },
+                        TextColor(colors.text_primary.clone().into()),
+                    ));
+                });
+            });
+    }
+
+    fn create_toggle_control(
+        parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
+        enabled: bool,
+        setting_name: &str,
+        colors: &crate::ui::config::ColorConfig,
+    ) {
+        parent.spawn((
+            Button,
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Px(30.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(if enabled { colors.accent.clone() } else { colors.button_normal.clone() }.into()),
+            BorderColor(colors.secondary.clone().into()),
+            match setting_name {
+                "Fullscreen" => SettingControl::Fullscreen,
+                "VSync" => SettingControl::Vsync,
+                _ => SettingControl::AudioMute, // Fallback for mute toggle
+            },
+            SettingDisplay {
+                setting_type: match setting_name {
+                    "Fullscreen" => SettingDisplayType::FullscreenToggle,
+                    "VSync" => SettingDisplayType::VsyncToggle,
+                    "Muted" => SettingDisplayType::MutedToggle,
+                    _ => SettingDisplayType::MutedToggle,
+                }
+            },
+        )).with_children(|parent| {
+            parent.spawn((
+                Text::new(if enabled { "ON" } else { "OFF" }),
+                TextFont { font_size: 14.0, ..default() },
+                TextColor(colors.text_primary.clone().into()),
+            ));
+        });
+    }
+
+    fn create_number_selector(
+        parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
+        current_value: u32,
+        _min_value: u32,
+        _max_value: u32,
+        setting_name: &str,
+        colors: &crate::ui::config::ColorConfig,
+    ) {
+        parent
+            .spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    height: Val::Px(30.0),
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    justify_content: JustifyContent::SpaceBetween,
+                    ..default()
+                },
+            ))
+            .with_children(|parent| {
+                // Decrease button
+                parent.spawn((
+                    Button,
+                    Node {
+                        width: Val::Px(25.0),
+                        height: Val::Px(25.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        border: UiRect::all(Val::Px(1.0)),
+                        ..default()
+                    },
+                    BackgroundColor(colors.button_normal.clone().into()),
+                    BorderColor(colors.secondary.clone().into()),
+                    match setting_name {
+                        "BoardSize" => SettingControl::BoardSize,
+                        "WinCondition" => SettingControl::WinCondition,
+                        "PairCaptures" => SettingControl::PairCaptures,
+                        _ => SettingControl::BoardSize,
+                    },
+                )).with_children(|parent| {
+                    parent.spawn((
+                        Text::new("-"),
+                        TextFont { font_size: 14.0, ..default() },
+                        TextColor(colors.text_primary.clone().into()),
+                    ));
+                });
+
+                // Value display
+                parent.spawn((
+                    Text::new(current_value.to_string()),
+                    TextFont { font_size: 14.0, ..default() },
+                    TextColor(colors.text_secondary.clone().into()),
+                    Node {
+                        width: Val::Px(40.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    SettingDisplay {
+                        setting_type: match setting_name {
+                            "BoardSize" => SettingDisplayType::BoardSizeValue,
+                            "WinCondition" => SettingDisplayType::WinConditionValue,
+                            "PairCaptures" => SettingDisplayType::PairCapturesValue,
+                            _ => SettingDisplayType::BoardSizeValue,
+                        }
+                    },
+                ));
+
+                // Increase button
+                parent.spawn((
+                    Button,
+                    Node {
+                        width: Val::Px(25.0),
+                        height: Val::Px(25.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        border: UiRect::all(Val::Px(1.0)),
+                        ..default()
+                    },
+                    BackgroundColor(colors.button_normal.clone().into()),
+                    BorderColor(colors.secondary.clone().into()),
+                    match setting_name {
+                        "BoardSize" => SettingControl::BoardSize,
+                        "WinCondition" => SettingControl::WinCondition,
+                        "PairCaptures" => SettingControl::PairCaptures,
+                        _ => SettingControl::BoardSize,
+                    },
+                )).with_children(|parent| {
+                    parent.spawn((
+                        Text::new("+"),
+                        TextFont { font_size: 14.0, ..default() },
+                        TextColor(colors.text_primary.clone().into()),
+                    ));
+                });
+            });
+    }
+
+    fn create_difficulty_selector(
+        parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
+        current_difficulty: &str,
+        colors: &crate::ui::config::ColorConfig,
+    ) {
+        let difficulties = ["Easy", "Medium", "Hard"];
+        
+        parent
+            .spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    height: Val::Auto,
+                    flex_direction: FlexDirection::Column,
+                    row_gap: Val::Px(5.0),
+                    ..default()
+                },
+            ))
+            .with_children(|parent| {
+                for difficulty in difficulties {
+                    let is_selected = current_difficulty.to_lowercase() == difficulty.to_lowercase();
+                    parent.spawn((
+                        Button,
+                        Node {
+                            width: Val::Percent(100.0),
+                            height: Val::Px(25.0),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            border: UiRect::all(Val::Px(1.0)),
+                            ..default()
+                        },
+                        BackgroundColor(if is_selected { colors.accent.clone() } else { colors.button_normal.clone() }.into()),
+                        BorderColor(colors.secondary.clone().into()),
+                        SettingControl::AIDifficulty,
+                        SettingDisplay {
+                            setting_type: SettingDisplayType::AIDifficultyButton(difficulty.to_string()),
+                        },
+                    )).with_children(|parent| {
+                        parent.spawn((
+                            Text::new(difficulty.to_string()),
+                            TextFont { font_size: 12.0, ..default() },
+                            TextColor(colors.text_primary.clone().into()),
+                        ));
+                    });
+                }
+            });
+    }
+

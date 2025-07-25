@@ -4,7 +4,7 @@ use gomoku::core::state::GameState;
 
 #[test]
 fn test_heuristic_empty_board() {
-    let state = GameState::new(19, 5);
+    let state = GameState::new(19, 5, 5);
     let score = Heuristic::evaluate(&state, 1);
 
     // Empty board should have neutral score
@@ -13,7 +13,7 @@ fn test_heuristic_empty_board() {
 
 #[test]
 fn test_heuristic_winner_max() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     state.winner = Some(Player::Max);
 
     let score = Heuristic::evaluate(&state, 1);
@@ -22,7 +22,7 @@ fn test_heuristic_winner_max() {
 
 #[test]
 fn test_heuristic_winner_min() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     state.winner = Some(Player::Min);
 
     let score = Heuristic::evaluate(&state, 1);
@@ -31,7 +31,7 @@ fn test_heuristic_winner_min() {
 
 #[test]
 fn test_heuristic_capture_win_max() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     state.max_captures = 5; // 5 pairs captured = win
 
     let score = Heuristic::evaluate(&state, 1);
@@ -40,7 +40,7 @@ fn test_heuristic_capture_win_max() {
 
 #[test]
 fn test_heuristic_capture_win_min() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     state.min_captures = 5; // 5 pairs captured = win
 
     let score = Heuristic::evaluate(&state, 1);
@@ -49,7 +49,7 @@ fn test_heuristic_capture_win_min() {
 
 #[test]
 fn test_heuristic_no_moves_draw() {
-    let mut state = GameState::new(3, 3);
+    let mut state = GameState::new(3, 3, 5);
 
     // Fill board with no winner
     state.board.place_stone(0, 0, Player::Max);
@@ -68,7 +68,7 @@ fn test_heuristic_no_moves_draw() {
 
 #[test]
 fn test_heuristic_capture_advantage() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
 
     // Give Max capture advantage
     state.max_captures = 3;
@@ -87,7 +87,7 @@ fn test_heuristic_capture_advantage() {
 
 #[test]
 fn test_heuristic_line_evaluation() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
 
     // Create a line of 3 stones for Max
     state.board.place_stone(9, 7, Player::Max);
@@ -102,7 +102,7 @@ fn test_heuristic_line_evaluation() {
 
 #[test]
 fn test_heuristic_blocked_line() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
 
     // Create a line of 3 stones for Max, blocked on both sides
     state.board.place_stone(9, 6, Player::Min); // Block left
@@ -120,8 +120,8 @@ fn test_heuristic_blocked_line() {
 
 #[test]
 fn test_heuristic_open_line_vs_blocked() {
-    let mut state1 = GameState::new(19, 5);
-    let mut state2 = GameState::new(19, 5);
+    let mut state1 = GameState::new(19, 5, 5);
+    let mut state2 = GameState::new(19, 5, 5);
 
     // State 1: Open line (both ends open)
     state1.board.place_stone(9, 7, Player::Max);
@@ -143,7 +143,7 @@ fn test_heuristic_open_line_vs_blocked() {
 
 #[test]
 fn test_heuristic_opponent_advantage() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
 
     // Create advantage for Min
     state.board.place_stone(9, 7, Player::Min);
@@ -158,7 +158,7 @@ fn test_heuristic_opponent_advantage() {
 
 #[test]
 fn test_heuristic_multiple_directions() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
 
     // Create lines in multiple directions for Max
     state.board.place_stone(9, 9, Player::Max);
@@ -174,7 +174,7 @@ fn test_heuristic_multiple_directions() {
 
 #[test]
 fn test_heuristic_winning_line_excluded() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
 
     // Create a winning line (5 in a row)
     for i in 0..5 {
@@ -190,9 +190,9 @@ fn test_heuristic_winning_line_excluded() {
 
 #[test]
 fn test_heuristic_different_line_lengths() {
-    let mut state2 = GameState::new(19, 5);
-    let mut state3 = GameState::new(19, 5);
-    let mut state4 = GameState::new(19, 5);
+    let mut state2 = GameState::new(19, 5, 5);
+    let mut state3 = GameState::new(19, 5, 5);
+    let mut state4 = GameState::new(19, 5, 5);
 
     // 2 in a row (open)
     state2.board.place_stone(9, 8, Player::Max);
@@ -220,7 +220,7 @@ fn test_heuristic_different_line_lengths() {
 
 #[test]
 fn test_heuristic_edge_cases() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
 
     // Test evaluation near board edges
     state.board.place_stone(0, 0, Player::Max);
@@ -235,8 +235,8 @@ fn test_heuristic_edge_cases() {
 
 #[test]
 fn test_heuristic_symmetry() {
-    let mut state_max = GameState::new(19, 5);
-    let mut state_min = GameState::new(19, 5);
+    let mut state_max = GameState::new(19, 5, 5);
+    let mut state_min = GameState::new(19, 5, 5);
 
     // Create identical patterns for both players
     state_max.board.place_stone(9, 7, Player::Max);

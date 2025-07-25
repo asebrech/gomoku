@@ -11,6 +11,7 @@ pub struct GameState {
     pub board: Board,
     pub current_player: Player,
     pub win_condition: usize,
+    pub capture_to_win: usize,
     pub winner: Option<Player>,
     pub max_captures: usize,
     pub min_captures: usize,
@@ -20,7 +21,7 @@ pub struct GameState {
 }
 
 impl GameState {
-    pub fn new(board_size: usize, win_condition: usize) -> Self {
+    pub fn new(board_size: usize, win_condition: usize, capture_to_win: usize) -> Self {
         let zobrist_hash = ZobristHash::new(board_size);
         let board = Board::new(board_size);
         let current_player = Player::Max;
@@ -28,6 +29,7 @@ impl GameState {
             board,
             current_player,
             win_condition,
+            capture_to_win,
             winner: None,
             max_captures: 0,
             min_captures: 0,
@@ -195,6 +197,6 @@ impl GameState {
     }
 
     pub fn check_capture_win(&self) -> Option<Player> {
-        WinChecker::check_capture_win(self.max_captures, self.min_captures)
+        WinChecker::check_capture_win(self.max_captures, self.min_captures, self.capture_to_win)
     }
 }

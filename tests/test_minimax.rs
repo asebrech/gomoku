@@ -5,7 +5,7 @@ use gomoku::core::state::GameState;
 
 #[test]
 fn test_minimax_terminal_position() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     let mut tt = TranspositionTable::new_default();
 
     // Create a winning position
@@ -22,7 +22,7 @@ fn test_minimax_terminal_position() {
 
 #[test]
 fn test_minimax_depth_zero() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     let mut tt = TranspositionTable::new_default();
 
     // Make a simple move
@@ -36,7 +36,7 @@ fn test_minimax_depth_zero() {
 
 #[test]
 fn test_minimax_maximizing_player() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     let mut tt = TranspositionTable::new_default();
 
     // Set up a position where Max has advantage
@@ -53,7 +53,7 @@ fn test_minimax_maximizing_player() {
 
 #[test]
 fn test_minimax_minimizing_player() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     let mut tt = TranspositionTable::new_default();
 
     // Set up a position where Min has advantage
@@ -70,7 +70,7 @@ fn test_minimax_minimizing_player() {
 
 #[test]
 fn test_minimax_alpha_beta_pruning() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     let mut tt = TranspositionTable::new_default();
 
     // Create a position with multiple moves
@@ -86,7 +86,7 @@ fn test_minimax_alpha_beta_pruning() {
 
 #[test]
 fn test_minimax_transposition_table_usage() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     let mut tt = TranspositionTable::new_default();
 
     // Make initial move
@@ -104,7 +104,7 @@ fn test_minimax_transposition_table_usage() {
 
 #[test]
 fn test_minimax_different_depths() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     let mut tt1 = TranspositionTable::new_default();
     let mut tt2 = TranspositionTable::new_default();
 
@@ -123,7 +123,7 @@ fn test_minimax_different_depths() {
 
 #[test]
 fn test_minimax_winning_position_detection() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     let mut tt = TranspositionTable::new_default();
 
     // Create a position where Max can win in one move
@@ -140,7 +140,7 @@ fn test_minimax_winning_position_detection() {
 
 #[test]
 fn test_minimax_losing_position_detection() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     let mut tt = TranspositionTable::new_default();
 
     // Create a position where Min can win in one move
@@ -157,7 +157,7 @@ fn test_minimax_losing_position_detection() {
 
 #[test]
 fn test_minimax_state_restoration() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     let mut tt = TranspositionTable::new_default();
 
     // Make a move using proper state management
@@ -178,7 +178,7 @@ fn test_minimax_state_restoration() {
 // TODO: Fix minimax evaluation function so that it properly recognizes and scores positions where a capture opportunity exists for the current player. Test currently fails.
 #[test]
 fn test_minimax_captures_evaluation() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     let mut tt = TranspositionTable::new_default();
 
     // Set up position with capture opportunity
@@ -195,7 +195,7 @@ fn test_minimax_captures_evaluation() {
 
 #[test]
 fn test_minimax_empty_moves() {
-    let mut state = GameState::new(3, 3);
+    let mut state = GameState::new(3, 3, 5);
     let mut tt = TranspositionTable::new_default();
 
     // Fill the board (no moves available)
@@ -213,7 +213,7 @@ fn test_minimax_empty_moves() {
 
 #[test]
 fn test_minimax_alternating_players() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     let mut tt = TranspositionTable::new_default();
 
     // Start with Max to move
@@ -229,7 +229,7 @@ fn test_minimax_alternating_players() {
 
 #[test]
 fn test_minimax_pruning_efficiency() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     let mut tt = TranspositionTable::new_default();
 
     // Create a position with many possible moves
@@ -246,7 +246,7 @@ fn test_minimax_pruning_efficiency() {
 // TODO: Update minimax to correctly detect capture-win scenarios where a player can win by making a capture. Test currently fails.
 #[test]
 fn test_minimax_capture_win_detection() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     let mut tt = TranspositionTable::new_default();
 
     // Set up near-capture-win scenario

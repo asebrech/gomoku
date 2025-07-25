@@ -60,7 +60,7 @@ pub fn game_plugin(app: &mut App) {
         .add_event::<StonePlacement>()
         .add_event::<MovePlayed>()
         .add_event::<UpdateAITimeDisplay>()
-        .add_systems(OnEnter(AppState::Game), (setup_game_ui, update_available_placement).chain())
+        .add_systems(OnEnter(AppState::Game), (update_game_settings_from_config, setup_game_ui, update_available_placement).chain())
         .add_systems(
             Update,
             (
@@ -75,6 +75,40 @@ pub fn game_plugin(app: &mut App) {
             ).run_if(in_state(AppState::Game)),
         )
         .add_systems(OnExit(AppState::Game), despawn_screen::<OnGameScreen>);
+}
+
+fn update_game_settings_from_config(
+    config: Res<GameConfig>,
+    mut game_settings: ResMut<GameSettings>,
+    mut game_state: ResMut<GameState>,
+) {
+    // Get current settings from config
+    let (board_size, win_condition, ai_difficulty, pair_captures_to_win) = config.get_game_settings();
+    
+    // Map AI difficulty to actual values
+    let (ai_depth, time_limit) = match ai_difficulty.to_lowercase().as_str() {
+        "easy" => (2, Some(300)),     // Depth 2, 300ms
+        "medium" => (4, Some(800)),   // Depth 4, 800ms  
+        "hard" => (6, Some(1500)),    // Depth 6, 1500ms
+        _ => (4, Some(800)),          // Default to medium
+    };
+    
+    // Update GameSettings resource
+    *game_settings = GameSettings {
+        board_size: board_size as usize,
+        total_capture_to_win: pair_captures_to_win as usize,
+        minimum_chain_to_win: win_condition as usize,
+        ai_depth,
+        alpha_beta_enabled: true,
+        versus_ai: true,
+        time_limit,
+    };
+    
+    // Create a new GameState with updated settings
+    *game_state = GameState::new(game_settings.board_size, game_settings.minimum_chain_to_win, game_settings.total_capture_to_win);
+    
+    info!("Updated game settings from config: Board {}x{}, Win Condition: {}, AI Difficulty: {} (depth: {}), Pair Captures: {}", 
+          board_size, board_size, win_condition, ai_difficulty, ai_depth, pair_captures_to_win);
 }
 
 fn setup_game_ui(

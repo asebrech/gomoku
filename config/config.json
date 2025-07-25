@@ -97,14 +97,14 @@
   },
   "ui": {
     "loading_messages": {
-      "61-80": "Importing neo-cat...",
-      "26-40": "Cloning heuristic...",
-      "0-10": "Initializing...",
-      "96-99": "Changing headers names...",
-      "41-60": "Using Minimax Algorithm...",
       "81-95": "Renaming variables...",
+      "26-40": "Cloning heuristic...",
       "100": "Complete!",
-      "11-25": "Loading songs..."
+      "0-10": "Initializing...",
+      "41-60": "Using Minimax Algorithm...",
+      "11-25": "Loading songs...",
+      "96-99": "Changing headers names...",
+      "61-80": "Importing neo-cat..."
     },
     "font_sizes": {
       "title": 32.0,
@@ -115,14 +115,24 @@
     }
   },
   "game": {
-    "board_size": 15,
-    "win_condition": 5,
-    "ai_difficulty": "medium"
+    "board_size": 17,
+    "win_condition": 6,
+    "ai_difficulty": "easy",
+    "pair_captures_to_win": 16
   },
   "settings": {
     "audio": {
-      "volume": 0.2,
+      "volume": 0.6,
       "muted": false
+    },
+    "display": {
+      "fullscreen": true,
+      "vsync": true
+    },
+    "gameplay": {
+      "show_move_hints": true,
+      "animation_speed": 1.0,
+      "auto_save": true
     }
   }
 }

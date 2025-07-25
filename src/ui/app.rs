@@ -8,7 +8,7 @@ use crate::ui::screens::game::game::game_plugin;
 use crate::ui::screens::menu::menu_plugin;
 use crate::ui::screens::splash::splash_plugin;
 use crate::ui::screens::tutorial::tutorial_plugin;
-use crate::ui::config::config_plugin;
+use crate::ui::config::{config_plugin, GameConfig};
 use crate::ui::theme::ThemeManager;
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
@@ -93,10 +93,33 @@ impl GomokuApp {
 	}
 
 	fn init_resources(&mut self) {
-		let settings = GameSettings::new();
+		// Load game settings from config
+		let config = GameConfig::load_from_file("config/config.json")
+			.unwrap_or_else(|_| GameConfig::default());
+		let (board_size, win_condition, ai_difficulty, pair_captures_to_win) = config.get_game_settings();
+		
+		// Map AI difficulty to actual values
+		let (ai_depth, time_limit) = match ai_difficulty.to_lowercase().as_str() {
+			"easy" => (2, Some(300)),     // Depth 2, 300ms
+			"medium" => (4, Some(800)),   // Depth 4, 800ms  
+			"hard" => (6, Some(1500)),    // Depth 6, 1500ms
+			_ => (4, Some(800)),          // Default to medium
+		};
+		
+		let settings = GameSettings {
+			board_size: board_size as usize,
+			total_capture_to_win: pair_captures_to_win as usize,
+			minimum_chain_to_win: win_condition as usize,
+			ai_depth,
+			alpha_beta_enabled: true,
+			versus_ai: true,
+			time_limit,
+		};
+		
 		self.app
-		.insert_resource(GameState::new(settings.board_size, settings.minimum_chain_to_win))
+		.insert_resource(GameState::new(settings.board_size, settings.minimum_chain_to_win, settings.total_capture_to_win))
         .insert_resource(settings)
+        .insert_resource(config)
         .insert_resource(ThemeManager::new())
         .init_resource::<TranspositionTable>();
 

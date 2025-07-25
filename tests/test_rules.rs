@@ -94,25 +94,25 @@ fn test_blocked_line_no_win() {
 #[test]
 fn test_capture_win_max() {
     // Test capture win for Max player (5 pairs = 10 captures)
-    assert_eq!(WinChecker::check_capture_win(5, 0), Some(Player::Max));
-    assert_eq!(WinChecker::check_capture_win(6, 0), Some(Player::Max));
-    assert_eq!(WinChecker::check_capture_win(4, 0), None);
+    assert_eq!(WinChecker::check_capture_win(5, 0, 5), Some(Player::Max));
+    assert_eq!(WinChecker::check_capture_win(6, 0, 5), Some(Player::Max));
+    assert_eq!(WinChecker::check_capture_win(4, 0, 5), None);
 }
 
 #[test]
 fn test_capture_win_min() {
     // Test capture win for Min player (5 pairs = 10 captures)
-    assert_eq!(WinChecker::check_capture_win(0, 5), Some(Player::Min));
-    assert_eq!(WinChecker::check_capture_win(0, 6), Some(Player::Min));
-    assert_eq!(WinChecker::check_capture_win(0, 4), None);
+    assert_eq!(WinChecker::check_capture_win(0, 5, 5), Some(Player::Min));
+    assert_eq!(WinChecker::check_capture_win(0, 6, 5), Some(Player::Min));
+    assert_eq!(WinChecker::check_capture_win(0, 4, 5), None);
 }
 
 #[test]
 fn test_no_capture_win() {
     // Test no capture win
-    assert_eq!(WinChecker::check_capture_win(4, 4), None);
-    assert_eq!(WinChecker::check_capture_win(3, 2), None);
-    assert_eq!(WinChecker::check_capture_win(0, 0), None);
+    assert_eq!(WinChecker::check_capture_win(4, 4, 5), None);
+    assert_eq!(WinChecker::check_capture_win(3, 2, 5), None);
+    assert_eq!(WinChecker::check_capture_win(0, 0, 5), None);
 }
 
 #[test]

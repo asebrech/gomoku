@@ -2,7 +2,7 @@ use gomoku::core::state::GameState;
 
 #[test]
 fn test_hash_stability() {
-    let mut state = GameState::new(15, 5);
+    let mut state = GameState::new(15, 5, 5);
     
     // Place some initial stones using proper move mechanics
     state.make_move((7, 7));  // Max
@@ -64,7 +64,7 @@ fn test_hash_stability() {
 fn test_position_uniqueness() {
     println!("\n🔍 Testing position hash uniqueness...");
     
-    let mut state = GameState::new(15, 5);
+    let mut state = GameState::new(15, 5, 5);
     let mut hashes = std::collections::HashSet::new();
     
     // Initial state
@@ -92,7 +92,7 @@ fn test_position_uniqueness() {
     
     for (i, position) in test_positions.iter().enumerate() {
         // Reset to empty board
-        let mut temp_state = GameState::new(15, 5);
+        let mut temp_state = GameState::new(15, 5, 5);
         
         // Apply moves
         for &mv in position {
@@ -130,8 +130,8 @@ fn test_position_uniqueness() {
 fn test_player_perspective_in_hash() {
     println!("\n--- Testing Player Perspective in Hash ---");
     
-    let mut state1 = GameState::new(15, 5);
-    let mut state2 = GameState::new(15, 5);
+    let mut state1 = GameState::new(15, 5, 5);
+    let mut state2 = GameState::new(15, 5, 5);
     
     // Create identical board positions but different current players
     state1.make_move((7, 7));  // Max plays

@@ -5,7 +5,7 @@ use gomoku::interface::utils::find_best_move;
 
 #[test]
 fn test_find_best_move_first_move() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     let mut tt = TranspositionTable::new_default();
 
     let best_move = find_best_move(&mut state, 2, &mut tt);
@@ -16,7 +16,7 @@ fn test_find_best_move_first_move() {
 
 #[test]
 fn test_find_best_move_response() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     let mut tt = TranspositionTable::new_default();
 
     // Make first move
@@ -32,7 +32,7 @@ fn test_find_best_move_response() {
 
 #[test]
 fn test_find_best_move_winning_opportunity() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     let mut tt = TranspositionTable::new_default();
 
     // Set up winning opportunity for current player (Max)
@@ -54,7 +54,7 @@ fn test_find_best_move_winning_opportunity() {
 
 #[test]
 fn test_find_best_move_block_opponent() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     let mut tt = TranspositionTable::new_default();
 
     // Set up threat from opponent (Min has 4 in a row)
@@ -84,7 +84,7 @@ fn test_find_best_move_block_opponent() {
 // TODO: Add a test to verify that find_best_move detects a capture opportunity and chooses the correct capturing move for the current player.
 #[test]
 fn test_find_best_move_capture_opportunity() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     let mut tt = TranspositionTable::new_default();
     // Set up capture opportunity
     state.board.place_stone(9, 9, Player::Max);
@@ -104,7 +104,7 @@ fn test_find_best_move_capture_opportunity() {
 
 #[test]
 fn test_find_best_move_no_moves() {
-    let mut state = GameState::new(3, 3);
+    let mut state = GameState::new(3, 3, 5);
     let mut tt = TranspositionTable::new_default();
 
     // Fill the board
@@ -122,7 +122,7 @@ fn test_find_best_move_no_moves() {
 
 #[test]
 fn test_find_best_move_different_depths() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     let mut tt = TranspositionTable::new_default();
 
     // Set up a position
@@ -143,7 +143,7 @@ fn test_find_best_move_different_depths() {
 
 #[test]
 fn test_find_best_move_player_alternation() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     let mut tt = TranspositionTable::new_default();
 
     // Test with Max player
@@ -163,7 +163,7 @@ fn test_find_best_move_player_alternation() {
 
 #[test]
 fn test_find_best_move_complex_position() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     let mut tt = TranspositionTable::new_default();
 
     // Create a complex position
@@ -187,7 +187,7 @@ fn test_find_best_move_complex_position() {
 
 #[test]
 fn test_find_best_move_state_preservation() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     let mut tt = TranspositionTable::new_default();
 
     // Set up initial state
@@ -206,7 +206,7 @@ fn test_find_best_move_state_preservation() {
 
 #[test]
 fn test_find_best_move_consistent_results() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     let mut tt = TranspositionTable::new_default();
 
     // Set up a deterministic position
@@ -222,7 +222,7 @@ fn test_find_best_move_consistent_results() {
 
 #[test]
 fn test_find_best_move_edge_cases() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
     let mut tt = TranspositionTable::new_default();
 
     // Fill most of the board leaving only a few moves
@@ -250,7 +250,7 @@ fn test_find_best_move_edge_cases() {
 // TODO: Add a test to confirm that find_best_move selects the correct move to win the game via a capture when one pair away from a capture-win.
 #[test]
 fn test_find_best_move_capture_win() {
-    let mut state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5, 5);
 
     // Set up near-capture-win scenario
     state.max_captures = 4; // One away from winning
@@ -267,8 +267,8 @@ fn test_find_best_move_capture_win() {
 
 #[test]
 fn test_find_best_move_different_board_sizes() {
-    let mut state13 = GameState::new(13, 5);
-    let mut state15 = GameState::new(15, 5);
+    let mut state13 = GameState::new(13, 5, 5);
+    let mut state15 = GameState::new(15, 5, 5);
     let mut tt = TranspositionTable::new_default();
 
     let move13 = find_best_move(&mut state13, 2, &mut tt);

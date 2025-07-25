@@ -109,11 +109,27 @@ pub struct GameSettings {
     pub board_size: u32,
     pub win_condition: u32,
     pub ai_difficulty: String,
+    pub pair_captures_to_win: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DisplaySettings {
+    pub fullscreen: bool,
+    pub vsync: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GameplaySettings {
+    pub show_move_hints: bool,
+    pub animation_speed: f32,
+    pub auto_save: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserSettings {
     pub audio: AudioSettings,
+    pub display: DisplaySettings,
+    pub gameplay: GameplaySettings,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -168,6 +184,45 @@ impl GameConfig {
     // Get current audio settings
     pub fn get_audio_settings(&self) -> (f32, bool) {
         (self.settings.audio.volume, self.settings.audio.muted)
+    }
+
+    // Save display settings
+    pub fn save_display_settings(&mut self, fullscreen: bool, vsync: bool) -> Result<(), Box<dyn std::error::Error>> {
+        self.settings.display.fullscreen = fullscreen;
+        self.settings.display.vsync = vsync;
+        self.save_to_file("config/config.json")
+    }
+
+    // Get display settings
+    pub fn get_display_settings(&self) -> (bool, bool) {
+        (self.settings.display.fullscreen, self.settings.display.vsync)
+    }
+
+    // Save gameplay settings
+    pub fn save_gameplay_settings(&mut self, show_move_hints: bool, animation_speed: f32, auto_save: bool) -> Result<(), Box<dyn std::error::Error>> {
+        self.settings.gameplay.show_move_hints = show_move_hints;
+        self.settings.gameplay.animation_speed = animation_speed;
+        self.settings.gameplay.auto_save = auto_save;
+        self.save_to_file("config/config.json")
+    }
+
+    // Get gameplay settings
+    pub fn get_gameplay_settings(&self) -> (bool, f32, bool) {
+        (self.settings.gameplay.show_move_hints, self.settings.gameplay.animation_speed, self.settings.gameplay.auto_save)
+    }
+
+    // Save game settings
+    pub fn save_game_settings(&mut self, board_size: u32, win_condition: u32, ai_difficulty: String, pair_captures_to_win: u32) -> Result<(), Box<dyn std::error::Error>> {
+        self.game.board_size = board_size;
+        self.game.win_condition = win_condition;
+        self.game.ai_difficulty = ai_difficulty;
+        self.game.pair_captures_to_win = pair_captures_to_win;
+        self.save_to_file("config/config.json")
+    }
+
+    // Get game settings
+    pub fn get_game_settings(&self) -> (u32, u32, String, u32) {
+        (self.game.board_size, self.game.win_condition, self.game.ai_difficulty.clone(), self.game.pair_captures_to_win)
     }
 
     pub fn default() -> Self {
@@ -243,11 +298,21 @@ impl GameConfig {
                 board_size: 15,
                 win_condition: 5,
                 ai_difficulty: "medium".to_string(),
+                pair_captures_to_win: 10,
             },
             settings: UserSettings {
                 audio: AudioSettings {
                     volume: 0.5,
                     muted: false,
+                },
+                display: DisplaySettings {
+                    fullscreen: false,
+                    vsync: true,
+                },
+                gameplay: GameplaySettings {
+                    show_move_hints: true,
+                    animation_speed: 1.0,
+                    auto_save: true,
                 },
             },
         }

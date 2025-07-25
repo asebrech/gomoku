@@ -70,10 +70,10 @@ impl WinChecker {
         false
     }
 
-    pub fn check_capture_win(max_captures: usize, min_captures: usize) -> Option<Player> {
-        if max_captures >= 5 {
+    pub fn check_capture_win(max_captures: usize, min_captures: usize, capture_to_win: usize) -> Option<Player> {
+        if max_captures >= capture_to_win {
             Some(Player::Max)
-        } else if min_captures >= 5 {
+        } else if min_captures >= capture_to_win {
             Some(Player::Min)
         } else {
             None

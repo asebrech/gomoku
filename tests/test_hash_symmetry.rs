@@ -4,7 +4,7 @@ mod tests {
 
     #[test]
     fn test_hash_symmetry() {
-        let mut state = GameState::new(19, 5);
+        let mut state = GameState::new(19, 5, 5);
         
         // Record initial state
         let initial_hash = state.hash();
