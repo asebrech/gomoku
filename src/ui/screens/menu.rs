@@ -26,6 +26,45 @@
     }
 
     #[derive(Resource)]
+    struct PreloadedAssets {
+        logo: Handle<Image>,
+    }
+
+    #[derive(Resource)]
+    struct TrackedAssets {
+        handles: Vec<UntypedHandle>,
+        total_count: usize,
+    }
+
+    impl TrackedAssets {
+        fn new() -> Self {
+            Self {
+                handles: Vec::new(),
+                total_count: 0,
+            }
+        }
+
+        fn add_image(&mut self, handle: Handle<Image>) {
+            self.handles.push(handle.untyped());
+            self.total_count += 1;
+        }
+
+        fn add_audio(&mut self, handle: Handle<AudioSource>) {
+            self.handles.push(handle.untyped());
+            self.total_count += 1;
+        }
+
+        fn count_loaded(&self, asset_server: &AssetServer) -> usize {
+            self.handles.iter()
+                .filter(|handle| matches!(
+                    asset_server.get_load_state(handle.id()), 
+                    Some(bevy::asset::LoadState::Loaded)
+                ))
+                .count()
+        }
+    }
+
+    #[derive(Resource)]
     struct LoadingProgress {
         total_assets: usize,
         loaded_assets: usize,
@@ -43,15 +82,21 @@
     }
 
     #[derive(Resource)]
-    struct GameAudio {
-        background_music: Handle<AudioSource>,
-        music_entity: Option<Entity>,
-        music_sink: Option<Entity>,
+    pub struct GameAudio {
+        pub background_music: Handle<AudioSource>,
+        pub music_entity: Option<Entity>,
+        pub music_sink: Option<Entity>,
     }
 
     #[derive(Resource)]
-    struct AudioSettings {
-        volume: f32,
+    pub struct AudioSettings {
+        pub volume: f32,
+    }
+
+    #[derive(Resource, Default)]
+    pub struct MenuInitialized {
+        pub audio_started: bool,
+        pub first_time: bool,
     }
 
     impl Default for AudioSettings {
@@ -79,10 +124,11 @@
         app
             .init_state::<MenuState>()
             .init_resource::<AudioSettings>()
+            .init_resource::<MenuInitialized>()
             .init_resource::<LoadingProgress>()
             .add_systems(OnEnter(AppState::Menu), menu_setup)
             .add_systems(OnEnter(MenuState::Splash), splash_screen_setup)
-            .add_systems(OnEnter(MenuState::Main), (main_menu_setup, setup_audio))
+            .add_systems(OnEnter(MenuState::Main), (main_menu_setup, setup_audio_if_needed))
             .add_systems(OnExit(MenuState::Splash), despawn_screen::<OnSplashScreen>)
             .add_systems(OnExit(MenuState::Main), despawn_screen::<OnMainMenuScreen>)
             .add_systems(
@@ -167,6 +213,7 @@
     enum MenuButtonAction {
 		Load,
         Play,
+        HowToPlay,
         Settings,
         SettingsSound,
         BackToMainMenu,
@@ -222,8 +269,18 @@
         }
     }
 
-    fn menu_setup(mut menu_state: ResMut<NextState<MenuState>>) {
-        menu_state.set(MenuState::Splash);
+    fn menu_setup(
+        mut menu_state: ResMut<NextState<MenuState>>,
+        mut menu_initialized: ResMut<MenuInitialized>,
+    ) {
+        if !menu_initialized.first_time {
+            // First time entering menu - do the splash screen
+            menu_state.set(MenuState::Splash);
+            menu_initialized.first_time = true;
+        } else {
+            // Returning to menu - go directly to main menu
+            menu_state.set(MenuState::Main);
+        }
     }
 
     fn splash_screen_setup(
@@ -234,32 +291,43 @@
     ) {
         let colors = &config.colors;
         
-        // Start loading all assets and count them
-        let mut total_assets = 0;
+        // Create tracked assets system
+        let mut tracked_assets = TrackedAssets::new();
         
         // Load splash background (contains logo)
         let splash_bg = asset_server.load(&config.assets.backgrounds.splash);
-        total_assets += 1;
+        tracked_assets.add_image(splash_bg.clone());
+        
+        // Load logo for main menu
+        let logo_handle = asset_server.load(&config.assets.icons.logo);
+        tracked_assets.add_image(logo_handle.clone());
         
         // Load audio
-        let _background_music: Handle<AudioSource> = asset_server.load(&config.assets.sounds.menu_theme);
-        total_assets += 1;
+        let background_music: Handle<AudioSource> = asset_server.load(&config.assets.sounds.menu_theme);
+        tracked_assets.add_audio(background_music);
         
         // Load all video frames
         let mut video_frames = Vec::new();
         let animation_config = &config.assets.animations.main_menu_frames;
         for i in 1..=animation_config.frame_count {
             let frame_path = config.get_animation_frame_path(i);
-            video_frames.push(asset_server.load(frame_path));
-            total_assets += 1;
+            let frame_handle = asset_server.load(frame_path);
+            tracked_assets.add_image(frame_handle.clone());
+            video_frames.push(frame_handle);
         }
         
-        // Store frames and set total assets count
+        // Store resources
         commands.insert_resource(VideoFrames { 
             frames: video_frames,
             all_loaded: false,
         });
-        loading_progress.total_assets = total_assets;
+        commands.insert_resource(PreloadedAssets {
+            logo: logo_handle,
+        });
+        
+        // Set total assets count from tracked system
+        loading_progress.total_assets = tracked_assets.total_count;
+        commands.insert_resource(tracked_assets);
         
         // Create splash screen UI
         commands
@@ -370,48 +438,32 @@
     fn loading_progress_system(
         asset_server: Res<AssetServer>,
         mut loading_progress: ResMut<LoadingProgress>,
-        video_frames: Option<Res<VideoFrames>>,
+        tracked_assets: Option<Res<TrackedAssets>>,
         mut commands: Commands,
         time: Res<Time>,
         fade_query: Query<Entity, With<FadeTransition>>,
-        config: Res<GameConfig>,
     ) {
         loading_progress.loading_timer.tick(time.delta());
         
         if loading_progress.loading_timer.just_finished() {
-            let mut loaded_count = 0;
-            
-            // Check splash background (contains logo)
-            let splash_handle = asset_server.load::<Image>(&config.assets.backgrounds.splash);
-            let splash_state = asset_server.get_load_state(&splash_handle);
-            if matches!(splash_state, Some(bevy::asset::LoadState::Loaded)) {
-                loaded_count += 1;
-            }
-            
-            // Check audio
-            let audio_handle = asset_server.load::<AudioSource>(&config.assets.sounds.menu_theme);
-            let audio_state = asset_server.get_load_state(&audio_handle);
-            if matches!(audio_state, Some(bevy::asset::LoadState::Loaded)) {
-                loaded_count += 1;
-            }
-            
-            // Check video frames
-            if let Some(frames) = video_frames.as_ref() {
-                for frame_handle in &frames.frames {
-                    if matches!(asset_server.get_load_state(frame_handle), Some(bevy::asset::LoadState::Loaded)) {
-                        loaded_count += 1;
-                    }
+            if let Some(tracked) = tracked_assets.as_ref() {
+                // Use the tracked assets system
+                let loaded_count = tracked.count_loaded(&asset_server);
+                let total_count = tracked.total_count;
+                
+                loading_progress.loaded_assets = loaded_count;
+                
+                // Update total assets if not set
+                if loading_progress.total_assets == 0 {
+                    loading_progress.total_assets = total_count;
                 }
-            }
-            
-            loading_progress.loaded_assets = loaded_count;
-            
-            // Start fade transition when loading is complete
-            if ((loaded_count >= loading_progress.total_assets && loading_progress.total_assets > 0) || 
-               (loaded_count >= 121 && loading_progress.total_assets == 122)) &&
-               fade_query.is_empty() {
-                println!("Loading complete! Starting beautiful fade transition...");
-                start_fade_transition(&mut commands);
+                
+                // Start fade transition when loading is complete
+                if loaded_count >= total_count && total_count > 0 && fade_query.is_empty() {
+                    println!("Loading complete! Starting beautiful fade transition...");
+                    println!("Loaded {} out of {} assets", loaded_count, total_count);
+                    start_fade_transition(&mut commands);
+                }
             }
         }
     }
@@ -519,7 +571,13 @@
     #[derive(Component)]
     struct FadeOverlay;
 
-fn main_menu_setup(mut commands: Commands, config: Res<GameConfig>, asset_server: Res<AssetServer>, video_frames: Option<Res<VideoFrames>>) {
+fn main_menu_setup(
+    mut commands: Commands, 
+    config: Res<GameConfig>, 
+    asset_server: Res<AssetServer>, 
+    video_frames: Option<Res<VideoFrames>>,
+    preloaded_assets: Option<Res<PreloadedAssets>>,
+) {
     let colors = &config.colors;
     
     // Get the already loaded video frames
@@ -750,8 +808,14 @@ fn main_menu_setup(mut commands: Commands, config: Res<GameConfig>, asset_server
                         ))
                         .with_children(|parent| {
                             // Logo
+                            let logo_handle = if let Some(assets) = preloaded_assets.as_ref() {
+                                assets.logo.clone()
+                            } else {
+                                asset_server.load(&config.assets.icons.logo)
+                            };
+                            
                             parent.spawn((
-                                ImageNode::new(asset_server.load(&config.assets.icons.logo)),
+                                ImageNode::new(logo_handle),
                                 Node {
                                     width: Val::Px(400.0),  // Scale down the logo
                                     height: Val::Auto,      // Maintain aspect ratio
@@ -799,6 +863,17 @@ fn main_menu_setup(mut commands: Commands, config: Res<GameConfig>, asset_server
                                 colors,
                                 true, // is_primary
                                 Some(play_icon),
+                            );
+
+                            // How to Play button
+                            create_menu_button(
+                                parent,
+                                "HOW TO PLAY",
+                                MenuButtonAction::HowToPlay,
+                                button_node.clone(),
+                                button_text_font.clone(),
+                                colors,
+                                false,
                             );
 
                             // Settings button
@@ -938,6 +1013,10 @@ fn create_menu_button_with_icon(
                         game_state.set(AppState::Game);
                         menu_state.set(MenuState::Disabled);
                     }
+                    MenuButtonAction::HowToPlay => {
+                        game_state.set(AppState::HowToPlay);
+                        menu_state.set(MenuState::Disabled);
+                    }
 					MenuButtonAction::Load => {
 						menu_state.set(MenuState::Load);
                     }
@@ -972,13 +1051,78 @@ fn create_menu_button_with_icon(
         }
     }
 
+    fn setup_audio_if_needed(
+        mut commands: Commands,
+        asset_server: Res<AssetServer>,
+        audio_settings: Res<AudioSettings>,
+        config: Res<GameConfig>,
+        mut menu_initialized: ResMut<MenuInitialized>,
+        _game_audio: Option<Res<GameAudio>>,
+    ) {
+        // Only start audio if it hasn't been started yet
+        if !menu_initialized.audio_started {
+            println!("Starting audio for the first time with volume: {}", audio_settings.volume);
+            
+            let background_music = asset_server.load(&config.assets.sounds.menu_theme);
+            
+            // Start playing background music
+            let audio_entity = commands.spawn((
+                AudioPlayer::new(background_music.clone()),
+                PlaybackSettings::LOOP.with_volume(Volume::Linear(audio_settings.volume)),
+            )).id();
+            
+            println!("Spawned audio entity: {:?}", audio_entity);
+            
+            let audio = GameAudio {
+                background_music,
+                music_entity: Some(audio_entity),
+                music_sink: Some(audio_entity),
+            };
+            commands.insert_resource(audio);
+            menu_initialized.audio_started = true;
+            println!("Audio setup complete - music will continue playing across screens");
+        } else {
+            println!("Audio already playing - keeping existing music");
+        }
+    }
+
     fn setup_audio(
         mut commands: Commands,
         asset_server: Res<AssetServer>,
         audio_settings: Res<AudioSettings>,
         config: Res<GameConfig>,
+        game_audio: Option<Res<GameAudio>>,
+        audio_sink_query: Query<Entity, With<AudioSink>>,
     ) {
         println!("Setting up audio with initial volume: {}", audio_settings.volume);
+        
+        // Stop and despawn any existing audio entities (safely)
+        if let Some(existing_audio) = game_audio {
+            if let Some(entity) = existing_audio.music_entity {
+                println!("Stopping existing audio entity: {:?}", entity);
+                match commands.get_entity(entity) {
+                    Ok(mut entity_commands) => {
+                        entity_commands.despawn();
+                    }
+                    Err(_) => {
+                        println!("Entity {:?} no longer exists", entity);
+                    }
+                }
+            }
+        }
+        
+        // Also clean up any orphaned AudioSink entities (safely)
+        for entity in audio_sink_query.iter() {
+            println!("Cleaning up orphaned audio entity: {:?}", entity);
+            match commands.get_entity(entity) {
+                Ok(mut entity_commands) => {
+                    entity_commands.despawn();
+                }
+                Err(_) => {
+                    println!("Entity {:?} no longer exists", entity);
+                }
+            }
+        }
         
         let background_music = asset_server.load(&config.assets.sounds.menu_theme);
         
@@ -988,7 +1132,7 @@ fn create_menu_button_with_icon(
             PlaybackSettings::LOOP.with_volume(Volume::Linear(audio_settings.volume)),
         )).id();
         
-        println!("Spawned audio entity: {:?}", audio_entity);
+        println!("Spawned new audio entity: {:?}", audio_entity);
         
         let audio = GameAudio {
             background_music,

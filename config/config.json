@@ -25,6 +25,11 @@
 				"path_pattern": "backgrounds/dolphin/frame_{:04}.png",
 				"frame_count": 120,
 				"fps": 15
+			},
+			"transition_frames": {
+				"path_pattern": "transitions/frames/frame_{:04}.png",
+				"frame_count": 60,
+				"fps": 30
 			}
 		}
 	},

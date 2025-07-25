@@ -1,9 +1,18 @@
 use bevy::prelude::*;
 
-use crate::ui::{app::GameSettings, screens::game::game::AITimeText};
+use crate::ui::{app::GameSettings, screens::{game::game::AITimeText, menu::AudioSettings}};
 
 #[derive(Component)]
 pub struct GameSettingsPanel;
+
+#[derive(Component)]
+pub struct VolumeUp;
+
+#[derive(Component)]
+pub struct VolumeDown;
+
+#[derive(Component)]
+pub struct VolumeDisplay;
 
 pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &GameSettings) {
     builder
@@ -54,13 +63,15 @@ pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &
 				spawn_timer_row(builder, "AI Time", "");
             }
 
-
             // Time Limit
             let time_limit = match game_settings.time_limit {
                 Some(seconds) => format!("{}s", seconds),
                 None => "Unlimited".to_string(),
             };
             spawn_setting_row(builder, "Time Limit", &time_limit);
+
+            // Volume Control Section
+            spawn_volume_control(builder);
         });
 }
 
@@ -138,5 +149,128 @@ fn spawn_timer_row(builder: &mut ChildSpawnerCommands, label: &str, value: &str)
                         ..default()
                     },
                 ));
+        });
+}
+
+fn spawn_volume_control(builder: &mut ChildSpawnerCommands) {
+    // Volume control section header
+    builder.spawn((
+        Text::new("Audio"),
+        TextFont {
+            font_size: 20.0,
+            ..default()
+        },
+        TextColor(Color::WHITE),
+        Node {
+            margin: UiRect::vertical(Val::Px(10.0)),
+            ..default()
+        },
+    ));
+
+    // Volume control row
+    builder
+        .spawn((
+            Node {
+                display: Display::Flex,
+                flex_direction: FlexDirection::Row,
+                justify_content: JustifyContent::SpaceBetween,
+                align_items: AlignItems::Center,
+                width: Val::Percent(100.0),
+                padding: UiRect::all(Val::Px(8.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.08, 0.08, 0.08)),
+            BorderRadius::all(Val::Px(4.0)),
+        ))
+        .with_children(|builder| {
+            // Volume label
+            builder.spawn((
+                Text::new("Volume"),
+                TextFont {
+                    font_size: 16.0,
+                    ..default()
+                },
+                TextColor(Color::srgb(0.8, 0.8, 0.8)),
+            ));
+
+            // Volume controls container
+            builder.spawn((
+                Node {
+                    display: Display::Flex,
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    column_gap: Val::Px(8.0),
+                    ..default()
+                },
+            )).with_children(|builder| {
+                // Volume down button
+                builder.spawn((
+                    Button,
+                    Node {
+                        width: Val::Px(30.0),
+                        height: Val::Px(30.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        border: UiRect::all(Val::Px(1.0)),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
+                    BorderColor(Color::srgb(0.4, 0.4, 0.4)),
+                    BorderRadius::all(Val::Px(4.0)),
+                    VolumeDown,
+                )).with_children(|builder| {
+                    builder.spawn((
+                        Text::new("-"),
+                        TextFont {
+                            font_size: 16.0,
+                            ..default()
+                        },
+                        TextColor(Color::WHITE),
+                    ));
+                });
+
+                // Volume display
+                builder.spawn((
+                    Text::new("50%"),
+                    TextFont {
+                        font_size: 14.0,
+                        ..default()
+                    },
+                    TextColor(Color::WHITE),
+                    VolumeDisplay,
+                    Node {
+                        width: Val::Px(40.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                ));
+
+                // Volume up button
+                builder.spawn((
+                    Button,
+                    Node {
+                        width: Val::Px(30.0),
+                        height: Val::Px(30.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        border: UiRect::all(Val::Px(1.0)),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
+                    BorderColor(Color::srgb(0.4, 0.4, 0.4)),
+                    BorderRadius::all(Val::Px(4.0)),
+                    VolumeUp,
+                )).with_children(|builder| {
+                    builder.spawn((
+                        Text::new("+"),
+                        TextFont {
+                            font_size: 16.0,
+                            ..default()
+                        },
+                        TextColor(Color::WHITE),
+                    ));
+                });
+            });
         });
 }

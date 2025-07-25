@@ -1,7 +1,24 @@
 use std::time::{Duration, Instant};
 
 use bevy::prelude::*;
-use crate::{ai::transposition::TranspositionTable, core::{board::Player, state::GameState}, interface::utils::{find_best_move, find_best_move_timed}, ui::{app::{AppState, GameSettings}, screens::{game::{self, board::{BoardRoot, BoardUtils, PreviewDot}, settings::spawn_settings_panel}, utils::despawn_screen}}};
+use crate::{
+    ai::transposition::TranspositionTable, 
+    core::{board::Player, state::GameState}, 
+    interface::utils::{find_best_move, find_best_move_timed}, 
+    ui::{
+        app::{AppState, GameSettings}, 
+        screens::{
+            game::{
+                board::{BoardRoot, BoardUtils, PreviewDot}, 
+                settings::{spawn_settings_panel, VolumeUp, VolumeDown, VolumeDisplay}
+            }, 
+            utils::despawn_screen,
+            menu::{AudioSettings, GameAudio},
+            splash::PreloadedStones,
+        },
+        theme::ThemeManager,
+    }
+};
 
 // Game status resource
 #[derive(Resource, Default)]
@@ -12,7 +29,7 @@ pub enum GameStatus {
     GameOver,
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub struct OnGameScreen;
 #[derive(Component)]
 pub struct Stone(Player);
@@ -52,12 +69,18 @@ pub fn game_plugin(app: &mut App) {
                 update_available_placement.run_if(on_event::<MovePlayed>),
                 toggle_pause,
                 update_ai_time_display.run_if(on_event::<UpdateAITimeDisplay>),
+                handle_game_volume_control,
+                update_game_volume_display,
             ).run_if(in_state(AppState::Game)),
         )
         .add_systems(OnExit(AppState::Game), despawn_screen::<OnGameScreen>);
 }
 
-fn setup_game_ui(mut commands: Commands, game_settings: Res<GameSettings>) {
+fn setup_game_ui(
+    mut commands: Commands, 
+    game_settings: Res<GameSettings>,
+    theme_manager: Res<ThemeManager>,
+) {
     commands
         .spawn((
             Node {
@@ -124,6 +147,7 @@ pub fn update_available_placement(
 
 pub fn place_stone(
     mut commands: Commands,
+    preloaded_stones: Res<PreloadedStones>,
     board_query: Query<Entity, With<BoardRoot>>,
     mut game_state: ResMut<GameState>,
     mut ev_stone_placement: EventReader<StonePlacement>,
@@ -135,13 +159,8 @@ pub fn place_stone(
         game_state.make_move((ev.x, ev.y));
 
         let player = game_state.current_player;
-        let color = match player {
-            Player::Min => Color::BLACK,
-            Player::Max => Color::WHITE,
-        };
 
-        // Despawn captured stones
-        //let captured_positions = game_state.get_captured_positions().unwrap_or_default();
+        // Despawn captured stones cleanly
         for (stone_entity, stone_cell, _) in stones.iter() {
             if game_state.board.is_empty_position(stone_cell.x, stone_cell.y) {
                 info!("Despawning captured stone at x: {}, y: {}", stone_cell.x, stone_cell.y);
@@ -151,13 +170,22 @@ pub fn place_stone(
 
         // Spawn new stone
         if let Ok(board_entity) = board_query.single() {
+            let is_black = player == Player::Min;
+            
             commands.entity(board_entity).with_children(|builder| {
+                // Use preloaded stone images
+                let stone_handle = if is_black {
+                    preloaded_stones.pink_stone.clone()  // Pink for black stones
+                } else {
+                    preloaded_stones.blue_stone.clone()  // Blue for white stones  
+                };
+                
+                // Spawn stone with preloaded image
                 builder.spawn((
                     BoardUtils::stone_node(ev.x, ev.y, BoardUtils::STONE_SIZE),
-                    BackgroundColor(color),
+                    ImageNode::new(stone_handle),
                     Stone(player),
-                    BorderRadius::all(Val::Percent(50.0)),
-                    ZIndex(20),
+                    ZIndex(15),
                     OnGameScreen,
                     GridCell { x: ev.x, y: ev.y },
                 ));
@@ -298,5 +326,75 @@ pub fn toggle_pause(
             }
             GameStatus::GameOver => GameStatus::GameOver,
         };
+    }
+}
+
+pub fn handle_game_volume_control(
+    volume_up_query: Query<&Interaction, (Changed<Interaction>, With<VolumeUp>, With<Button>)>,
+    volume_down_query: Query<&Interaction, (Changed<Interaction>, With<VolumeDown>, With<Button>)>,
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut audio_settings: ResMut<AudioSettings>,
+    mut audio_sink_query: Query<&mut AudioSink>,
+    game_audio: Option<Res<GameAudio>>,
+) {
+    let mut volume_changed = false;
+    
+    // Handle volume up button
+    for interaction in volume_up_query.iter() {
+        if *interaction == Interaction::Pressed {
+            let old_volume = audio_settings.volume;
+            audio_settings.volume = (audio_settings.volume + 0.1).min(1.0);
+            volume_changed = true;
+            info!("GAME VOLUME UP: {} -> {}", old_volume, audio_settings.volume);
+        }
+    }
+    
+    // Handle volume down button
+    for interaction in volume_down_query.iter() {
+        if *interaction == Interaction::Pressed {
+            let old_volume = audio_settings.volume;
+            audio_settings.volume = (audio_settings.volume - 0.1).max(0.0);
+            volume_changed = true;
+            info!("GAME VOLUME DOWN: {} -> {}", old_volume, audio_settings.volume);
+        }
+    }
+    
+    // Handle keyboard controls for volume (only if not paused)
+    if keyboard_input.just_pressed(KeyCode::Equal) || keyboard_input.just_pressed(KeyCode::NumpadAdd) {
+        let old_volume = audio_settings.volume;
+        audio_settings.volume = (audio_settings.volume + 0.1).min(1.0);
+        volume_changed = true;
+        info!("GAME KEYBOARD UP: {} -> {}", old_volume, audio_settings.volume);
+    }
+    if keyboard_input.just_pressed(KeyCode::Minus) || keyboard_input.just_pressed(KeyCode::NumpadSubtract) {
+        let old_volume = audio_settings.volume;
+        audio_settings.volume = (audio_settings.volume - 0.1).max(0.0);
+        volume_changed = true;
+        info!("GAME KEYBOARD DOWN: {} -> {}", old_volume, audio_settings.volume);
+    }
+    
+    // Apply volume changes using AudioSink component
+    if volume_changed {
+        if let Some(audio) = game_audio {
+            if let Some(entity) = audio.music_entity {
+                if let Ok(mut sink) = audio_sink_query.get_mut(entity) {
+                    sink.set_volume(bevy::audio::Volume::Linear(audio_settings.volume));
+                    info!("Updated game AudioSink volume to: {}", audio_settings.volume);
+                } else {
+                    info!("Could not find AudioSink component on entity in game");
+                }
+            }
+        }
+    }
+}
+
+pub fn update_game_volume_display(
+    audio_settings: Res<AudioSettings>,
+    mut volume_display_query: Query<&mut Text, With<VolumeDisplay>>,
+) {
+    if audio_settings.is_changed() {
+        for mut text in volume_display_query.iter_mut() {
+            text.0 = format!("{}%", (audio_settings.volume * 100.0) as u32);
+        }
     }
 }

@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-
 use bevy::window::{PresentMode, WindowTheme};
 
 use crate::core::state::GameState;
@@ -8,15 +7,18 @@ use crate::ui::display::display::make_visible;
 use crate::ui::screens::game::game::game_plugin;
 use crate::ui::screens::menu::menu_plugin;
 use crate::ui::screens::splash::splash_plugin;
+use crate::ui::screens::tutorial::tutorial_plugin;
 use crate::ui::config::config_plugin;
+use crate::ui::theme::ThemeManager;
 
-#[derive(Clone, Copy, Default, Eq, PartialEq, Debug, Hash, States)]
+#[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
 pub enum AppState {
 	#[default]
 	Splash,
 	Menu,
 	GameOptions,
 	Game,
+	HowToPlay,
 	Credit
 }
 
@@ -95,6 +97,7 @@ impl GomokuApp {
 		self.app
 		.insert_resource(GameState::new(settings.board_size, settings.minimum_chain_to_win))
         .insert_resource(settings)
+        .insert_resource(ThemeManager::new())
         .init_resource::<TranspositionTable>();
 
 	}
@@ -109,7 +112,7 @@ impl GomokuApp {
                 make_visible,
             ),
         )
-        .add_plugins((splash_plugin, menu_plugin, game_plugin, config_plugin));
+        .add_plugins((splash_plugin, menu_plugin, game_plugin, tutorial_plugin, config_plugin));
 	}
 
 	pub fn start(&mut self) {

@@ -50,6 +50,7 @@ pub struct SoundAssets {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnimationAssets {
     pub main_menu_frames: FrameAnimation,
+    pub transition_frames: FrameAnimation,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -173,6 +174,11 @@ impl GameConfig {
                         path_pattern: "backgrounds/dolphin/frame_{:04}.png".to_string(),
                         frame_count: 120,
                         fps: 15,
+                    },
+                    transition_frames: FrameAnimation {
+                        path_pattern: "transitions/frames/frame_{:04}.png".to_string(),
+                        frame_count: 300,
+                        fps: 30,
                     },
                 },
             },

@@ -3,6 +3,13 @@ use bevy::prelude::*;
 
 use crate::ui::{app::AppState, screens::utils::despawn_screen};
 
+// Resource to hold preloaded stone images
+#[derive(Resource)]
+pub struct PreloadedStones {
+    pub pink_stone: Handle<Image>,
+    pub blue_stone: Handle<Image>,
+}
+
 pub fn splash_plugin(app: &mut App) {
 	app
 		.add_systems(OnEnter(AppState::Splash), splash_setup)
@@ -18,6 +25,17 @@ struct SplashTimer(Timer);
 
 fn splash_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 	let icon = asset_server.load("le_cat.png");
+	
+	// Preload stone images during splash screen
+	let pink_stone = asset_server.load("icons/synthwave/pink-stone.png");
+	let blue_stone = asset_server.load("icons/synthwave/blue-stone.png");
+	
+	// Insert preloaded stones resource
+	commands.insert_resource(PreloadedStones {
+		pink_stone,
+		blue_stone,
+	});
+	
 	commands.spawn((
 		Node {
 			align_items: AlignItems::Center,

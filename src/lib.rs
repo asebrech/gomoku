@@ -34,6 +34,7 @@ pub mod ui {
         }
         pub mod menu;
         pub mod splash;
+        pub mod tutorial;
         pub mod utils;
     }
 }
