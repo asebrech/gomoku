@@ -7,13 +7,14 @@ use crate::{
     interface::utils::{find_best_move, find_best_move_timed}, 
     ui::{
         app::{AppState, GameSettings}, 
+        config::GameConfig,
         screens::{
             game::{
                 board::{BoardRoot, BoardUtils, PreviewDot}, 
                 settings::{spawn_settings_panel, VolumeUp, VolumeDown, VolumeDisplay}
             }, 
             utils::despawn_screen,
-            menu::{AudioSettings, GameAudio},
+            menu::{GameAudio},
             splash::PreloadedStones,
         },
         theme::ThemeManager,
@@ -333,53 +334,77 @@ pub fn handle_game_volume_control(
     volume_up_query: Query<&Interaction, (Changed<Interaction>, With<VolumeUp>, With<Button>)>,
     volume_down_query: Query<&Interaction, (Changed<Interaction>, With<VolumeDown>, With<Button>)>,
     keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut audio_settings: ResMut<AudioSettings>,
+    mut config: ResMut<GameConfig>,
     mut audio_sink_query: Query<&mut AudioSink>,
     game_audio: Option<Res<GameAudio>>,
 ) {
     let mut volume_changed = false;
+    let (current_volume, mut muted) = config.get_audio_settings();
+    
+    // Convert to percentage (0-10) for clean increments
+    let mut volume_percent = (current_volume * 10.0).round() as i32;
     
     // Handle volume up button
     for interaction in volume_up_query.iter() {
         if *interaction == Interaction::Pressed {
-            let old_volume = audio_settings.volume;
-            audio_settings.volume = (audio_settings.volume + 0.1).min(1.0);
+            let old_percent = volume_percent;
+            volume_percent = (volume_percent + 1).min(10);
+            muted = false;
             volume_changed = true;
-            info!("GAME VOLUME UP: {} -> {}", old_volume, audio_settings.volume);
+            info!("GAME VOLUME UP: {}% -> {}%", old_percent * 10, volume_percent * 10);
         }
     }
     
     // Handle volume down button
     for interaction in volume_down_query.iter() {
         if *interaction == Interaction::Pressed {
-            let old_volume = audio_settings.volume;
-            audio_settings.volume = (audio_settings.volume - 0.1).max(0.0);
+            let old_percent = volume_percent;
+            volume_percent = (volume_percent - 1).max(0);
+            if volume_percent == 0 {
+                muted = true;
+            }
             volume_changed = true;
-            info!("GAME VOLUME DOWN: {} -> {}", old_volume, audio_settings.volume);
+            info!("GAME VOLUME DOWN: {}% -> {}%", old_percent * 10, volume_percent * 10);
         }
     }
     
     // Handle keyboard controls for volume (only if not paused)
     if keyboard_input.just_pressed(KeyCode::Equal) || keyboard_input.just_pressed(KeyCode::NumpadAdd) {
-        let old_volume = audio_settings.volume;
-        audio_settings.volume = (audio_settings.volume + 0.1).min(1.0);
+        let old_percent = volume_percent;
+        volume_percent = (volume_percent + 1).min(10);
+        muted = false;
         volume_changed = true;
-        info!("GAME KEYBOARD UP: {} -> {}", old_volume, audio_settings.volume);
+        info!("GAME KEYBOARD UP: {}% -> {}%", old_percent * 10, volume_percent * 10);
     }
     if keyboard_input.just_pressed(KeyCode::Minus) || keyboard_input.just_pressed(KeyCode::NumpadSubtract) {
-        let old_volume = audio_settings.volume;
-        audio_settings.volume = (audio_settings.volume - 0.1).max(0.0);
+        let old_percent = volume_percent;
+        volume_percent = (volume_percent - 1).max(0);
+        if volume_percent == 0 {
+            muted = true;
+        }
         volume_changed = true;
-        info!("GAME KEYBOARD DOWN: {} -> {}", old_volume, audio_settings.volume);
+        info!("GAME KEYBOARD DOWN: {}% -> {}%", old_percent * 10, volume_percent * 10);
     }
     
-    // Apply volume changes using AudioSink component
+    // Apply volume changes and save to config
     if volume_changed {
+        // Convert back to float (0.0-1.0) with clean values
+        let volume = volume_percent as f32 / 10.0;
+        
+        // Save to persistent config
+        if let Err(e) = config.save_audio_settings(volume, muted) {
+            info!("Failed to save audio settings: {}", e);
+        } else {
+            info!("Saved audio settings: volume={}, muted={}", volume, muted);
+        }
+        
+        // Apply to current audio
+        let effective_volume = if muted { 0.0 } else { volume };
         if let Some(audio) = game_audio {
             if let Some(entity) = audio.music_entity {
                 if let Ok(mut sink) = audio_sink_query.get_mut(entity) {
-                    sink.set_volume(bevy::audio::Volume::Linear(audio_settings.volume));
-                    info!("Updated game AudioSink volume to: {}", audio_settings.volume);
+                    sink.set_volume(bevy::audio::Volume::Linear(effective_volume));
+                    info!("Updated game AudioSink volume to: {}", effective_volume);
                 } else {
                     info!("Could not find AudioSink component on entity in game");
                 }
@@ -389,12 +414,17 @@ pub fn handle_game_volume_control(
 }
 
 pub fn update_game_volume_display(
-    audio_settings: Res<AudioSettings>,
+    config: Res<GameConfig>,
     mut volume_display_query: Query<&mut Text, With<VolumeDisplay>>,
 ) {
-    if audio_settings.is_changed() {
+    if config.is_changed() {
+        let (volume, muted) = config.get_audio_settings();
         for mut text in volume_display_query.iter_mut() {
-            text.0 = format!("{}%", (audio_settings.volume * 100.0) as u32);
+            if muted {
+                text.0 = "MUTED".to_string();
+            } else {
+                text.0 = format!("{}%", (volume * 100.0) as u32);
+            }
         }
     }
 }

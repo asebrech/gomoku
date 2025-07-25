@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::ui::{app::GameSettings, screens::{game::game::AITimeText, menu::AudioSettings}};
+use crate::ui::{app::GameSettings, config::GameConfig, screens::{game::game::AITimeText}};
 
 #[derive(Component)]
 pub struct GameSettingsPanel;

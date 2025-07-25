@@ -8,6 +8,7 @@ pub struct GameConfig {
     pub colors: ColorConfig,
     pub ui: UiConfig,
     pub game: GameSettings,
+    pub settings: UserSettings,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -110,6 +111,17 @@ pub struct GameSettings {
     pub ai_difficulty: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserSettings {
+    pub audio: AudioSettings,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AudioSettings {
+    pub volume: f32,
+    pub muted: bool,
+}
+
 impl GameConfig {
     pub fn load_from_file(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let config_content = std::fs::read_to_string(path)?;
@@ -144,6 +156,18 @@ impl GameConfig {
     pub fn get_animation_frame_path(&self, frame_number: u32) -> String {
         self.assets.animations.main_menu_frames.path_pattern
             .replace("{:04}", &format!("{:04}", frame_number))
+    }
+
+    // Save current audio settings to the config file
+    pub fn save_audio_settings(&mut self, volume: f32, muted: bool) -> Result<(), Box<dyn std::error::Error>> {
+        self.settings.audio.volume = volume;
+        self.settings.audio.muted = muted;
+        self.save_to_file("config/config.json")
+    }
+
+    // Get current audio settings
+    pub fn get_audio_settings(&self) -> (f32, bool) {
+        (self.settings.audio.volume, self.settings.audio.muted)
     }
 
     pub fn default() -> Self {
@@ -219,6 +243,12 @@ impl GameConfig {
                 board_size: 15,
                 win_condition: 5,
                 ai_difficulty: "medium".to_string(),
+            },
+            settings: UserSettings {
+                audio: AudioSettings {
+                    volume: 0.5,
+                    muted: false,
+                },
             },
         }
     }
