@@ -1,5 +1,5 @@
 use gomoku::ai::transposition::TranspositionTable;
-use gomoku::ai::minimax::{iterative_deepening_search, SearchResult};
+use gomoku::ai::minimax::iterative_deepening_search;
 use gomoku::core::state::GameState;
 use gomoku::core::board::Player;
 use gomoku::interface::utils::{find_best_move_iterative, find_best_move_timed};

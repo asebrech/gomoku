@@ -1,5 +1,5 @@
 use gomoku::core::board::{Board, Player};
-use gomoku::core::moves::{MoveHandler, RuleValidator};
+use gomoku::core::moves::MoveHandler;
 
 #[test]
 fn test_first_move_center_only() {

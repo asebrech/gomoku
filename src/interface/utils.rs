@@ -18,15 +18,12 @@ pub fn find_best_move_legacy(state: &mut GameState, depth: i32, tt: &mut Transpo
         i32::MAX
     };
 
-    // Record initial stats for this search
-    //let (initial_hits, initial_misses, initial_collisions) = tt.get_stats();
-
     let mut moves = state.get_possible_moves();
     prioritize_defensive_moves(state, &mut moves);
 
     for mv in moves {
         state.make_move(mv);
-        let score = minimax(
+        let (score, _) = minimax(
             state,
             depth - 1,
             i32::MIN,
@@ -44,21 +41,6 @@ pub fn find_best_move_legacy(state: &mut GameState, depth: i32, tt: &mut Transpo
         }
     }
 
-    // Print transposition table statistics for this search
-    /*let (final_hits, final_misses, final_collisions) = tt.get_stats();
-    let search_hits = final_hits - initial_hits;
-    let search_misses = final_misses - initial_misses;
-    let search_collisions = final_collisions - initial_collisions;
-    let total_probes = search_hits + search_misses;
-    
-    if total_probes > 0 {
-        let hit_rate = search_hits as f64 / total_probes as f64 * 100.0;
-        println!(
-            "🔍 AI Search Stats - Depth: {}, Player: {:?}, TT Hit Rate: {:.1}% ({}/{} probes), Collisions: {}, Table Size: {}",
-            depth, current_player, hit_rate, search_hits, total_probes, search_collisions, tt.size()
-        );
-    }*/
-
     best_move
 }
 
@@ -69,6 +51,7 @@ pub fn find_best_move_iterative(
 ) -> Option<(usize, usize)> {
     let result = iterative_deepening_search(state, max_depth, None, tt);
     
+    #[cfg(debug_assertions)]
     println!(
         "🧠 Iterative deepening completed: depth={}, score={}, nodes={}, time={:?}",
         result.depth_reached, result.score, result.nodes_searched, result.time_elapsed
@@ -85,6 +68,7 @@ pub fn find_best_move_timed(
 ) -> Option<(usize, usize)> {
     let result = iterative_deepening_search(state, max_depth, Some(time_limit), tt);
     
+    #[cfg(debug_assertions)]
     println!(
         "⏱️  Timed search completed: depth={}/{}, score={}, nodes={}, time={:?}",
         result.depth_reached, max_depth, result.score, result.nodes_searched, result.time_elapsed

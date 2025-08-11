@@ -11,19 +11,20 @@ pub fn minimax(
     mut beta: i32,
     maximizing_player: bool,
     tt: &mut TranspositionTable,
-) -> i32 {
+) -> (i32, u64) {
     let original_alpha = alpha;
     let hash_key = state.hash();
+    let mut nodes_visited = 1u64; // Count this node
     
     let tt_result = tt.probe(hash_key, depth, alpha, beta);
     if tt_result.cutoff {
-        return tt_result.value.unwrap();
+        return (tt_result.value.unwrap(), nodes_visited);
     }
 
     if depth == 0 || state.is_terminal() {
         let eval = Heuristic::evaluate(state, depth);
         tt.store(hash_key, eval, depth, EntryType::Exact, None);
-        return eval;
+        return (eval, nodes_visited);
     }
 
     let mut moves = state.get_possible_moves();
@@ -42,8 +43,9 @@ pub fn minimax(
         value = i32::MIN;
         for move_ in moves {
             state.make_move(move_);
-            let eval = minimax(state, depth - 1, alpha, beta, false, tt);
+            let (eval, child_nodes) = minimax(state, depth - 1, alpha, beta, false, tt);
             state.undo_move(move_);
+            nodes_visited += child_nodes;
             
             if eval > value {
                 value = eval;
@@ -59,8 +61,9 @@ pub fn minimax(
         value = i32::MAX;
         for move_ in moves {
             state.make_move(move_);
-            let eval = minimax(state, depth - 1, alpha, beta, true, tt);
+            let (eval, child_nodes) = minimax(state, depth - 1, alpha, beta, true, tt);
             state.undo_move(move_);
+            nodes_visited += child_nodes;
             
             if eval < value {
                 value = eval;
@@ -83,7 +86,7 @@ pub fn minimax(
     };
     
     tt.store(hash_key, value, depth, entry_type, best_move);
-    value
+    (value, nodes_visited)
 }
 
 #[derive(Debug)]
@@ -164,7 +167,7 @@ pub fn iterative_deepening_search(
             }
 
             state.make_move(mv);
-            let score = minimax(
+            let (score, child_nodes) = minimax(
                 state,
                 depth - 1,
                 i32::MIN,
@@ -173,7 +176,7 @@ pub fn iterative_deepening_search(
                 tt,
             );
             state.undo_move(mv);
-            nodes_searched += 1;
+            nodes_searched += child_nodes;
 
             let is_better = if state.current_player == crate::core::board::Player::Max {
                 score > iteration_best_score
@@ -203,6 +206,8 @@ pub fn iterative_deepening_search(
         }
 
         let depth_time = depth_start_time.elapsed();
+        // Optional debug output - can be enabled with a feature flag
+        #[cfg(debug_assertions)]
         println!(
             "Depth {} completed in {:?}: best_move={:?}, score={}, nodes={}",
             depth, depth_time, best_move, best_score, nodes_searched
