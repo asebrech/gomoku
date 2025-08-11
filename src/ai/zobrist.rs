@@ -50,13 +50,31 @@ impl ZobristHash {
     pub fn compute_hash(&self, state: &crate::core::state::GameState) -> u64 {
         let mut hash = 0u64;
         
-        for row in 0..self.board_size {
-            for col in 0..self.board_size {
-                if let Some(player) = state.board.get_player(row, col) {
-                    let pos_idx = self.position_index(row, col);
-                    let player_idx = Self::player_index(player);
-                    hash ^= self.position_keys[pos_idx][player_idx];
+        // Use bitboard operations instead of iterating through the entire board
+        for u64_idx in 0..state.board.u64_count {
+            let max_bits = state.board.max_bits[u64_idx];
+            let min_bits = state.board.min_bits[u64_idx];
+            
+            // Process max player stones
+            let mut remaining_max = max_bits;
+            while remaining_max != 0 {
+                let bit_pos = remaining_max.trailing_zeros() as usize;
+                let global_pos = u64_idx * 64 + bit_pos;
+                if global_pos < self.position_keys.len() {
+                    hash ^= self.position_keys[global_pos][0]; // Max player index = 0
                 }
+                remaining_max &= remaining_max - 1; // Clear the lowest set bit
+            }
+            
+            // Process min player stones
+            let mut remaining_min = min_bits;
+            while remaining_min != 0 {
+                let bit_pos = remaining_min.trailing_zeros() as usize;
+                let global_pos = u64_idx * 64 + bit_pos;
+                if global_pos < self.position_keys.len() {
+                    hash ^= self.position_keys[global_pos][1]; // Min player index = 1
+                }
+                remaining_min &= remaining_min - 1; // Clear the lowest set bit
             }
         }
         
@@ -74,11 +92,10 @@ impl ZobristHash {
         current_hash ^ self.position_keys[pos_idx][player_idx] ^ self.player_key
     }
     
+    // Zobrist hashing is symmetric - making and undoing a move use the same XOR operation
     pub fn update_hash_undo_move(&self, current_hash: u64, row: usize, col: usize, player: Player) -> u64 {
-        let pos_idx = self.position_index(row, col);
-        let player_idx = Self::player_index(player);
-        
-        current_hash ^ self.position_keys[pos_idx][player_idx] ^ self.player_key
+        // Same as make_move since XOR is its own inverse
+        self.update_hash_make_move(current_hash, row, col, player)
     }
     
     pub fn update_hash_capture(&self, current_hash: u64, captured_positions: &[(usize, usize)], captured_player: Player) -> u64 {

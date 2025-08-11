@@ -419,8 +419,8 @@ fn test_transposition_table_benefits() {
     assert_eq!(second_result.depth_reached, 4);
     
     // Get TT statistics
-    let (hits, misses, collisions) = tt.get_stats();
-    println!("TT stats after searches: hits={}, misses={}, collisions={}", hits, misses, collisions);
+    let (hits, misses) = tt.get_stats();
+    println!("TT stats after searches: hits={}, misses={}", hits, misses);
     
     // Should have some hits from the second search
     assert!(hits > 0);
