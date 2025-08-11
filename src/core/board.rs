@@ -30,7 +30,7 @@ pub struct Board {
 impl Board {
     pub fn new(size: usize) -> Self {
         let total_cells = size * size;
-        let u64_count = ((total_cells + 63) / 64) as usize;
+        let u64_count = (total_cells + 63) / 64;
         Board {
             max_bits: vec![0u64; u64_count],
             min_bits: vec![0u64; u64_count],
@@ -45,7 +45,7 @@ impl Board {
         row * self.size + col
     }
 
-    pub fn set_bit(bits: &mut Vec<u64>, idx: usize) {
+    pub fn set_bit(bits: &mut [u64], idx: usize) {
         let array_idx = idx / 64;
         if array_idx >= bits.len() {
             return;
@@ -54,7 +54,7 @@ impl Board {
         bits[array_idx] |= 1u64 << bit_idx;
     }
 
-    pub fn clear_bit(bits: &mut Vec<u64>, idx: usize) {
+    pub fn clear_bit(bits: &mut [u64], idx: usize) {
         let array_idx = idx / 64;
         if array_idx >= bits.len() {
             return;

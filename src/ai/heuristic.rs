@@ -140,7 +140,7 @@ impl Heuristic {
         dy: isize,
         player: Player,
         win_condition: usize,
-        analyzed: &mut Vec<Vec<u8>>,
+        analyzed: &mut [Vec<u8>],
         bit_mask: u8,
     ) -> Option<PatternInfo> {
         let (pattern_start_row, pattern_start_col) =
@@ -280,7 +280,7 @@ impl Heuristic {
         dx: isize,
         dy: isize,
         length: usize,
-        analyzed: &mut Vec<Vec<u8>>,
+        analyzed: &mut [Vec<u8>],
         bit_mask: u8,
     ) {
         for i in 0..length {

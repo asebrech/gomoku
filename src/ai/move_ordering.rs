@@ -16,7 +16,7 @@ const ALL_DIRECTIONS: [(isize, isize); 8] = [
 ];
 
 impl MoveOrdering {
-    pub fn order_moves(state: &GameState, moves: &mut Vec<(usize, usize)>) {
+    pub fn order_moves(state: &GameState, moves: &mut [(usize, usize)]) {
         let center = state.board.size / 2;
         moves.sort_unstable_by_key(|&mv| -Self::calculate_move_priority(state, mv, center));
     }
