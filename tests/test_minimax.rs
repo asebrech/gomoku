@@ -283,3 +283,48 @@ fn test_minimax_immediate_win_detection() {
     // Should detect immediate win
     assert!(score > 900_000, "Should detect immediate win, got score: {}", score);
 }
+
+#[test]
+fn test_find_immediate_win_or_block() {
+    use gomoku::ai::minimax::iterative_deepening_search;
+    let mut state = GameState::new(15, 5);
+    let mut tt = TranspositionTable::new_default();
+    
+    // Create immediate win scenario for current player
+    state.board.place_stone(7, 5, Player::Max);
+    state.board.place_stone(7, 6, Player::Max);
+    state.board.place_stone(7, 7, Player::Max);
+    state.board.place_stone(7, 8, Player::Max);
+    state.current_player = Player::Max; // Max can win by playing (7,9)
+    
+    let result = iterative_deepening_search(&mut state, 3, None, &mut tt);
+    
+    // Should find immediate win (either end of the line is valid)
+    assert!(result.best_move.is_some());
+    let chosen_move = result.best_move.unwrap();
+    assert!(chosen_move == (7, 4) || chosen_move == (7, 9), 
+            "Should choose either end of winning line, got {:?}", chosen_move);
+    assert!(result.score > 900_000);
+    assert_eq!(result.depth_reached, 1); // Should terminate early
+}
+
+#[test]
+fn test_iterative_deepening_progressive_improvement() {
+    use gomoku::ai::minimax::iterative_deepening_search;
+    let mut state = GameState::new(15, 5);
+    let mut tt = TranspositionTable::new_default();
+    
+    // Create complex position
+    state.board.place_stone(7, 7, Player::Max);
+    state.board.place_stone(8, 8, Player::Min);
+    state.board.place_stone(7, 8, Player::Max);
+    state.board.place_stone(8, 7, Player::Min);
+    state.current_player = Player::Max;
+    
+    let result = iterative_deepening_search(&mut state, 4, None, &mut tt);
+    
+    // Should reach reasonable depth
+    assert!(result.depth_reached >= 3, "Should reach depth 3+, got: {}", result.depth_reached);
+    assert!(result.best_move.is_some());
+    assert!(result.nodes_searched > 0);
+}

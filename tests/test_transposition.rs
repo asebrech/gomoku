@@ -293,3 +293,45 @@ fn test_hash_collision_resistance() {
     assert!(success_rate > 0.90, "Success rate too low: {:.2}%", success_rate * 100.0);
 }
 
+#[test]
+fn test_aging_mechanism() {
+    let mut tt = TranspositionTable::new_default();
+    
+    // Store entry with current age
+    tt.store(12345, 500, 10, EntryType::Exact, None);
+    let initial_probe = tt.probe(12345, 10, i32::MIN, i32::MAX);
+    assert!(initial_probe.cutoff && initial_probe.value == Some(500));
+    
+    // Advance age and add more entries
+    tt.advance_age();
+    tt.store(67890, 300, 8, EntryType::Exact, None);
+    
+    // Old entry should still be there initially
+    assert!(tt.probe(12345, 10, i32::MIN, i32::MAX).cutoff);
+    
+    // Advance age multiple times
+    for _ in 0..10 {
+        tt.advance_age();
+    }
+    
+    // Table should still function after aging
+    tt.store(11111, 700, 12, EntryType::Exact, None);
+    assert!(tt.probe(11111, 12, i32::MIN, i32::MAX).cutoff);
+}
+
+#[test] 
+fn test_table_capacity_management() {
+    let mut tt = TranspositionTable::new(50); // Smaller for testing
+    
+    // Fill beyond capacity with varied keys
+    for i in 0..200 {
+        let key = (i as u64).wrapping_mul(0x9e3779b97f4a7c15); // Better distribution
+        tt.store(key, i as i32 * 10, 8, EntryType::Exact, None);
+    }
+    
+    // Recent entries should still be accessible  
+    let last_key = (199_u64).wrapping_mul(0x9e3779b97f4a7c15);
+    let result = tt.probe(last_key, 8, i32::MIN, i32::MAX);
+    assert!(result.cutoff && result.value == Some(1990));
+}
+
