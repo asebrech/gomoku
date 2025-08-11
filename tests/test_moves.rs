@@ -136,3 +136,43 @@ fn test_corner_moves() {
         );
     }
 }
+
+#[test] 
+fn test_double_three_moves_excluded() {
+    use gomoku::core::moves::RuleValidator;
+    
+    let mut board = Board::new(19);
+    
+    // Create a scenario where placing at a specific position would create double-three
+    // Pattern that creates double-three when filled:
+    // . . X . X . .
+    // . X . ? . X .  (? = target position that would create double-three)
+    // . . X . X . .
+    
+    board.place_stone(5, 7, Player::Max);   // Top
+    board.place_stone(5, 9, Player::Max);   // Top  
+    board.place_stone(6, 6, Player::Max);   // Left
+    board.place_stone(6, 10, Player::Max);  // Right
+    board.place_stone(7, 7, Player::Max);   // Bottom
+    board.place_stone(7, 9, Player::Max);   // Bottom
+    
+    // Verify that position (6,8) would create double-three
+    assert!(RuleValidator::creates_double_three(&board, 6, 8, Player::Max));
+    
+    // Now test that MoveHandler excludes this move
+    let moves = MoveHandler::get_possible_moves(&board, Player::Max);
+    
+    // The double-three creating move should NOT be in possible moves
+    assert!(!moves.contains(&(6, 8)), "Double-three move should be excluded from possible moves");
+    
+    // But adjacent valid moves should still be included
+    let valid_adjacent_moves = [
+        (5, 8), (6, 7), (6, 9), (7, 8)  // Adjacent to existing stones
+    ];
+    
+    for &mv in &valid_adjacent_moves {
+        if !RuleValidator::creates_double_three(&board, mv.0, mv.1, Player::Max) {
+            assert!(moves.contains(&mv), "Valid adjacent move {:?} should be included", mv);
+        }
+    }
+}

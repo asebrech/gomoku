@@ -262,3 +262,34 @@ fn test_mixed_operations() {
     assert!(result3b.cutoff && result3b.value == Some(30));
 }
 
+#[test]
+fn test_hash_collision_resistance() {
+    let mut tt = TranspositionTable::new_default();
+    let mut successful_stores = 0;
+    let total_attempts = 500;
+    
+    // Try to force collisions by using keys that might collide
+    for i in 0..total_attempts {
+        let base_key = i as u64;
+        let collision_key = base_key ^ 0x8000000000000000_u64; // Flip top bit
+        
+        tt.store(base_key, i as i32, 1, EntryType::Exact, None);
+        tt.store(collision_key, (i + 1000) as i32, 1, EntryType::Exact, None);
+        
+        // Check if we can retrieve the correct values
+        let result1 = tt.probe(base_key, 1, i32::MIN, i32::MAX);
+        let result2 = tt.probe(collision_key, 1, i32::MIN, i32::MAX);
+        
+        if result1.cutoff && result2.cutoff {
+            if result1.value == Some(i as i32) && result2.value == Some((i + 1000) as i32) {
+                successful_stores += 1;
+            }
+        }
+    }
+    
+    let success_rate = successful_stores as f64 / total_attempts as f64;
+    
+    // Should handle most entries correctly even with potential collisions
+    assert!(success_rate > 0.90, "Success rate too low: {:.2}%", success_rate * 100.0);
+}
+

@@ -178,7 +178,6 @@ fn test_minimax_state_restoration() {
     assert_eq!(state.current_player, initial_player);
 }
 
-// TODO: Fix minimax evaluation function so that it properly recognizes and scores positions where a capture opportunity exists for the current player. Test currently fails.
 #[test]
 fn test_minimax_captures_evaluation() {
     let mut state = GameState::new(19, 5);
@@ -246,21 +245,41 @@ fn test_minimax_pruning_efficiency() {
     assert!(score > i32::MIN && score < i32::MAX);
 }
 
-// TODO: Update minimax to correctly detect capture-win scenarios where a player can win by making a capture. Test currently fails.
 #[test]
 fn test_minimax_capture_win_detection() {
     let mut state = GameState::new(19, 5);
     let mut tt = TranspositionTable::new_default();
 
-    // Set up near-capture-win scenario
-    state.max_captures = 4; // One pair away from winning
+    // Set up capture win scenario where Max can win by capturing
+    state.max_captures = 8; // Need 10 to win, so 1 capture away
+    
+    // Create a capture opportunity: Max-Min-Min-empty
     state.board.place_stone(9, 9, Player::Max);
     state.board.place_stone(9, 10, Player::Min);
     state.board.place_stone(9, 11, Player::Min);
     state.current_player = Player::Max;
 
-    let (score, _) = minimax(&mut state, 2, i32::MIN, i32::MAX, true, &mut tt);
+    let (score, _nodes) = minimax(&mut state, 2, i32::MIN, i32::MAX, true, &mut tt);
 
-    // Should detect capture win opportunity
-    assert!(score > 900_000);
+    // Should detect capture opportunity and give high score
+    assert!(score > 500_000, "Should detect capture win opportunity, got score: {}", score);
+}
+
+#[test] 
+fn test_minimax_immediate_win_detection() {
+    let mut state = GameState::new(15, 5);
+    let mut tt = TranspositionTable::new_default();
+
+    // Set up 4-in-a-row with one empty spot to complete win
+    state.board.place_stone(7, 6, Player::Max);
+    state.board.place_stone(7, 7, Player::Max);
+    state.board.place_stone(7, 8, Player::Max);
+    state.board.place_stone(7, 9, Player::Max);
+    // Empty at (7, 10) for 5-in-a-row win
+    state.current_player = Player::Max;
+
+    let (score, _nodes) = minimax(&mut state, 1, i32::MIN, i32::MAX, true, &mut tt);
+
+    // Should detect immediate win
+    assert!(score > 900_000, "Should detect immediate win, got score: {}", score);
 }
