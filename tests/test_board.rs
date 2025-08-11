@@ -87,31 +87,3 @@ fn test_player_opponent() {
     assert_eq!(Player::Min.opponent(), Player::Max);
 }
 
-#[test]
-fn test_board_hash_consistency() {
-    let mut board1 = Board::new(19);
-    let mut board2 = Board::new(19);
-    
-    // Empty boards should have same hash
-    assert_eq!(board1.hash(), board2.hash());
-    
-    // Same moves should produce same hash
-    board1.place_stone(5, 5, Player::Max);
-    board2.place_stone(5, 5, Player::Max);
-    assert_eq!(board1.hash(), board2.hash());
-    
-    // Different moves should produce different hash
-    board1.place_stone(6, 6, Player::Min);
-    board2.place_stone(7, 7, Player::Min);
-    assert_ne!(board1.hash(), board2.hash());
-}
-
-#[test]
-fn test_board_hash_different_sizes() {
-    let board1 = Board::new(19);
-    let board2 = Board::new(15);
-    
-    // Different sized boards should have different hashes
-    assert_ne!(board1.hash(), board2.hash());
-}
-

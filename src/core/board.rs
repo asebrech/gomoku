@@ -1,4 +1,4 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
+use std::hash::Hash;
 
 use bevy::prelude::*;
 
@@ -181,19 +181,6 @@ impl Board {
         }
 
         total_set_bits == self.total_cells
-    }
-
-    // Note: This hash function is redundant with Zobrist hashing in GameState
-    // Consider removing if not needed for debugging purposes
-    pub fn hash(&self) -> u64 {
-        let mut hasher = DefaultHasher::new();
-        for &b in &self.max_bits {
-            b.hash(&mut hasher);
-        }
-        for &b in &self.min_bits {
-            b.hash(&mut hasher);
-        }
-        hasher.finish()
     }
 
     pub fn count_in_line(
