@@ -57,7 +57,6 @@ impl TranspositionTable {
         
         match self.table.get(&key) {
             Some(existing) => {
-                // Always replace if new entry has greater depth or same depth but newer age
                 if depth > existing.depth || (depth == existing.depth && current_age >= existing.age) {
                     self.table.insert(key, new_entry);
                 }
@@ -146,7 +145,6 @@ impl TranspositionTable {
             entry.age >= cutoff_age || entry.depth > 10
         });
         
-        // If still too many entries, be more aggressive
         if self.table.len() > self.max_size * 3 / 4 {
             let cutoff_age = current_age - 2;
             self.table.retain(|_, entry| {

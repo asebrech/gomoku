@@ -4,7 +4,6 @@ use crate::core::board::Player;
 use std::time::Duration;
 
 pub fn find_best_move(state: &mut GameState, depth: i32, tt: &mut TranspositionTable) -> Option<(usize, usize)> {
-    // Use iterative deepening by default for better performance
     find_best_move_iterative(state, depth, tt)
 }
 
@@ -18,7 +17,6 @@ pub fn find_best_move_legacy(state: &mut GameState, depth: i32, tt: &mut Transpo
     };
 
     let mut moves = state.get_possible_moves();
-    // Use the same sophisticated move ordering as iterative deepening
     crate::ai::move_ordering::MoveOrdering::order_moves(state, &mut moves);
 
     for mv in moves {

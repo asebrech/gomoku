@@ -35,7 +35,6 @@ impl GameState {
             zobrist_hash: zobrist_hash.clone(),
             current_hash: 0,
         };
-        // Compute the initial hash
         state.current_hash = zobrist_hash.compute_hash(&state);
         state
     }

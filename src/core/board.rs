@@ -48,7 +48,7 @@ impl Board {
     pub fn set_bit(bits: &mut Vec<u64>, idx: usize) {
         let array_idx = idx / 64;
         if array_idx >= bits.len() {
-            return; // Bounds check for safety
+            return;
         }
         let bit_idx = (idx % 64) as u32;
         bits[array_idx] |= 1u64 << bit_idx;
@@ -57,7 +57,7 @@ impl Board {
     pub fn clear_bit(bits: &mut Vec<u64>, idx: usize) {
         let array_idx = idx / 64;
         if array_idx >= bits.len() {
-            return; // Bounds check for safety
+            return;
         }
         let bit_idx = (idx % 64) as u32;
         bits[array_idx] &= !(1u64 << bit_idx);
@@ -66,7 +66,7 @@ impl Board {
     pub fn is_bit_set(bits: &[u64], idx: usize) -> bool {
         let array_idx = idx / 64;
         if array_idx >= bits.len() {
-            return false; // Bounds check for safety
+            return false;
         }
         let bit_idx = (idx % 64) as u32;
         (bits[array_idx] & (1u64 << bit_idx)) != 0
@@ -76,12 +76,10 @@ impl Board {
         self.occupied.iter().all(|&b| b == 0)
     }
 
-    /// Count total stones on board efficiently
     pub fn count_stones(&self) -> usize {
         self.occupied.iter().map(|&bits| bits.count_ones() as usize).sum()
     }
 
-    /// Count stones for a specific player
     pub fn count_player_stones(&self, player: Player) -> usize {
         let bits = match player {
             Player::Max => &self.max_bits,
@@ -143,7 +141,6 @@ impl Board {
             return false;
         }
         
-        // Check 8 adjacent positions directly
         let directions = [-1isize, 0, 1];
         for &dr in &directions {
             for &dc in &directions {
@@ -239,13 +236,12 @@ impl Board {
                     let col = global_idx % self.size;
                     empties.push((row, col));
                 }
-                bits &= bits - 1; // Clear the lowest set bit
+                bits &= bits - 1;
             }
         }
         empties
     }
 
-    /// Get all occupied positions with their respective players
     pub fn get_occupied_positions(&self) -> Vec<((usize, usize), Player)> {
         let mut positions = Vec::new();
         for array_idx in 0..self.u64_count {
@@ -265,7 +261,7 @@ impl Board {
                     };
                     positions.push(((row, col), player));
                 }
-                occupied_bits &= occupied_bits - 1; // Clear the lowest set bit
+                occupied_bits &= occupied_bits - 1;
             }
         }
         positions

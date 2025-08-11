@@ -90,7 +90,6 @@ impl Heuristic {
         for row in 0..board.size {
             for col in 0..board.size {
                 let idx = board.index(row, col);
-                // Skip empty positions early
                 if !Board::is_bit_set(&board.occupied, idx) {
                     continue;
                 }

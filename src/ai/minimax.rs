@@ -14,7 +14,7 @@ pub fn minimax(
 ) -> (i32, u64) {
     let original_alpha = alpha;
     let hash_key = state.hash();
-    let mut nodes_visited = 1u64; // Count this node
+    let mut nodes_visited = 1u64;
     
     let tt_result = tt.probe(hash_key, depth, alpha, beta);
     if tt_result.cutoff {
@@ -53,7 +53,7 @@ pub fn minimax(
             }
             
             if value >= beta {
-                break; // Beta cutoff
+                break;
             }
             alpha = max(alpha, value);
         }
@@ -71,7 +71,7 @@ pub fn minimax(
             }
             
             if value <= alpha {
-                break; // Alpha cutoff
+                break;
             }
             beta = min(beta, value);
         }
@@ -111,22 +111,19 @@ pub fn iterative_deepening_search(
     let mut nodes_searched = 0u64;
     let mut depth_reached = 0;
 
-    // Advance transposition table age for this search
     tt.advance_age();
 
-    // Check if there are any possible moves at all
     let initial_moves = state.get_possible_moves();
     if initial_moves.is_empty() {
         return SearchResult {
             best_move: None,
-            score: 0, // Draw/no moves available
+            score: 0,
             depth_reached: 0,
             nodes_searched: 0,
             time_elapsed: start_time.elapsed(),
         };
     }
 
-    // Check for immediate wins/threats before deep search
     if let Some(immediate_move) = find_immediate_win_or_block(state) {
         return SearchResult {
             best_move: Some(immediate_move),
@@ -140,7 +137,6 @@ pub fn iterative_deepening_search(
     for depth in 1..=max_depth {
         let depth_start_time = Instant::now();
         
-        // Check time limit before starting new depth iteration
         if let Some(limit) = time_limit {
             if start_time.elapsed() >= limit {
                 break;
@@ -153,7 +149,6 @@ pub fn iterative_deepening_search(
         let mut moves = state.get_possible_moves();
         MoveOrdering::order_moves(state, &mut moves);
         
-        // Use best move from previous iteration for move ordering
         if let Some(prev_best) = best_move {
             if let Some(pos) = moves.iter().position(|&m| m == prev_best) {
                 moves.swap(0, pos);
@@ -162,7 +157,6 @@ pub fn iterative_deepening_search(
 
         let mut all_moves_searched = true;
         for mv in moves {
-            // Check time limit during move iteration
             if let Some(limit) = time_limit {
                 if start_time.elapsed() >= limit {
                     all_moves_searched = false;
@@ -176,7 +170,7 @@ pub fn iterative_deepening_search(
                 depth - 1,
                 i32::MIN,
                 i32::MAX,
-                !is_maximizing, // Flip maximizing player for next level
+                !is_maximizing,
                 tt,
             );
             state.undo_move(mv);
@@ -194,20 +188,17 @@ pub fn iterative_deepening_search(
             }
         }
 
-        // Only update best result if we completed the full depth search
         if all_moves_searched {
             best_move = iteration_best_move;
             best_score = iteration_best_score;
             depth_reached = depth;
             
-            // Check for immediate win/loss - no need to search deeper
             if best_score.abs() >= 1_000_000 {
                 #[cfg(debug_assertions)]
                 println!("🏆 Found winning/losing position at depth {}, stopping search", depth);
                 break;
             }
         } else {
-            // If we didn't complete this depth, don't use its results
             #[cfg(debug_assertions)]
             println!("⏰ Time limit reached during depth {}, using previous results", depth);
             break;
@@ -232,11 +223,9 @@ pub fn iterative_deepening_search(
     }
 }
 
-// Helper function to quickly check for immediate wins or necessary blocks
 fn find_immediate_win_or_block(state: &GameState) -> Option<(usize, usize)> {
     let moves = state.get_possible_moves();
     
-    // First, check if current player can win immediately
     for &mv in &moves {
         let mut temp_board = state.board.clone();
         temp_board.place_stone(mv.0, mv.1, state.current_player);
@@ -245,7 +234,6 @@ fn find_immediate_win_or_block(state: &GameState) -> Option<(usize, usize)> {
         }
     }
     
-    // Then, check if we need to block opponent's winning move
     let opponent = state.current_player.opponent();
     for &mv in &moves {
         let mut temp_board = state.board.clone();
