@@ -6,7 +6,7 @@ use gomoku::core::state::GameState;
 #[test]
 fn test_minimax_terminal_position() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
 
     // Create a winning position
     for i in 0..5 {
@@ -24,7 +24,7 @@ fn test_minimax_terminal_position() {
 #[test]
 fn test_minimax_depth_zero() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
 
     // Make a simple move
     state.board.place_stone(9, 9, Player::Max);
@@ -39,7 +39,7 @@ fn test_minimax_depth_zero() {
 #[test]
 fn test_minimax_maximizing_player() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
 
     // Set up a position where Max has advantage
     state.board.place_stone(9, 9, Player::Max);
@@ -57,7 +57,7 @@ fn test_minimax_maximizing_player() {
 #[test]
 fn test_minimax_minimizing_player() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
 
     // Set up a position where Min has advantage
     state.board.place_stone(9, 9, Player::Min);
@@ -74,7 +74,7 @@ fn test_minimax_minimizing_player() {
 #[test]
 fn test_minimax_alpha_beta_pruning() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
 
     // Create a position with multiple moves
     state.board.place_stone(9, 9, Player::Max);
@@ -90,7 +90,7 @@ fn test_minimax_alpha_beta_pruning() {
 #[test]
 fn test_minimax_transposition_table_usage() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
 
     // Make initial move
     state.board.place_stone(9, 9, Player::Max);
@@ -108,8 +108,8 @@ fn test_minimax_transposition_table_usage() {
 #[test]
 fn test_minimax_different_depths() {
     let mut state = GameState::new(19, 5);
-    let mut tt1 = TranspositionTable::new_default();
-    let mut tt2 = TranspositionTable::new_default();
+    let mut tt1 = TranspositionTable::default();
+    let mut tt2 = TranspositionTable::default();
 
     // Create a non-terminal position
     state.board.place_stone(9, 9, Player::Max);
@@ -127,7 +127,7 @@ fn test_minimax_different_depths() {
 #[test]
 fn test_minimax_winning_position_detection() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
 
     // Create a position where Max can win in one move
     for i in 0..4 {
@@ -144,7 +144,7 @@ fn test_minimax_winning_position_detection() {
 #[test]
 fn test_minimax_losing_position_detection() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
 
     // Create a position where Min can win in one move
     for i in 0..4 {
@@ -161,7 +161,7 @@ fn test_minimax_losing_position_detection() {
 #[test]
 fn test_minimax_state_restoration() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
 
     // Make a move using proper state management
     state.make_move((9, 9));
@@ -181,7 +181,7 @@ fn test_minimax_state_restoration() {
 #[test]
 fn test_minimax_captures_evaluation() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
 
     // Set up position with capture opportunity
     state.board.place_stone(9, 9, Player::Max);
@@ -198,7 +198,7 @@ fn test_minimax_captures_evaluation() {
 #[test]
 fn test_minimax_empty_moves() {
     let mut state = GameState::new(3, 3);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
 
     // Fill the board (no moves available)
     for i in 0..3 {
@@ -216,7 +216,7 @@ fn test_minimax_empty_moves() {
 #[test]
 fn test_minimax_alternating_players() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
 
     // Start with Max to move
     state.board.place_stone(9, 9, Player::Max);
@@ -232,7 +232,7 @@ fn test_minimax_alternating_players() {
 #[test]
 fn test_minimax_pruning_efficiency() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
 
     // Create a position with many possible moves
     state.board.place_stone(9, 9, Player::Max);
@@ -248,7 +248,7 @@ fn test_minimax_pruning_efficiency() {
 #[test]
 fn test_minimax_capture_win_detection() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
 
     // Set up capture win scenario where Max can win by capturing
     state.max_captures = 8; // Need 10 to win, so 1 capture away
@@ -268,7 +268,7 @@ fn test_minimax_capture_win_detection() {
 #[test] 
 fn test_minimax_immediate_win_detection() {
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
 
     // Set up 4-in-a-row with one empty spot to complete win
     state.board.place_stone(7, 6, Player::Max);
@@ -288,7 +288,7 @@ fn test_minimax_immediate_win_detection() {
 fn test_find_immediate_win_or_block() {
     use gomoku::ai::minimax::iterative_deepening_search;
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Create immediate win scenario for current player
     state.board.place_stone(7, 5, Player::Max);
@@ -312,7 +312,7 @@ fn test_find_immediate_win_or_block() {
 fn test_iterative_deepening_progressive_improvement() {
     use gomoku::ai::minimax::iterative_deepening_search;
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Create complex position
     state.board.place_stone(7, 7, Player::Max);

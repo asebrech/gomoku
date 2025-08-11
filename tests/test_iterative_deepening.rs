@@ -8,7 +8,7 @@ use std::time::Duration;
 #[test]
 fn test_iterative_deepening_basic() {
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Make a few moves to create a non-trivial position
     state.make_move((7, 7)); // Center
@@ -27,7 +27,7 @@ fn test_iterative_deepening_basic() {
 #[test]
 fn test_iterative_deepening_time_limit() {
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Make a few moves
     state.make_move((7, 7));
@@ -44,7 +44,7 @@ fn test_iterative_deepening_time_limit() {
 #[test]
 fn test_find_best_move_iterative() {
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Make some moves
     state.make_move((7, 7));
@@ -58,7 +58,7 @@ fn test_find_best_move_iterative() {
 #[test]
 fn test_find_best_move_timed() {
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Make some moves
     state.make_move((7, 7));
@@ -73,8 +73,8 @@ fn test_find_best_move_timed() {
 #[test]
 fn test_iterative_deepening_vs_direct_minimax() {
     let mut state = GameState::new(15, 5);
-    let mut tt1 = TranspositionTable::new_default();
-    let mut tt2 = TranspositionTable::new_default();
+    let mut tt1 = TranspositionTable::default();
+    let mut tt2 = TranspositionTable::default();
     
     // Create identical game states
     let moves = [(7, 7), (7, 8), (8, 7)];
@@ -85,26 +85,26 @@ fn test_iterative_deepening_vs_direct_minimax() {
     // Test iterative deepening
     let iterative_result = iterative_deepening_search(&mut state, 3, None, &mut tt1);
     
-    // Test direct search using the legacy function
-    let legacy_result = gomoku::interface::utils::find_best_move_legacy(&mut state, 3, &mut tt2);
+    // Test direct search using the regular find_best_move function  
+    let regular_result = gomoku::interface::utils::find_best_move(&mut state, 3, &mut tt2);
     
     // Both should find a move
     assert!(iterative_result.best_move.is_some());
-    assert!(legacy_result.is_some());
+    assert!(regular_result.is_some());
     
     println!("Iterative result: {:?}", iterative_result.best_move);
-    println!("Legacy result: {:?}", legacy_result);
+    println!("Regular result: {:?}", regular_result);
     
     // The moves might be different due to different search strategies, but both should be valid
     let moves = state.get_possible_moves();
     assert!(moves.contains(&iterative_result.best_move.unwrap()));
-    assert!(moves.contains(&legacy_result.unwrap()));
+    assert!(moves.contains(&regular_result.unwrap()));
 }
 
 #[test]
 fn test_early_termination_on_win() {
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Create a position where there's an immediate winning move
     // Set up a line of 4 for the current player
@@ -128,7 +128,7 @@ fn test_early_termination_on_win() {
 #[test]
 fn test_complex_board_with_short_time_limit() {
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Create a complex tactical position with NO immediate wins
     // Strategy: Create only 2-stone groups separated by opponent stones
@@ -251,7 +251,7 @@ fn test_complex_board_with_short_time_limit() {
 #[test]
 fn test_500ms_time_limit() {
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Make a few moves
     state.make_move((7, 7));
@@ -281,7 +281,7 @@ fn test_500ms_time_limit() {
 #[test]
 fn test_progressive_depth_improvement() {
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Create a position with tactical elements
     state.make_move((7, 7));
@@ -303,8 +303,8 @@ fn test_progressive_depth_improvement() {
 #[test]
 fn test_time_vs_depth_consistency() {
     let mut state = GameState::new(15, 5);
-    let mut tt1 = TranspositionTable::new_default();
-    let mut tt2 = TranspositionTable::new_default();
+    let mut tt1 = TranspositionTable::default();
+    let mut tt2 = TranspositionTable::default();
     
     // Make some moves
     state.make_move((7, 7));
@@ -332,7 +332,7 @@ fn test_time_vs_depth_consistency() {
 #[test]
 fn test_winning_position_early_termination() {
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Set up a position where current player can win immediately
     // Create 4 in a row for current player (Max)
@@ -366,7 +366,7 @@ fn test_winning_position_early_termination() {
 #[test]
 fn test_defensive_play_under_pressure() {
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Set up a position where opponent (Max) has 4 in a row
     state.board.place_stone(7, 7, Player::Max);
@@ -398,7 +398,7 @@ fn test_defensive_play_under_pressure() {
 #[test]
 fn test_transposition_table_benefits() {
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Create a position
     state.make_move((7, 7));
@@ -433,7 +433,7 @@ fn test_transposition_table_benefits() {
 #[test]
 fn test_very_complex_board_500ms() {
     let mut state = GameState::new(19, 5); // Larger board
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Create an even more complex board with many stones scattered around
     let moves = [
@@ -491,7 +491,7 @@ fn test_very_complex_board_500ms() {
 #[test]
 fn test_game_like_conditions() {
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Simulate a mid-game situation with realistic stone placement
     let realistic_moves = [

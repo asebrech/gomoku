@@ -37,10 +37,6 @@ impl TranspositionTable {
         }
     }
     
-    pub fn new_default() -> Self {
-        Self::new(1_000_000)
-    }
-    
     pub fn store(&mut self, key: u64, value: i32, depth: i32, entry_type: EntryType, best_move: Option<(usize, usize)>) {
         if self.table.len() >= self.max_size {
             self.cleanup_old_entries();
@@ -156,7 +152,7 @@ impl TranspositionTable {
 
 impl Default for TranspositionTable {
     fn default() -> Self {
-        Self::new_default()
+        Self::new(1_000_000)
     }
 }
 
