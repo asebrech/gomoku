@@ -125,6 +125,11 @@ pub fn iterative_deepening_search(
     }
 
     if let Some(immediate_move) = find_immediate_win_or_block(state) {
+        #[cfg(debug_assertions)]
+        {
+            let player = if is_maximizing { "MAX" } else { "MIN" };
+            println!("⚡ Immediate win/block found for {} at {:?}", player, immediate_move);
+        }
         return SearchResult {
             best_move: Some(immediate_move),
             score: if is_maximizing { 1_000_000 } else { -1_000_000 },
@@ -195,21 +200,36 @@ pub fn iterative_deepening_search(
             
             if best_score.abs() >= 1_000_000 {
                 #[cfg(debug_assertions)]
-                println!("🏆 Found winning/losing position at depth {}, stopping search", depth);
+                {
+                    let result_type = if (is_maximizing && best_score > 0) || (!is_maximizing && best_score < 0) {
+                        "WINNING"
+                    } else {
+                        "LOSING"
+                    };
+                    let player = if is_maximizing { "MAX" } else { "MIN" };
+                    println!("🏆 {} position found for {} at depth {} (score={}), stopping search", 
+                        result_type, player, depth, best_score);
+                }
                 break;
             }
         } else {
             #[cfg(debug_assertions)]
-            println!("⏰ Time limit reached during depth {}, using previous results", depth);
+            println!("⏰ Time limit reached at depth {} ({:.1}ms elapsed), using depth {} results", 
+                depth, start_time.elapsed().as_millis(), depth_reached);
             break;
         }
 
         #[cfg(debug_assertions)]
         {
             let depth_time = depth_start_time.elapsed();
+            let nps = if depth_time.as_millis() > 0 {
+                (nodes_searched as f64 / depth_time.as_millis() as f64 * 1000.0) as u64
+            } else {
+                nodes_searched
+            };
             println!(
-                "Depth {} completed in {:?}: best_move={:?}, score={}, nodes={}",
-                depth, depth_time, best_move, best_score, nodes_searched
+                "📊 Depth {} completed: {:.1}ms, move={:?}, score={}, nodes={}, nps={}",
+                depth, depth_time.as_millis(), best_move, best_score, nodes_searched, nps
             );
         }
     }
