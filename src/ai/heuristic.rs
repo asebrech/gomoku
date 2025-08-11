@@ -90,39 +90,38 @@ impl Heuristic {
         for row in 0..board.size {
             for col in 0..board.size {
                 let idx = board.index(row, col);
-                let is_max = Board::is_bit_set(&board.max_bits, idx);
-                let is_min = Board::is_bit_set(&board.min_bits, idx);
-                let player = if is_max {
-                    Some(Player::Max)
-                } else if is_min {
-                    Some(Player::Min)
+                // Skip empty positions early
+                if !Board::is_bit_set(&board.occupied, idx) {
+                    continue;
+                }
+                
+                let player = if Board::is_bit_set(&board.max_bits, idx) {
+                    Player::Max
                 } else {
-                    None
+                    Player::Min
                 };
+                
+                for (dir_idx, &(dx, dy)) in DIRECTIONS.iter().enumerate() {
+                    let bit_mask = 1u8 << dir_idx;
 
-                if let Some(player) = player {
-                    for (dir_idx, &(dx, dy)) in DIRECTIONS.iter().enumerate() {
-                        let bit_mask = 1u8 << dir_idx;
-
-                        if analyzed[row][col] & bit_mask == 0 {
-                            if let Some(pattern_info) = Self::analyze_pattern(
-                                board,
-                                row,
-                                col,
-                                dx,
-                                dy,
-                                player,
-                                win_condition,
-                                &mut analyzed,
-                                bit_mask,
-                            ) {
-                                match player {
-                                    Player::Max => {
-                                        Self::update_counts(&mut max_counts, pattern_info)
-                                    }
-                                    Player::Min => {
-                                        Self::update_counts(&mut min_counts, pattern_info)
-                                    }
+                    if analyzed[row][col] & bit_mask == 0 {
+                        if let Some(pattern_info) = Self::analyze_pattern(
+                            board,
+                            row,
+                            col,
+                            dx,
+                            dy,
+                            player,
+                            win_condition,
+                            &mut analyzed,
+                            bit_mask,
+                        ) {
+                            match player {
+                                Player::Max => {
+                                    Self::update_counts(&mut max_counts, pattern_info)
+                                }
+                                Player::Min => {
+                                    Self::update_counts(&mut min_counts, pattern_info)
                                 }
                             }
                         }
