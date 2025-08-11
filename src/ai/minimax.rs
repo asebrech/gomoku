@@ -106,11 +106,8 @@ pub fn iterative_deepening_search(
 ) -> SearchResult {
     let start_time = Instant::now();
     let mut best_move = None;
-    let mut best_score = if state.current_player == crate::core::board::Player::Max {
-        i32::MIN
-    } else {
-        i32::MAX
-    };
+    let is_maximizing = state.current_player == crate::core::board::Player::Max;
+    let mut best_score = if is_maximizing { i32::MIN } else { i32::MAX };
     let mut nodes_searched = 0u64;
     let mut depth_reached = 0;
 
@@ -129,6 +126,17 @@ pub fn iterative_deepening_search(
         };
     }
 
+    // Check for immediate wins/threats before deep search
+    if let Some(immediate_move) = find_immediate_win_or_block(state) {
+        return SearchResult {
+            best_move: Some(immediate_move),
+            score: if is_maximizing { 1_000_000 } else { -1_000_000 },
+            depth_reached: 1,
+            nodes_searched: initial_moves.len() as u64,
+            time_elapsed: start_time.elapsed(),
+        };
+    }
+
     for depth in 1..=max_depth {
         let depth_start_time = Instant::now();
         
@@ -140,11 +148,7 @@ pub fn iterative_deepening_search(
         }
 
         let mut iteration_best_move = None;
-        let mut iteration_best_score = if state.current_player == crate::core::board::Player::Max {
-            i32::MIN
-        } else {
-            i32::MAX
-        };
+        let mut iteration_best_score = if is_maximizing { i32::MIN } else { i32::MAX };
 
         let mut moves = state.get_possible_moves();
         MoveOrdering::order_moves(state, &mut moves);
@@ -172,13 +176,13 @@ pub fn iterative_deepening_search(
                 depth - 1,
                 i32::MIN,
                 i32::MAX,
-                state.current_player == crate::core::board::Player::Max,
+                !is_maximizing, // Flip maximizing player for next level
                 tt,
             );
             state.undo_move(mv);
             nodes_searched += child_nodes;
 
-            let is_better = if state.current_player == crate::core::board::Player::Max {
+            let is_better = if is_maximizing {
                 score > iteration_best_score
             } else {
                 score < iteration_best_score
@@ -198,20 +202,25 @@ pub fn iterative_deepening_search(
             
             // Check for immediate win/loss - no need to search deeper
             if best_score.abs() >= 1_000_000 {
+                #[cfg(debug_assertions)]
+                println!("🏆 Found winning/losing position at depth {}, stopping search", depth);
                 break;
             }
         } else {
             // If we didn't complete this depth, don't use its results
+            #[cfg(debug_assertions)]
+            println!("⏰ Time limit reached during depth {}, using previous results", depth);
             break;
         }
 
-        let depth_time = depth_start_time.elapsed();
-        // Optional debug output - can be enabled with a feature flag
         #[cfg(debug_assertions)]
-        println!(
-            "Depth {} completed in {:?}: best_move={:?}, score={}, nodes={}",
-            depth, depth_time, best_move, best_score, nodes_searched
-        );
+        {
+            let depth_time = depth_start_time.elapsed();
+            println!(
+                "Depth {} completed in {:?}: best_move={:?}, score={}, nodes={}",
+                depth, depth_time, best_move, best_score, nodes_searched
+            );
+        }
     }
 
     SearchResult {
@@ -221,4 +230,30 @@ pub fn iterative_deepening_search(
         nodes_searched,
         time_elapsed: start_time.elapsed(),
     }
+}
+
+// Helper function to quickly check for immediate wins or necessary blocks
+fn find_immediate_win_or_block(state: &GameState) -> Option<(usize, usize)> {
+    let moves = state.get_possible_moves();
+    
+    // First, check if current player can win immediately
+    for &mv in &moves {
+        let mut temp_board = state.board.clone();
+        temp_board.place_stone(mv.0, mv.1, state.current_player);
+        if crate::core::rules::WinChecker::check_win_around(&temp_board, mv.0, mv.1, state.win_condition) {
+            return Some(mv);
+        }
+    }
+    
+    // Then, check if we need to block opponent's winning move
+    let opponent = state.current_player.opponent();
+    for &mv in &moves {
+        let mut temp_board = state.board.clone();
+        temp_board.place_stone(mv.0, mv.1, opponent);
+        if crate::core::rules::WinChecker::check_win_around(&temp_board, mv.0, mv.1, state.win_condition) {
+            return Some(mv);
+        }
+    }
+    
+    None
 }

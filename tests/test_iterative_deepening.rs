@@ -388,8 +388,9 @@ fn test_defensive_play_under_pressure() {
     // Should block at (7, 6) or (7, 11)
     assert!(best_move == (7, 6) || best_move == (7, 11));
     
-    // Should recognize this as a critical position (high positive score since Min found winning move)
-    assert!(result.score >= 1000);
+    // Should recognize this as a critical position
+    // Min player blocking a win gets negative score (good for Min)
+    assert!(result.score <= -1000, "Expected high negative score for Min blocking, got {}", result.score);
     
     println!("Defensive play test result: {:?}", result);
 }
