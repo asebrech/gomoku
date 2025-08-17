@@ -1,7 +1,7 @@
 use gomoku::ai::transposition::TranspositionTable;
 use gomoku::core::board::Player;
 use gomoku::core::state::GameState;
-use gomoku::interface::utils::find_best_move;
+use gomoku::ai::minimax::find_best_move;
 
 #[test]
 fn test_full_game_flow_simple() {

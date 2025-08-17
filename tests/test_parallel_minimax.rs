@@ -1,4 +1,4 @@
-use gomoku::ai::{minimax::iterative_deepening_search, transposition::TranspositionTable};
+use gomoku::ai::{minimax::find_best_move, transposition::TranspositionTable};
 use gomoku::core::state::GameState;
 use std::time::Duration;
 
@@ -10,7 +10,7 @@ fn test_parallel_search_functionality() {
     
     let mut tt = TranspositionTable::new(50_000);
     
-    let result = iterative_deepening_search(&mut state, 4, None, &mut tt);
+    let result = find_best_move(&mut state, 4, None, &mut tt);
     
     assert!(result.best_move.is_some());
     assert!(result.depth_reached >= 1);
@@ -25,7 +25,7 @@ fn test_parallel_search_with_time_limit() {
     let mut tt = TranspositionTable::new(10_000);
     
     let time_limit = Duration::from_millis(50);
-    let result = iterative_deepening_search(&mut state, 8, Some(time_limit), &mut tt);
+    let result = find_best_move(&mut state, 8, Some(time_limit), &mut tt);
     
     assert!(result.time_elapsed <= Duration::from_millis(100));
     assert!(result.best_move.is_some());
@@ -44,8 +44,8 @@ fn test_parallel_search_consistency() {
     let mut tt1 = TranspositionTable::new(20_000);
     let mut tt2 = TranspositionTable::new(20_000);
     
-    let result1 = iterative_deepening_search(&mut state1, 3, None, &mut tt1);
-    let result2 = iterative_deepening_search(&mut state2, 3, None, &mut tt2);
+    let result1 = find_best_move(&mut state1, 3, None, &mut tt1);
+    let result2 = find_best_move(&mut state2, 3, None, &mut tt2);
     
     assert_eq!(result1.best_move, result2.best_move);
     assert_eq!(result1.score, result2.score);

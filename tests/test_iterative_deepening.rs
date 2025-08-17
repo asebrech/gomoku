@@ -1,8 +1,7 @@
 use gomoku::ai::transposition::TranspositionTable;
-use gomoku::ai::minimax::iterative_deepening_search;
+use gomoku::ai::minimax::find_best_move;
 use gomoku::core::state::GameState;
 use gomoku::core::board::Player;
-use gomoku::interface::utils::find_best_move;
 use std::time::Duration;
 
 #[test]
@@ -15,7 +14,7 @@ fn test_iterative_deepening_basic() {
     state.make_move((7, 8)); // Adjacent
     state.make_move((7, 6)); // Other side
     
-    let result = iterative_deepening_search(&mut state, 3, None, &mut tt);
+    let result = find_best_move(&mut state, 3, None, &mut tt);
     
     assert!(result.best_move.is_some());
     assert!(result.depth_reached > 0);
@@ -34,7 +33,7 @@ fn test_iterative_deepening_time_limit() {
     state.make_move((7, 8));
     
     let time_limit = Duration::from_millis(100);
-    let result = iterative_deepening_search(&mut state, 10, Some(time_limit), &mut tt);
+    let result = find_best_move(&mut state, 10, Some(time_limit), &mut tt);
     
     assert!(result.best_move.is_some());
     assert!(result.time_elapsed <= Duration::from_millis(150)); // Allow some margin
@@ -83,10 +82,10 @@ fn test_iterative_deepening_vs_direct_minimax() {
     }
     
     // Test iterative deepening
-    let iterative_result = iterative_deepening_search(&mut state, 3, None, &mut tt1);
+    let iterative_result = find_best_move(&mut state, 3, None, &mut tt1);
     
     // Test direct search using the regular find_best_move function  
-    let regular_result = gomoku::interface::utils::find_best_move(&mut state, 3, None, &mut tt2);
+    let regular_result = gomoku::ai::minimax::find_best_move(&mut state, 3, None, &mut tt2);
     
     // Both should find a move
     assert!(iterative_result.best_move.is_some());
@@ -117,7 +116,7 @@ fn test_early_termination_on_win() {
     state.make_move((7, 10)); // Max - now has 4 in a row
     
     // Min should find the blocking move immediately
-    let result = iterative_deepening_search(&mut state, 5, None, &mut tt);
+    let result = find_best_move(&mut state, 5, None, &mut tt);
     
     assert!(result.best_move.is_some());
     // Should find the winning/blocking move quickly
@@ -221,7 +220,7 @@ fn test_complex_board_with_short_time_limit() {
     println!("Immediate win available: {}, Must defend: {}", has_immediate_win, must_defend);
     
     let start_time = std::time::Instant::now();
-    let result = iterative_deepening_search(&mut state, 10, Some(time_limit), &mut tt);
+    let result = find_best_move(&mut state, 10, Some(time_limit), &mut tt);
     let actual_time = start_time.elapsed();
     
     println!("Search completed in {:?} (measured externally)", actual_time);
@@ -260,7 +259,7 @@ fn test_500ms_time_limit() {
     
     // Short time limit (500ms) like in real game
     let time_limit = Duration::from_millis(500);
-    let result = iterative_deepening_search(&mut state, 10, Some(time_limit), &mut tt);
+    let result = find_best_move(&mut state, 10, Some(time_limit), &mut tt);
     
     // Should still find a move
     assert!(result.best_move.is_some());
@@ -289,7 +288,7 @@ fn test_progressive_depth_improvement() {
     state.make_move((7, 6));
     state.make_move((8, 7));
     
-    let result = iterative_deepening_search(&mut state, 5, None, &mut tt);
+    let result = find_best_move(&mut state, 5, None, &mut tt);
     
     // Should reach the full depth
     assert_eq!(result.depth_reached, 5);
@@ -312,11 +311,11 @@ fn test_time_vs_depth_consistency() {
     state.make_move((8, 7));
     
     // Test with depth limit
-    let depth_result = iterative_deepening_search(&mut state, 3, None, &mut tt1);
+    let depth_result = find_best_move(&mut state, 3, None, &mut tt1);
     
     // Test with generous time limit that should allow reaching the same depth
     let time_limit = Duration::from_millis(5000); // 5 seconds should be plenty
-    let time_result = iterative_deepening_search(&mut state, 10, Some(time_limit), &mut tt2);
+    let time_result = find_best_move(&mut state, 10, Some(time_limit), &mut tt2);
     
     // Both should find moves
     assert!(depth_result.best_move.is_some());
@@ -344,7 +343,7 @@ fn test_winning_position_early_termination() {
     
     state.current_player = Player::Max;
     
-    let result = iterative_deepening_search(&mut state, 5, None, &mut tt);
+    let result = find_best_move(&mut state, 5, None, &mut tt);
     
     // Should find the winning move
     assert!(result.best_move.is_some());
@@ -379,7 +378,7 @@ fn test_defensive_play_under_pressure() {
     
     // Use a 500ms time limit to test under pressure
     let time_limit = Duration::from_millis(500);
-    let result = iterative_deepening_search(&mut state, 6, Some(time_limit), &mut tt);
+    let result = find_best_move(&mut state, 6, Some(time_limit), &mut tt);
     
     // Should find the blocking move
     assert!(result.best_move.is_some());
@@ -406,10 +405,10 @@ fn test_transposition_table_benefits() {
     state.make_move((8, 7));
     
     // First search to populate transposition table
-    let first_result = iterative_deepening_search(&mut state, 4, None, &mut tt);
+    let first_result = find_best_move(&mut state, 4, None, &mut tt);
     
     // Second search should benefit from transposition table
-    let second_result = iterative_deepening_search(&mut state, 4, None, &mut tt);
+    let second_result = find_best_move(&mut state, 4, None, &mut tt);
     
     // Both should find the same move (or equally good moves)
     assert!(first_result.best_move.is_some());
@@ -457,7 +456,7 @@ fn test_very_complex_board_500ms() {
     
     // 500ms time limit - this should reproduce the issue you mentioned
     let time_limit = Duration::from_millis(500);
-    let result = iterative_deepening_search(&mut state, 8, Some(time_limit), &mut tt);
+    let result = find_best_move(&mut state, 8, Some(time_limit), &mut tt);
     
     // Should still find a move
     assert!(result.best_move.is_some());
@@ -517,7 +516,7 @@ fn test_game_like_conditions() {
     
     // Test with game-like 500ms time limit
     let time_limit = Duration::from_millis(500);
-    let result = iterative_deepening_search(&mut state, 6, Some(time_limit), &mut tt);
+    let result = find_best_move(&mut state, 6, Some(time_limit), &mut tt);
     
     // Basic assertions
     assert!(result.best_move.is_some(), "Should find a move");

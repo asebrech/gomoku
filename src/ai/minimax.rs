@@ -107,7 +107,7 @@ pub struct SearchResult {
     pub time_elapsed: Duration,
 }
 
-pub fn iterative_deepening_search(
+pub fn find_best_move(
     state: &mut GameState,
     max_depth: i32,
     time_limit: Option<Duration>,

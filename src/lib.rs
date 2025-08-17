@@ -14,10 +14,6 @@ pub mod core {
     pub mod state;
 }
 
-pub mod interface {
-    pub mod utils;
-}
-
 pub mod ui {
     pub mod app;
     pub mod display {
