@@ -299,7 +299,7 @@ fn test_minimax_immediate_win_detection() {
 
 #[test]
 fn test_find_immediate_win_or_block() {
-    use gomoku::ai::minimax::find_best_move;
+    use gomoku::ai::search::find_best_move;
     let mut state = GameState::new(15, 5);
     let mut tt = TranspositionTable::default();
     
@@ -323,7 +323,7 @@ fn test_find_immediate_win_or_block() {
 
 #[test]
 fn test_iterative_deepening_progressive_improvement() {
-    use gomoku::ai::minimax::find_best_move;
+    use gomoku::ai::search::find_best_move;
     let mut state = GameState::new(15, 5);
     let mut tt = TranspositionTable::default();
     

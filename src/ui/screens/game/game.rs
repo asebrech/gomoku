@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use bevy::prelude::*;
-use crate::{ai::{minimax::find_best_move, transposition::TranspositionTable}, core::{board::Player, state::GameState}, ui::{app::{AppState, GameSettings}, screens::{game::{board::{BoardRoot, BoardUtils, PreviewDot}, settings::spawn_settings_panel}, utils::despawn_screen}}};
+use crate::{ai::{search::find_best_move, transposition::TranspositionTable}, core::{board::Player, state::GameState}, ui::{app::{AppState, GameSettings}, screens::{game::{board::{BoardRoot, BoardUtils, PreviewDot}, settings::spawn_settings_panel}, utils::despawn_screen}}};
 
 // Game status resource
 #[derive(Resource, Default)]

@@ -1,5 +1,5 @@
 use gomoku::ai::transposition::TranspositionTable;
-use gomoku::ai::minimax::find_best_move;
+use gomoku::ai::search::find_best_move;
 use gomoku::core::state::GameState;
 use gomoku::core::board::Player;
 use std::time::Duration;
@@ -85,7 +85,7 @@ fn test_iterative_deepening_vs_direct_minimax() {
     let iterative_result = find_best_move(&mut state, 3, None, &mut tt1);
     
     // Test direct search using the regular find_best_move function  
-    let regular_result = gomoku::ai::minimax::find_best_move(&mut state, 3, None, &mut tt2);
+    let regular_result = find_best_move(&mut state, 3, None, &mut tt2);
     
     // Both should find a move
     assert!(iterative_result.best_move.is_some());

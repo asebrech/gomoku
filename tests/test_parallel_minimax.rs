@@ -1,4 +1,4 @@
-use gomoku::ai::{minimax::find_best_move, transposition::TranspositionTable};
+use gomoku::ai::{search::find_best_move, transposition::TranspositionTable};
 use gomoku::core::state::GameState;
 use std::time::Duration;
 
