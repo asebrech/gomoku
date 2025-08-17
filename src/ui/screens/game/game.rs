@@ -1,4 +1,4 @@
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use bevy::prelude::*;
 use crate::{ai::{search::find_best_move, transposition::TranspositionTable}, core::{board::Player, state::GameState}, ui::{app::{AppState, GameSettings}, screens::{game::{board::{BoardRoot, BoardUtils, PreviewDot}, settings::spawn_settings_panel}, utils::despawn_screen}}};
@@ -227,7 +227,6 @@ pub fn process_next_round(
             *game_status = GameStatus::AwaitingUserInput;
         } else if settings.versus_ai {
             // AI's turn
-            let start_time = Instant::now();
             
             if !game_state.is_terminal() {
                 let placement = if let Some(time_limit_ms) = settings.time_limit {
@@ -238,8 +237,7 @@ pub fn process_next_round(
                     info!("AI using depth-based search to depth {}", settings.ai_depth);
                     find_best_move(&mut game_state, settings.ai_depth, None, &mut tt)
                 };
-                let elapsed_time = start_time.elapsed().as_millis();
-                ai_time.millis = elapsed_time;
+                ai_time.micros = placement.time_elapsed.as_micros();
                 ai_depth.depth = placement.depth_reached;
                 update_ai_time.write(UpdateAITimeDisplay);
                 update_ai_depth.write(UpdateAIDepthDisplay);
@@ -265,9 +263,10 @@ pub fn update_ai_time_display(
     mut events: EventReader<UpdateAITimeDisplay>,
 ) {
     for _ in events.read() {
-        info!("Updating AI time display: {:.0}ms", ai_time.millis);
+        let time_ms = ai_time.micros as f64 / 1000.0;
+        info!("Updating AI time display: {:.1}ms", time_ms);
         for mut text in query.iter_mut() {
-			text.0 = format!("{:.0}ms", ai_time.millis);
+			text.0 = format!("{:.1}ms", time_ms);
         }
     }
 }
@@ -290,7 +289,7 @@ pub struct AITimeText;
 
 #[derive(Resource, Default)]
 pub struct AITimeTaken {
-    pub millis: u128,
+    pub micros: u128,
 }
 
 #[derive(Event)]
