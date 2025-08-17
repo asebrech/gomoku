@@ -38,10 +38,12 @@ pub struct GridCell {
 pub fn game_plugin(app: &mut App) {
     app.init_resource::<GameStatus>()
         .init_resource::<AITimeTaken>()
+        .init_resource::<AIDepthReached>()
         .add_event::<GameEnded>()
         .add_event::<StonePlacement>()
         .add_event::<MovePlayed>()
         .add_event::<UpdateAITimeDisplay>()
+        .add_event::<UpdateAIDepthDisplay>()
         .add_systems(OnEnter(AppState::Game), (setup_game_ui, update_available_placement).chain())
         .add_systems(
             Update,
@@ -52,6 +54,7 @@ pub fn game_plugin(app: &mut App) {
                 update_available_placement.run_if(on_event::<MovePlayed>),
                 toggle_pause,
                 update_ai_time_display.run_if(on_event::<UpdateAITimeDisplay>),
+                update_ai_depth_display.run_if(on_event::<UpdateAIDepthDisplay>),
             ).run_if(in_state(AppState::Game)),
         )
         .add_systems(OnExit(AppState::Game), despawn_screen::<OnGameScreen>);
@@ -199,7 +202,9 @@ pub fn process_next_round(
     mut game_state: ResMut<GameState>,
     mut game_status: ResMut<GameStatus>,
     mut ai_time: ResMut<AITimeTaken>,
+    mut ai_depth: ResMut<AIDepthReached>,
     mut update_ai_time: EventWriter<UpdateAITimeDisplay>,
+    mut update_ai_depth: EventWriter<UpdateAIDepthDisplay>,
     mut tt: ResMut<TranspositionTable>,
 ) {
     for _ in move_played.read() {
@@ -224,23 +229,22 @@ pub fn process_next_round(
             // AI's turn
             let start_time = Instant::now();
             
-            // Only call find_best_move if game is not terminal
             if !game_state.is_terminal() {
                 let placement = if let Some(time_limit_ms) = settings.time_limit {
-                    // Use time-based iterative deepening
                     let time_limit = Duration::from_millis(time_limit_ms as u64);
                     info!("AI using time-based search with {}ms limit", time_limit_ms);
                     find_best_move(&mut game_state, settings.ai_depth, Some(time_limit), &mut tt)
                 } else {
-                    // Use depth-based iterative deepening
                     info!("AI using depth-based search to depth {}", settings.ai_depth);
                     find_best_move(&mut game_state, settings.ai_depth, None, &mut tt)
                 };
                 let elapsed_time = start_time.elapsed().as_millis();
                 ai_time.millis = elapsed_time;
+                ai_depth.depth = placement.depth_reached;
                 update_ai_time.write(UpdateAITimeDisplay);
+                update_ai_depth.write(UpdateAIDepthDisplay);
 
-                if let Some((x, y)) = placement {
+                if let Some((x, y)) = placement.best_move {
                     stone_placement.write(StonePlacement { x, y });
                     *game_status = GameStatus::AwaitingUserInput;
                 } else {
@@ -268,18 +272,40 @@ pub fn update_ai_time_display(
     }
 }
 
+pub fn update_ai_depth_display(
+    mut query: Query<&mut Text, With<AIDepthText>>,
+    ai_depth: Res<AIDepthReached>,
+    mut events: EventReader<UpdateAIDepthDisplay>,
+) {
+    for _ in events.read() {
+        info!("Updating AI depth display: depth {}", ai_depth.depth);
+        for mut text in query.iter_mut() {
+			text.0 = format!("depth {}", ai_depth.depth);
+        }
+    }
+}
+
 #[derive(Component)]
 pub struct AITimeText;
 
-// Resource to store AI computation time
 #[derive(Resource, Default)]
 pub struct AITimeTaken {
     pub millis: u128,
 }
 
-// Event to trigger AI time display update
 #[derive(Event)]
 pub struct UpdateAITimeDisplay;
+
+#[derive(Component)]
+pub struct AIDepthText;
+
+#[derive(Resource, Default)]
+pub struct AIDepthReached {
+    pub depth: i32,
+}
+
+#[derive(Event)]
+pub struct UpdateAIDepthDisplay;
 
 
 pub fn toggle_pause(

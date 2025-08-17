@@ -12,10 +12,18 @@ pub fn minimax(
     mut beta: i32,
     maximizing_player: bool,
     tt: &mut TranspositionTable,
+    start_time: &Instant,
+    time_limit: Option<Duration>,
 ) -> (i32, u64) {
     let original_alpha = alpha;
     let hash_key = state.hash();
     let mut nodes_visited = 1u64;
+    
+    if let Some(limit) = time_limit {
+        if start_time.elapsed() >= limit {
+            return (0, nodes_visited);
+        }
+    }
     
     let tt_result = tt.probe(hash_key, depth, alpha, beta);
     if tt_result.cutoff {
@@ -44,7 +52,7 @@ pub fn minimax(
         value = i32::MIN;
         for move_ in moves {
             state.make_move(move_);
-            let (eval, child_nodes) = minimax(state, depth - 1, alpha, beta, false, tt);
+            let (eval, child_nodes) = minimax(state, depth - 1, alpha, beta, false, tt, start_time, time_limit);
             state.undo_move(move_);
             nodes_visited += child_nodes;
             
@@ -62,7 +70,7 @@ pub fn minimax(
         value = i32::MAX;
         for move_ in moves {
             state.make_move(move_);
-            let (eval, child_nodes) = minimax(state, depth - 1, alpha, beta, true, tt);
+            let (eval, child_nodes) = minimax(state, depth - 1, alpha, beta, true, tt, start_time, time_limit);
             state.undo_move(move_);
             nodes_visited += child_nodes;
             
@@ -126,11 +134,6 @@ pub fn iterative_deepening_search(
     }
 
     if let Some(immediate_move) = find_immediate_win_or_block(state) {
-        #[cfg(debug_assertions)]
-        {
-            let player = if is_maximizing { "MAX" } else { "MIN" };
-            println!("⚡ Immediate win/block found for {} at {:?}", player, immediate_move);
-        }
         return SearchResult {
             best_move: Some(immediate_move),
             score: if is_maximizing { 1_000_000 } else { -1_000_000 },
@@ -141,11 +144,9 @@ pub fn iterative_deepening_search(
     }
 
     for depth in 1..=max_depth {
-        #[cfg(debug_assertions)]
-        let depth_start_time = Instant::now();
-        
         if let Some(limit) = time_limit {
-            if start_time.elapsed() >= limit {
+            let elapsed = start_time.elapsed();
+            if elapsed >= limit || elapsed > limit * 4 / 5 {
                 break;
             }
         }
@@ -165,17 +166,15 @@ pub fn iterative_deepening_search(
         let mut all_moves_searched = true;
         
         if let Some(limit) = time_limit {
-            if start_time.elapsed() >= limit {
+            let elapsed = start_time.elapsed();
+            if elapsed >= limit {
                 break;
             }
         }
         
         let remaining_time = time_limit.map(|limit| limit.saturating_sub(start_time.elapsed()));
         let use_parallel = moves.len() <= 10 && (time_limit.is_none() || 
-            remaining_time.map_or(true, |remaining| remaining > Duration::from_millis(100)));
-        
-        #[cfg(debug_assertions)]
-        let parallel_start = Instant::now();
+            remaining_time.map_or(true, |remaining| remaining > Duration::from_millis(200)));
         
         if use_parallel {
             let move_results: Vec<_> = moves.par_iter().map(|&mv| {
@@ -190,6 +189,8 @@ pub fn iterative_deepening_search(
                     i32::MAX,
                     !is_maximizing,
                     &mut tt_local,
+                    &start_time,
+                    time_limit,
                 );
                 
                 let (local_hits, local_misses) = tt_local.get_stats();
@@ -221,7 +222,7 @@ pub fn iterative_deepening_search(
             for (i, mv) in moves.iter().enumerate() {
                 if let Some(limit) = time_limit {
                     let elapsed = start_time.elapsed();
-                    if elapsed >= limit || (i > 5 && elapsed > limit * 3 / 4) {
+                    if elapsed >= limit || (i > 2 && elapsed > limit / 2) {
                         all_moves_searched = false;
                         break;
                     }
@@ -235,6 +236,8 @@ pub fn iterative_deepening_search(
                     i32::MAX,
                     !is_maximizing,
                     tt,
+                    &start_time,
+                    time_limit,
                 );
                 state.undo_move(*mv);
                 nodes_searched += child_nodes;
@@ -251,9 +254,6 @@ pub fn iterative_deepening_search(
                 }
             }
         }
-        
-        #[cfg(debug_assertions)]
-        let parallel_time = parallel_start.elapsed();
 
         if all_moves_searched {
             best_move = iteration_best_move;
@@ -261,45 +261,10 @@ pub fn iterative_deepening_search(
             depth_reached = depth;
             
             if best_score.abs() >= 1_000_000 {
-                #[cfg(debug_assertions)]
-                {
-                    let result_type = if (is_maximizing && best_score > 0) || (!is_maximizing && best_score < 0) {
-                        "WINNING"
-                    } else {
-                        "LOSING"
-                    };
-                    let player = if is_maximizing { "MAX" } else { "MIN" };
-                    println!("🏆 {} position found for {} at depth {} (score={}), stopping search", 
-                        result_type, player, depth, best_score);
-                }
                 break;
             }
         } else {
-            #[cfg(debug_assertions)]
-            println!("⏰ Time limit reached at depth {} ({:.1}ms elapsed), using depth {} results", 
-                depth, start_time.elapsed().as_millis(), depth_reached);
             break;
-        }
-
-        #[cfg(debug_assertions)]
-        {
-            let depth_time = depth_start_time.elapsed();
-            let nps = if depth_time.as_millis() > 0 {
-                (nodes_searched as f64 / depth_time.as_millis() as f64 * 1000.0) as u64
-            } else {
-                nodes_searched
-            };
-            let core_efficiency = if parallel_time.as_millis() > 0 {
-                depth_time.as_millis() as f64 / parallel_time.as_millis() as f64
-            } else {
-                1.0
-            };
-            let search_type = if use_parallel { "parallel" } else { "sequential" };
-            println!(
-                "📊 Depth {} completed ({}): {:.1}ms (core: {:.1}ms, efficiency: {:.1}x), move={:?}, score={}, nodes={}, nps={}",
-                depth, search_type, depth_time.as_millis(), parallel_time.as_millis(), core_efficiency, 
-                best_move, best_score, nodes_searched, nps
-            );
         }
     }
 

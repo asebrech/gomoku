@@ -42,7 +42,7 @@ fn test_iterative_deepening_time_limit() {
 }
 
 #[test]
-fn test_find_best_move_iterative() {
+fn test_find_best_move_without_time_limit() {
     let mut state = GameState::new(15, 5);
     let mut tt = TranspositionTable::default();
     
@@ -50,13 +50,13 @@ fn test_find_best_move_iterative() {
     state.make_move((7, 7));
     state.make_move((7, 8));
     
-    let best_move = find_best_move(&mut state, 3, None, &mut tt);
-    assert!(best_move.is_some());
-    println!("Best move from iterative search: {:?}", best_move);
+    let result = find_best_move(&mut state, 3, None, &mut tt);
+    assert!(result.best_move.is_some());
+    println!("Best move from search without time limit: {:?}", result.best_move);
 }
 
 #[test]
-fn test_find_best_move_timed() {
+fn test_find_best_move_with_time_limit() {
     let mut state = GameState::new(15, 5);
     let mut tt = TranspositionTable::default();
     
@@ -65,9 +65,9 @@ fn test_find_best_move_timed() {
     state.make_move((7, 8));
     
     let time_limit = Duration::from_millis(50);
-    let best_move = find_best_move(&mut state, 5, Some(time_limit), &mut tt);
-    assert!(best_move.is_some());
-    println!("Best move from timed search: {:?}", best_move);
+    let result = find_best_move(&mut state, 5, Some(time_limit), &mut tt);
+    assert!(result.best_move.is_some());
+    println!("Best move from timed search: {:?}", result.best_move);
 }
 
 #[test]
@@ -90,7 +90,7 @@ fn test_iterative_deepening_vs_direct_minimax() {
     
     // Both should find a move
     assert!(iterative_result.best_move.is_some());
-    assert!(regular_result.is_some());
+    assert!(regular_result.best_move.is_some());
     
     println!("Iterative result: {:?}", iterative_result.best_move);
     println!("Regular result: {:?}", regular_result);
@@ -98,7 +98,7 @@ fn test_iterative_deepening_vs_direct_minimax() {
     // The moves might be different due to different search strategies, but both should be valid
     let moves = state.get_possible_moves();
     assert!(moves.contains(&iterative_result.best_move.unwrap()));
-    assert!(moves.contains(&regular_result.unwrap()));
+    assert!(moves.contains(&regular_result.best_move.unwrap()));
 }
 
 #[test]

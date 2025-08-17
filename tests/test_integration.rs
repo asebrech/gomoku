@@ -8,10 +8,10 @@ fn test_find_best_move_first_move() {
     let mut state = GameState::new(19, 5);
     let mut tt = TranspositionTable::default();
 
-    let best_move = find_best_move(&mut state, 2, None, &mut tt);
+    let result = find_best_move(&mut state, 2, None, &mut tt);
 
     // Should return center move for first move
-    assert_eq!(best_move, Some((9, 9)));
+    assert_eq!(result.best_move, Some((9, 9)));
 }
 
 #[test]
@@ -22,11 +22,11 @@ fn test_find_best_move_response() {
     // Make first move
     state.make_move((9, 9));
 
-    let best_move = find_best_move(&mut state, 2, None, &mut tt);
+    let result = find_best_move(&mut state, 2, None, &mut tt);
 
     // Should return some adjacent move
-    assert!(best_move.is_some());
-    let (row, col) = best_move.unwrap();
+    assert!(result.best_move.is_some());
+    let (row, col) = result.best_move.unwrap();
     assert!(state.board.is_adjacent_to_stone(row, col));
 }
 
@@ -42,11 +42,11 @@ fn test_find_best_move_winning_opportunity() {
     state.board.place_stone(9, 8, Player::Max);
     state.current_player = Player::Max;
 
-    let best_move = find_best_move(&mut state, 2, None, &mut tt);
+    let result = find_best_move(&mut state, 2, None, &mut tt);
 
     // Should find the winning move
-    assert!(best_move.is_some());
-    let (row, col) = best_move.unwrap();
+    assert!(result.best_move.is_some());
+    let (row, col) = result.best_move.unwrap();
 
     // Should be adjacent to complete the line
     assert!(row == 9 && (col == 4 || col == 9));
@@ -64,11 +64,11 @@ fn test_find_best_move_block_opponent() {
     state.board.place_stone(9, 8, Player::Min);
     state.current_player = Player::Max;
 
-    let best_move = find_best_move(&mut state, 2, None, &mut tt);
+    let result = find_best_move(&mut state, 2, None, &mut tt);
 
     // Should find a blocking move
-    assert!(best_move.is_some());
-    let (row, col) = best_move.unwrap();
+    assert!(result.best_move.is_some());
+    let (row, col) = result.best_move.unwrap();
     
     println!("AI chose: ({}, {})", row, col);
     
@@ -92,11 +92,11 @@ fn test_find_best_move_capture_opportunity() {
     state.board.place_stone(9, 11, Player::Min);
     state.current_player = Player::Max;
 
-    let best_move = find_best_move(&mut state, 2, None, &mut tt);
+    let result = find_best_move(&mut state, 2, None, &mut tt);
 
     // Should find a move (capture move would be at (9, 12) to complete Max-Min-Min-Max)
-    assert!(best_move.is_some());
-    let (row, col) = best_move.unwrap();
+    assert!(result.best_move.is_some());
+    let (row, col) = result.best_move.unwrap();
     
     // Verify it's a valid move
     let possible_moves = state.get_possible_moves();
@@ -123,10 +123,10 @@ fn test_find_best_move_no_moves() {
         }
     }
 
-    let best_move = find_best_move(&mut state, 2, None, &mut tt);
+    let result = find_best_move(&mut state, 2, None, &mut tt);
 
     // Should return None when no moves available
-    assert_eq!(best_move, None);
+    assert_eq!(result.best_move, None);
 }
 
 #[test]
@@ -139,12 +139,12 @@ fn test_find_best_move_different_depths() {
     state.board.place_stone(9, 10, Player::Min);
     state.current_player = Player::Max;
 
-    let move_depth1 = find_best_move(&mut state, 1, None, &mut tt);
-    let move_depth3 = find_best_move(&mut state, 3, None, &mut tt);
+    let result1 = find_best_move(&mut state, 1, None, &mut tt);
+    let result3 = find_best_move(&mut state, 3, None, &mut tt);
 
     // Both should return valid moves
-    assert!(move_depth1.is_some());
-    assert!(move_depth3.is_some());
+    assert!(result1.best_move.is_some());
+    assert!(result3.best_move.is_some());
 
     // Moves might be different due to deeper search
     // (but this isn't guaranteed, so we just check validity)
@@ -159,15 +159,15 @@ fn test_find_best_move_player_alternation() {
     state.current_player = Player::Max;
     state.board.place_stone(9, 9, Player::Min); // Add opponent stone
 
-    let move_max = find_best_move(&mut state, 2, None, &mut tt);
-    assert!(move_max.is_some());
+    let result_max = find_best_move(&mut state, 2, None, &mut tt);
+    assert!(result_max.best_move.is_some());
 
     // Test with Min player
     state.current_player = Player::Min;
     state.board.place_stone(9, 10, Player::Max); // Add opponent stone
 
-    let move_min = find_best_move(&mut state, 2, None, &mut tt);
-    assert!(move_min.is_some());
+    let result_min = find_best_move(&mut state, 2, None, &mut tt);
+    assert!(result_min.best_move.is_some());
 }
 
 #[test]
@@ -184,12 +184,12 @@ fn test_find_best_move_complex_position() {
     state.board.place_stone(10, 10, Player::Min);
     state.current_player = Player::Max;
 
-    let best_move = find_best_move(&mut state, 2, None, &mut tt);
+    let result = find_best_move(&mut state, 2, None, &mut tt);
 
     // Should find some reasonable move
-    assert!(best_move.is_some());
+    assert!(result.best_move.is_some());
 
-    let (row, col) = best_move.unwrap();
+    let (row, col) = result.best_move.unwrap();
     let possible_moves = state.get_possible_moves();
     assert!(possible_moves.contains(&(row, col)));
 }
@@ -205,7 +205,7 @@ fn test_find_best_move_state_preservation() {
     let initial_hash = state.hash();
 
     // Find best move
-    let _best_move = find_best_move(&mut state, 2, None, &mut tt);
+    let _result = find_best_move(&mut state, 2, None, &mut tt);
 
     // State should be preserved
     assert_eq!(state.hash(), initial_hash);
@@ -223,10 +223,10 @@ fn test_find_best_move_consistent_results() {
     state.current_player = Player::Min;
 
     // Multiple calls should give same result
-    let move1 = find_best_move(&mut state, 2, None, &mut tt);
-    let move2 = find_best_move(&mut state, 2, None, &mut tt);
+    let result1 = find_best_move(&mut state, 2, None, &mut tt);
+    let result2 = find_best_move(&mut state, 2, None, &mut tt);
 
-    assert_eq!(move1, move2);
+    assert_eq!(result1.best_move, result2.best_move);
 }
 
 #[test]
@@ -247,12 +247,12 @@ fn test_find_best_move_edge_cases() {
     state.board.place_stone(9, 9, Player::Max);
     state.current_player = Player::Min;
 
-    let best_move = find_best_move(&mut state, 2, None, &mut tt);
+    let result = find_best_move(&mut state, 2, None, &mut tt);
 
     // Should find one of the few available moves
-    assert!(best_move.is_some());
+    assert!(result.best_move.is_some());
 
-    let (row, col) = best_move.unwrap();
+    let (row, col) = result.best_move.unwrap();
     assert!(state.board.is_empty_position(row, col));
 }
 
@@ -270,11 +270,11 @@ fn test_find_best_move_capture_win() {
     state.board.place_stone(9, 11, Player::Min);
     state.current_player = Player::Max;
 
-    let best_move = find_best_move(&mut state, 3, None, &mut tt);
+    let result = find_best_move(&mut state, 3, None, &mut tt);
 
     // Should find the capturing move
-    assert!(best_move.is_some());
-    let (row, col) = best_move.unwrap();
+    assert!(result.best_move.is_some());
+    let (row, col) = result.best_move.unwrap();
     
     // Test that this move leads to a capture
     let initial_captures = state.max_captures;
@@ -303,11 +303,11 @@ fn test_find_best_move_defensive_priority() {
     
     state.current_player = Player::Min; // Min must defend
     
-    let best_move = find_best_move(&mut state, 3, None, &mut tt);
+    let result = find_best_move(&mut state, 3, None, &mut tt);
     
     // Should find the blocking move
-    assert!(best_move.is_some());
-    let (row, col) = best_move.unwrap();
+    assert!(result.best_move.is_some());
+    let (row, col) = result.best_move.unwrap();
     
     // Should block the winning threat - either at (7, 4) or (7, 9)
     let valid_blocks = [(7, 4), (7, 9)];
@@ -321,10 +321,10 @@ fn test_find_best_move_different_board_sizes() {
     let mut state15 = GameState::new(15, 5);
     let mut tt = TranspositionTable::default();
 
-    let move13 = find_best_move(&mut state13, 2, None, &mut tt);
-    let move15 = find_best_move(&mut state15, 2, None, &mut tt);
+    let result13 = find_best_move(&mut state13, 2, None, &mut tt);
+    let result15 = find_best_move(&mut state15, 2, None, &mut tt);
 
     // Should find center moves for different board sizes
-    assert_eq!(move13, Some((6, 6)));
-    assert_eq!(move15, Some((7, 7)));
+    assert_eq!(result13.best_move, Some((6, 6)));
+    assert_eq!(result15.best_move, Some((7, 7)));
 }

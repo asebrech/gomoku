@@ -1,4 +1,4 @@
-use crate::ai::{minimax::iterative_deepening_search, transposition::TranspositionTable};
+use crate::ai::{minimax::{iterative_deepening_search, SearchResult}, transposition::TranspositionTable};
 use crate::core::state::GameState;
 use std::time::Duration;
 
@@ -7,7 +7,6 @@ pub fn find_best_move(
     max_depth: i32, 
     time_limit: Option<Duration>,
     tt: &mut TranspositionTable
-) -> Option<(usize, usize)> {
-    let result = iterative_deepening_search(state, max_depth, time_limit, tt);
-    result.best_move
+) -> SearchResult {
+    iterative_deepening_search(state, max_depth, time_limit, tt)
 }
