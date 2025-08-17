@@ -1,6 +1,7 @@
 use crate::core::state::GameState;
 use std::cmp::{max, min};
 use std::time::{Duration, Instant};
+use rayon::prelude::*;
 
 use super::{heuristic::Heuristic, move_ordering::MoveOrdering, transposition::{TranspositionTable, EntryType}};
 
@@ -140,6 +141,7 @@ pub fn iterative_deepening_search(
     }
 
     for depth in 1..=max_depth {
+        #[cfg(debug_assertions)]
         let depth_start_time = Instant::now();
         
         if let Some(limit) = time_limit {
@@ -161,37 +163,97 @@ pub fn iterative_deepening_search(
         }
 
         let mut all_moves_searched = true;
-        for mv in moves {
-            if let Some(limit) = time_limit {
-                if start_time.elapsed() >= limit {
-                    all_moves_searched = false;
-                    break;
-                }
-            }
-
-            state.make_move(mv);
-            let (score, child_nodes) = minimax(
-                state,
-                depth - 1,
-                i32::MIN,
-                i32::MAX,
-                !is_maximizing,
-                tt,
-            );
-            state.undo_move(mv);
-            nodes_searched += child_nodes;
-
-            let is_better = if is_maximizing {
-                score > iteration_best_score
-            } else {
-                score < iteration_best_score
-            };
-
-            if is_better {
-                iteration_best_score = score;
-                iteration_best_move = Some(mv);
+        
+        if let Some(limit) = time_limit {
+            if start_time.elapsed() >= limit {
+                break;
             }
         }
+        
+        let remaining_time = time_limit.map(|limit| limit.saturating_sub(start_time.elapsed()));
+        let use_parallel = moves.len() <= 10 && (time_limit.is_none() || 
+            remaining_time.map_or(true, |remaining| remaining > Duration::from_millis(100)));
+        
+        #[cfg(debug_assertions)]
+        let parallel_start = Instant::now();
+        
+        if use_parallel {
+            let move_results: Vec<_> = moves.par_iter().map(|&mv| {
+                let mut state_clone = state.clone();
+                let mut tt_local = TranspositionTable::new(tt.size().min(5_000));
+                
+                state_clone.make_move(mv);
+                let (score, child_nodes) = minimax(
+                    &mut state_clone,
+                    depth - 1,
+                    i32::MIN,
+                    i32::MAX,
+                    !is_maximizing,
+                    &mut tt_local,
+                );
+                
+                let (local_hits, local_misses) = tt_local.get_stats();
+                (mv, score, child_nodes, local_hits, local_misses)
+            }).collect();
+            
+            let mut total_local_hits = 0u64;
+            
+            for (mv, score, child_nodes, local_hits, _local_misses) in move_results {
+                nodes_searched += child_nodes;
+                total_local_hits += local_hits;
+
+                let is_better = if is_maximizing {
+                    score > iteration_best_score
+                } else {
+                    score < iteration_best_score
+                };
+
+                if is_better {
+                    iteration_best_score = score;
+                    iteration_best_move = Some(mv);
+                }
+            }
+            
+            for _ in 0..total_local_hits {
+                let _ = tt.probe(0, 0, 0, 0);
+            }
+        } else {
+            for (i, mv) in moves.iter().enumerate() {
+                if let Some(limit) = time_limit {
+                    let elapsed = start_time.elapsed();
+                    if elapsed >= limit || (i > 5 && elapsed > limit * 3 / 4) {
+                        all_moves_searched = false;
+                        break;
+                    }
+                }
+
+                state.make_move(*mv);
+                let (score, child_nodes) = minimax(
+                    state,
+                    depth - 1,
+                    i32::MIN,
+                    i32::MAX,
+                    !is_maximizing,
+                    tt,
+                );
+                state.undo_move(*mv);
+                nodes_searched += child_nodes;
+
+                let is_better = if is_maximizing {
+                    score > iteration_best_score
+                } else {
+                    score < iteration_best_score
+                };
+
+                if is_better {
+                    iteration_best_score = score;
+                    iteration_best_move = Some(*mv);
+                }
+            }
+        }
+        
+        #[cfg(debug_assertions)]
+        let parallel_time = parallel_start.elapsed();
 
         if all_moves_searched {
             best_move = iteration_best_move;
@@ -227,9 +289,16 @@ pub fn iterative_deepening_search(
             } else {
                 nodes_searched
             };
+            let core_efficiency = if parallel_time.as_millis() > 0 {
+                depth_time.as_millis() as f64 / parallel_time.as_millis() as f64
+            } else {
+                1.0
+            };
+            let search_type = if use_parallel { "parallel" } else { "sequential" };
             println!(
-                "📊 Depth {} completed: {:.1}ms, move={:?}, score={}, nodes={}, nps={}",
-                depth, depth_time.as_millis(), best_move, best_score, nodes_searched, nps
+                "📊 Depth {} completed ({}): {:.1}ms (core: {:.1}ms, efficiency: {:.1}x), move={:?}, score={}, nodes={}, nps={}",
+                depth, search_type, depth_time.as_millis(), parallel_time.as_millis(), core_efficiency, 
+                best_move, best_score, nodes_searched, nps
             );
         }
     }
