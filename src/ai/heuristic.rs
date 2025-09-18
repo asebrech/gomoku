@@ -158,6 +158,31 @@ impl Heuristic {
         }
 
         let length = length.min(win_condition);
+        
+        // Check if this pattern has sufficient space to develop into a winning line
+        if !Self::has_sufficient_space(
+            board,
+            pattern_start_row,
+            pattern_start_col,
+            dx,
+            dy,
+            length,
+            player,
+            win_condition,
+        ) {
+            // Mark as analyzed but don't score it
+            Self::mark_pattern_analyzed(
+                pattern_start_row,
+                pattern_start_col,
+                dx,
+                dy,
+                length,
+                analyzed,
+                bit_mask,
+            );
+            return None;
+        }
+        
         let is_live =
             Self::is_pattern_live(board, pattern_start_row, pattern_start_col, dx, dy, length);
 
@@ -272,6 +297,88 @@ impl Heuristic {
         }
         let idx = board.index(row as usize, col as usize);
         !Board::is_bit_set(&board.occupied, idx)
+    }
+
+    fn has_sufficient_space(
+        board: &Board,
+        start_row: usize,
+        start_col: usize,
+        dx: isize,
+        dy: isize,
+        length: usize,
+        player: Player,
+        win_condition: usize,
+    ) -> bool {
+        let player_bits = match player {
+            Player::Max => &board.max_bits,
+            Player::Min => &board.min_bits,
+        };
+        let opponent_bits = match player {
+            Player::Max => &board.min_bits,
+            Player::Min => &board.max_bits,
+        };
+
+        // Count total available space in both directions from the pattern
+        let mut total_space = length; // Current pattern length
+        
+        // Count backwards from pattern start
+        let mut pos_row = start_row as isize - dx;
+        let mut pos_col = start_col as isize - dy;
+        let mut backward_space = 0;
+        
+        while pos_row >= 0 
+            && pos_row < board.size as isize 
+            && pos_col >= 0 
+            && pos_col < board.size as isize 
+            && backward_space < win_condition
+        {
+            let idx = board.index(pos_row as usize, pos_col as usize);
+            
+            // Stop if we hit an opponent stone
+            if Board::is_bit_set(opponent_bits, idx) {
+                break;
+            }
+            
+            // Count empty spaces and our own stones
+            if !Board::is_bit_set(&board.occupied, idx) || Board::is_bit_set(player_bits, idx) {
+                backward_space += 1;
+                pos_row -= dx;
+                pos_col -= dy;
+            } else {
+                break;
+            }
+        }
+        
+        // Count forwards from pattern end
+        let mut pos_row = start_row as isize + (length as isize * dx);
+        let mut pos_col = start_col as isize + (length as isize * dy);
+        let mut forward_space = 0;
+        
+        while pos_row >= 0 
+            && pos_row < board.size as isize 
+            && pos_col >= 0 
+            && pos_col < board.size as isize 
+            && forward_space < win_condition
+        {
+            let idx = board.index(pos_row as usize, pos_col as usize);
+            
+            // Stop if we hit an opponent stone
+            if Board::is_bit_set(opponent_bits, idx) {
+                break;
+            }
+            
+            // Count empty spaces and our own stones
+            if !Board::is_bit_set(&board.occupied, idx) || Board::is_bit_set(player_bits, idx) {
+                forward_space += 1;
+                pos_row += dx;
+                pos_col += dy;
+            } else {
+                break;
+            }
+        }
+        
+        total_space += backward_space + forward_space;
+        total_space >= win_condition
     }
 
     fn mark_pattern_analyzed(

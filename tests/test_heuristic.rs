@@ -113,9 +113,9 @@ fn test_heuristic_blocked_line() {
 
     let score = Heuristic::evaluate(&state, 1);
 
-    // Should be less favorable than open line
-    // Since blocked lines get score 0, other factors determine the score
-    assert!(score != 0); // Not zero due to other evaluations
+    // Completely blocked patterns should not contribute to score
+    // since they have no winning potential
+    assert_eq!(score, 0); // Should be zero since blocked pattern has no value
 }
 
 #[test]
@@ -346,4 +346,125 @@ fn test_heuristic_pattern_counting_accuracy() {
     // Should score as 2 live threes: actual score is 11,000 which includes other pattern bonuses
     assert!(score >= 10_000 && score < 20_000, 
             "Two separate live threes should score moderately: {}", score);
+}
+
+#[test]
+fn test_heuristic_insufficient_space_near_edge() {
+    let mut state = GameState::new(19, 5);
+
+    // Place a pattern near the right edge that can't develop into 5-in-a-row
+    // Position 17: X X . (only 2 positions total available to the right)
+    state.board.place_stone(9, 17, Player::Max);
+    state.board.place_stone(9, 18, Player::Max);
+
+    let score = Heuristic::evaluate(&state, 1);
+    
+    // Should be 0 because the pattern has insufficient space to win
+    assert_eq!(score, 0, "Pattern near edge without winning potential should score 0");
+}
+
+#[test]
+fn test_heuristic_sufficient_space_analysis() {
+    let mut state1 = GameState::new(19, 5);
+    let mut state2 = GameState::new(19, 5);
+
+    // State 1: Pattern with sufficient space (middle of board)
+    state1.board.place_stone(9, 9, Player::Max);
+    state1.board.place_stone(9, 10, Player::Max);
+
+    // State 2: Same pattern near edge without sufficient space  
+    state2.board.place_stone(9, 17, Player::Max);
+    state2.board.place_stone(9, 18, Player::Max);
+
+    let score1 = Heuristic::evaluate(&state1, 1);
+    let score2 = Heuristic::evaluate(&state2, 1);
+
+    // Pattern with sufficient space should score positively
+    assert!(score1 > 0, "Pattern with sufficient space should score positively: {}", score1);
+    
+    // Pattern without sufficient space should score 0
+    assert_eq!(score2, 0, "Pattern without sufficient space should score 0");
+}
+
+#[test]
+fn test_heuristic_space_with_obstacles() {
+    let mut state = GameState::new(19, 5);
+
+    // Create a pattern that would have space, but opponent stones block it
+    // Layout: O X X . . O (total space = 4, not enough for 5-in-a-row)
+    state.board.place_stone(9, 5, Player::Min);  // Obstacle on left
+    state.board.place_stone(9, 6, Player::Max);
+    state.board.place_stone(9, 7, Player::Max);
+    // positions 8,9 are empty
+    state.board.place_stone(9, 10, Player::Min); // Obstacle on right
+
+    let score = Heuristic::evaluate(&state, 1);
+    
+    // Should be 0 because total available space (4) < win_condition (5)
+    assert_eq!(score, 0, "Pattern blocked by opponents without sufficient space should score 0");
+}
+
+#[test]
+fn test_heuristic_space_with_own_stones() {
+    let mut state = GameState::new(19, 5);
+
+    // Create a pattern where our own stones provide the necessary space
+    // Layout: X . X X . (total space = 5, exactly enough for 5-in-a-row)
+    state.board.place_stone(9, 6, Player::Max);
+    // position 7 is empty
+    state.board.place_stone(9, 8, Player::Max);
+    state.board.place_stone(9, 9, Player::Max);
+    // position 10 is empty
+
+    let score = Heuristic::evaluate(&state, 1);
+    
+    // Should score positively because total space (including our stones) = 5
+    assert!(score > 0, "Pattern with sufficient space (including own stones) should score positively: {}", score);
+}
+
+#[test]
+fn test_heuristic_corner_patterns() {
+    let mut state = GameState::new(19, 5);
+
+    // Test patterns in corners and edges
+    // Corner pattern: can't possibly win
+    state.board.place_stone(0, 0, Player::Max);
+    state.board.place_stone(0, 1, Player::Max);
+    state.board.place_stone(1, 0, Player::Max);
+
+    let score = Heuristic::evaluate(&state, 1);
+    
+    // Should be 0 because corner patterns can't develop into 5-in-a-row
+    assert_eq!(score, 0, "Corner patterns without winning potential should score 0");
+}
+
+#[test]
+fn test_heuristic_minimal_winning_space() {
+    let mut state = GameState::new(7, 5); // Smaller board for easier testing
+
+    // Create a pattern that exactly fits the board width
+    // On 7x7 board: . X X X . . (total space = 5, exactly enough)
+    state.board.place_stone(3, 1, Player::Max);
+    state.board.place_stone(3, 2, Player::Max);
+    state.board.place_stone(3, 3, Player::Max);
+
+    let score = Heuristic::evaluate(&state, 1);
+    
+    // Should score positively because total space exactly equals win_condition
+    assert!(score > 0, "Pattern with exactly sufficient space should score positively: {}", score);
+}
+
+#[test]
+fn test_heuristic_diagonal_space_analysis() {
+    let mut state = GameState::new(19, 5);
+
+    // Test diagonal pattern very close to corner - insufficient space
+    // Position (17,17) and (18,18) - only 2 positions available in diagonal
+    state.board.place_stone(17, 17, Player::Max);
+    state.board.place_stone(18, 18, Player::Max);
+
+    let score = Heuristic::evaluate(&state, 1);
+    
+    // Should be 0 because diagonal near corner lacks space (only 2 total positions)
+    assert_eq!(score, 0, "Diagonal pattern near corner should score 0 due to insufficient space");
 }
