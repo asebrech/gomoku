@@ -94,8 +94,13 @@ impl Heuristic {
         let max_score = Self::calculate_pattern_score(max_counts);
         let min_score = Self::calculate_pattern_score(min_counts);
         let capture_bonus = Self::calculate_capture_bonus(state);
+        let historical_bonus = Self::calculate_historical_bonus(state);
 
-        max_score - min_score + capture_bonus
+        max_score - min_score + capture_bonus + historical_bonus
+    }
+
+    fn calculate_historical_bonus(state: &GameState) -> i32 {
+        state.pattern_analyzer.calculate_historical_bonus(state)
     }
 
     fn analyze_both_players(board: &Board, win_condition: usize) -> (PatternCounts, PatternCounts) {
