@@ -7,23 +7,36 @@ const WINNING_SCORE: i32 = 1_000_000;
 const FIVE_IN_ROW_SCORE: i32 = 100_000;
 const LIVE_FOUR_SINGLE_SCORE: i32 = 15_000;
 const LIVE_FOUR_MULTIPLE_SCORE: i32 = 20_000;
+const HALF_FREE_FOUR_SCORE: i32 = 5_000;
 const WINNING_THREAT_SCORE: i32 = 10_000;
 const DEAD_FOUR_SCORE: i32 = 1_000;
 const LIVE_THREE_SCORE: i32 = 500;
+const HALF_FREE_THREE_SCORE: i32 = 200;
 const DEAD_THREE_SCORE: i32 = 100;
 const LIVE_TWO_SCORE: i32 = 50;
+const HALF_FREE_TWO_SCORE: i32 = 20;
 const CAPTURE_BONUS_MULTIPLIER: i32 = 1_000;
 
 const DIRECTIONS: [(isize, isize); 4] = [(1, 0), (0, 1), (1, 1), (1, -1)];
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum PatternFreedom {
+    Free,     // Both ends open: . X X X .
+    HalfFree, // One end open:   O X X X . or . X X X O
+    Flanked,  // Both blocked:   O X X X O
+}
 
 #[derive(Debug, Clone, Copy)]
 struct PatternCounts {
     five_in_row: u8,
     live_four: u8,
+    half_free_four: u8,
     dead_four: u8,
     live_three: u8,
+    half_free_three: u8,
     dead_three: u8,
     live_two: u8,
+    half_free_two: u8,
 }
 
 impl PatternCounts {
@@ -31,10 +44,13 @@ impl PatternCounts {
         Self {
             five_in_row: 0,
             live_four: 0,
+            half_free_four: 0,
             dead_four: 0,
             live_three: 0,
+            half_free_three: 0,
             dead_three: 0,
             live_two: 0,
+            half_free_two: 0,
         }
     }
 }
@@ -42,7 +58,7 @@ impl PatternCounts {
 #[derive(Debug, Clone, Copy)]
 struct PatternInfo {
     length: usize,
-    is_live: bool,
+    freedom: PatternFreedom,
 }
 
 impl Heuristic {
@@ -183,8 +199,8 @@ impl Heuristic {
             return None;
         }
         
-        let is_live =
-            Self::is_pattern_live(board, pattern_start_row, pattern_start_col, dx, dy, length);
+        let freedom =
+            Self::analyze_pattern_freedom(board, pattern_start_row, pattern_start_col, dx, dy, length);
 
         Self::mark_pattern_analyzed(
             pattern_start_row,
@@ -196,7 +212,7 @@ impl Heuristic {
             bit_mask,
         );
 
-        Some(PatternInfo { length, is_live })
+        Some(PatternInfo { length, freedom })
     }
 
     fn count_consecutive(
@@ -271,14 +287,14 @@ impl Heuristic {
         (current_row as usize, current_col as usize)
     }
 
-    fn is_pattern_live(
+    fn analyze_pattern_freedom(
         board: &Board,
         start_row: usize,
         start_col: usize,
         dx: isize,
         dy: isize,
         length: usize,
-    ) -> bool {
+    ) -> PatternFreedom {
         let before_row = start_row as isize - dx;
         let before_col = start_col as isize - dy;
         let start_open = Self::is_position_empty(board, before_row, before_col);
@@ -287,7 +303,11 @@ impl Heuristic {
         let end_col = start_col as isize + (length as isize * dy);
         let end_open = Self::is_position_empty(board, end_row, end_col);
 
-        start_open && end_open
+        match (start_open, end_open) {
+            (true, true) => PatternFreedom::Free,
+            (true, false) | (false, true) => PatternFreedom::HalfFree,
+            (false, false) => PatternFreedom::Flanked,
+        }
     }
 
     #[inline(always)]
@@ -402,25 +422,21 @@ impl Heuristic {
     fn update_counts(counts: &mut PatternCounts, pattern: PatternInfo) {
         match pattern.length {
             5 => counts.five_in_row += 1,
-            4 => {
-                if pattern.is_live {
-                    counts.live_four += 1;
-                } else {
-                    counts.dead_four += 1;
-                }
-            }
-            3 => {
-                if pattern.is_live {
-                    counts.live_three += 1;
-                } else {
-                    counts.dead_three += 1;
-                }
-            }
-            2 => {
-                if pattern.is_live {
-                    counts.live_two += 1;
-                }
-            }
+            4 => match pattern.freedom {
+                PatternFreedom::Free => counts.live_four += 1,
+                PatternFreedom::HalfFree => counts.half_free_four += 1,
+                PatternFreedom::Flanked => counts.dead_four += 1,
+            },
+            3 => match pattern.freedom {
+                PatternFreedom::Free => counts.live_three += 1,
+                PatternFreedom::HalfFree => counts.half_free_three += 1,
+                PatternFreedom::Flanked => counts.dead_three += 1,
+            },
+            2 => match pattern.freedom {
+                PatternFreedom::Free => counts.live_two += 1,
+                PatternFreedom::HalfFree => counts.half_free_two += 1,
+                PatternFreedom::Flanked => {}, // Don't count flanked twos
+            },
             _ => {}
         }
     }
@@ -438,17 +454,23 @@ impl Heuristic {
             _ => 0,
         };
 
+        // Enhanced threat detection including half-free patterns
         if counts.live_three >= 2
             || counts.dead_four >= 2
             || (counts.dead_four >= 1 && counts.live_three >= 1)
+            || (counts.half_free_four >= 1 && counts.live_three >= 1)
+            || (counts.half_free_four >= 2)
         {
             score += WINNING_THREAT_SCORE;
         }
 
-        score += (counts.dead_four as i32) * DEAD_FOUR_SCORE
+        score += (counts.half_free_four as i32) * HALF_FREE_FOUR_SCORE
+            + (counts.dead_four as i32) * DEAD_FOUR_SCORE
             + (counts.live_three as i32) * LIVE_THREE_SCORE
+            + (counts.half_free_three as i32) * HALF_FREE_THREE_SCORE
             + (counts.dead_three as i32) * DEAD_THREE_SCORE
-            + (counts.live_two as i32) * LIVE_TWO_SCORE;
+            + (counts.live_two as i32) * LIVE_TWO_SCORE
+            + (counts.half_free_two as i32) * HALF_FREE_TWO_SCORE;
 
         score
     }
