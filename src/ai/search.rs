@@ -52,7 +52,7 @@ pub fn find_best_move(
     for depth in 1..=max_depth {
         if let Some(limit) = time_limit {
             let elapsed = start_time.elapsed();
-            if elapsed >= limit || elapsed > limit * 4 / 5 {
+            if elapsed >= limit {
                 break;
             }
         }
@@ -71,16 +71,9 @@ pub fn find_best_move(
 
         let mut all_moves_searched = true;
         
-        if let Some(limit) = time_limit {
-            let elapsed = start_time.elapsed();
-            if elapsed >= limit {
-                break;
-            }
-        }
-        
         let remaining_time = time_limit.map(|limit| limit.saturating_sub(start_time.elapsed()));
-        let use_parallel = moves.len() <= 10 && (time_limit.is_none() || 
-            remaining_time.map_or(true, |remaining| remaining > Duration::from_millis(200)));
+        let use_parallel = moves.len() <= 15 && (time_limit.is_none() || 
+            remaining_time.map_or(true, |remaining| remaining > Duration::from_millis(50)));
         
         if use_parallel {
             let move_results: Vec<_> = moves.par_iter().map(|&mv| {
@@ -125,10 +118,10 @@ pub fn find_best_move(
                 let _ = tt.probe(0, 0, 0, 0);
             }
         } else {
-            for (i, mv) in moves.iter().enumerate() {
+            for mv in moves.iter() {
                 if let Some(limit) = time_limit {
                     let elapsed = start_time.elapsed();
-                    if elapsed >= limit || (i > 2 && elapsed > limit / 2) {
+                    if elapsed >= limit {
                         all_moves_searched = false;
                         break;
                     }
