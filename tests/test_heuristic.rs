@@ -4,8 +4,8 @@ use gomoku::core::state::GameState;
 
 #[test]
 fn test_heuristic_empty_board() {
-    let state = GameState::new(19, 5);
-    let score = Heuristic::evaluate(&state, 1);
+    let mut state = GameState::new(19, 5);
+    let score = Heuristic::evaluate(&mut state, 1);
 
     // Empty board should have neutral score
     assert_eq!(score, 0);
@@ -16,7 +16,7 @@ fn test_heuristic_winner_max() {
     let mut state = GameState::new(19, 5);
     state.winner = Some(Player::Max);
 
-    let score = Heuristic::evaluate(&state, 1);
+    let score = Heuristic::evaluate(&mut state, 1);
     assert_eq!(score, 1_000_001);
 }
 
@@ -25,7 +25,7 @@ fn test_heuristic_winner_min() {
     let mut state = GameState::new(19, 5);
     state.winner = Some(Player::Min);
 
-    let score = Heuristic::evaluate(&state, 1);
+    let score = Heuristic::evaluate(&mut state, 1);
     assert_eq!(score, -1_000_001);
 }
 
@@ -34,7 +34,7 @@ fn test_heuristic_capture_win_max() {
     let mut state = GameState::new(19, 5);
     state.max_captures = 5; // 5 pairs captured = win
 
-    let score = Heuristic::evaluate(&state, 1);
+    let score = Heuristic::evaluate(&mut state, 1);
     assert_eq!(score, 1_000_001);
 }
 
@@ -43,7 +43,7 @@ fn test_heuristic_capture_win_min() {
     let mut state = GameState::new(19, 5);
     state.min_captures = 5; // 5 pairs captured = win
 
-    let score = Heuristic::evaluate(&state, 1);
+    let score = Heuristic::evaluate(&mut state, 1);
     assert_eq!(score, -1_000_001);
 }
 
@@ -62,7 +62,7 @@ fn test_heuristic_no_moves_draw() {
     state.board.place_stone(2, 1, Player::Min);
     state.board.place_stone(2, 2, Player::Max);
 
-    let score = Heuristic::evaluate(&state, 1);
+    let score = Heuristic::evaluate(&mut state, 1);
     assert_eq!(score, 0); // Draw
 }
 
@@ -76,7 +76,7 @@ fn test_heuristic_capture_advantage() {
 
     state.board.place_stone(9, 9, Player::Max); // Add some stones to avoid empty board
 
-    let score = Heuristic::evaluate(&state, 1);
+    let score = Heuristic::evaluate(&mut state, 1);
 
     // Should favor Max due to capture advantage
     assert!(score > 0);
@@ -94,7 +94,7 @@ fn test_heuristic_line_evaluation() {
     state.board.place_stone(9, 8, Player::Max);
     state.board.place_stone(9, 9, Player::Max);
 
-    let score = Heuristic::evaluate(&state, 1);
+    let score = Heuristic::evaluate(&mut state, 1);
 
     // Should be positive (favoring Max)
     assert!(score > 0);
@@ -111,7 +111,7 @@ fn test_heuristic_blocked_line() {
     state.board.place_stone(9, 9, Player::Max);
     state.board.place_stone(9, 10, Player::Min); // Block right
 
-    let score = Heuristic::evaluate(&state, 1);
+    let score = Heuristic::evaluate(&mut state, 1);
 
     // Completely blocked patterns should not contribute to score
     // since they have no winning potential
@@ -134,8 +134,8 @@ fn test_heuristic_open_line_vs_blocked() {
     state2.board.place_stone(9, 8, Player::Max);
     state2.board.place_stone(9, 9, Player::Max);
 
-    let score1 = Heuristic::evaluate(&state1, 1);
-    let score2 = Heuristic::evaluate(&state2, 1);
+    let score1 = Heuristic::evaluate(&mut state1, 1);
+    let score2 = Heuristic::evaluate(&mut state2, 1);
 
     // Open line should be better than semi-open
     assert!(score1 > score2);
@@ -150,7 +150,7 @@ fn test_heuristic_opponent_advantage() {
     state.board.place_stone(9, 8, Player::Min);
     state.board.place_stone(9, 9, Player::Min);
 
-    let score = Heuristic::evaluate(&state, 1);
+    let score = Heuristic::evaluate(&mut state, 1);
 
     // Should be negative (favoring Min)
     assert!(score < 0);
@@ -166,7 +166,7 @@ fn test_heuristic_multiple_directions() {
     state.board.place_stone(8, 9, Player::Max); // Vertical
     state.board.place_stone(8, 8, Player::Max); // Diagonal
 
-    let score = Heuristic::evaluate(&state, 1);
+    let score = Heuristic::evaluate(&mut state, 1);
 
     // Should be strongly positive due to multiple threats
     assert!(score > 100);
@@ -181,7 +181,7 @@ fn test_heuristic_winning_line_excluded() {
         state.board.place_stone(9, 5 + i, Player::Max);
     }
 
-    let score = Heuristic::evaluate(&state, 1);
+    let score = Heuristic::evaluate(&mut state, 1);
 
     // Winning lines should not contribute to line evaluation
     // Score should be based on other factors
@@ -209,9 +209,9 @@ fn test_heuristic_different_line_lengths() {
     state4.board.place_stone(9, 8, Player::Max);
     state4.board.place_stone(9, 9, Player::Max);
 
-    let score2 = Heuristic::evaluate(&state2, 1);
-    let score3 = Heuristic::evaluate(&state3, 1);
-    let score4 = Heuristic::evaluate(&state4, 1);
+    let score2 = Heuristic::evaluate(&mut state2, 1);
+    let score3 = Heuristic::evaluate(&mut state3, 1);
+    let score4 = Heuristic::evaluate(&mut state4, 1);
 
     // Longer lines should be more valuable
     assert!(score2 < score3);
@@ -227,7 +227,7 @@ fn test_heuristic_edge_cases() {
     state.board.place_stone(0, 1, Player::Max);
     state.board.place_stone(0, 2, Player::Max);
 
-    let score = Heuristic::evaluate(&state, 1);
+    let score = Heuristic::evaluate(&mut state, 1);
 
     // Should handle edge cases without crashing
     assert!(score != 0);
@@ -247,8 +247,8 @@ fn test_heuristic_symmetry() {
     state_min.board.place_stone(9, 8, Player::Min);
     state_min.board.place_stone(9, 9, Player::Min);
 
-    let score_max = Heuristic::evaluate(&state_max, 1);
-    let score_min = Heuristic::evaluate(&state_min, 1);
+    let score_max = Heuristic::evaluate(&mut state_max, 1);
+    let score_min = Heuristic::evaluate(&mut state_min, 1);
 
         // Should be symmetric (opposite signs)
     assert_eq!(score_max, -score_min);
@@ -267,7 +267,7 @@ fn test_heuristic_multiple_live_four_detection() {
     state.board.place_stone(7, 8, Player::Max);
     // Positions (7,4) and (7,9) should be open
     
-    let score = Heuristic::evaluate(&state, 1);
+    let score = Heuristic::evaluate(&mut state, 1);
     
     // The actual score is 15,200 which suggests one live four (15,000) + some pattern bonus (200)
     // Let's adjust our expectation to match the implementation
@@ -292,8 +292,8 @@ fn test_heuristic_live_vs_dead_patterns() {
     dead_state.board.place_stone(7, 7, Player::Max);
     dead_state.board.place_stone(7, 8, Player::Max);
     
-    let live_score = Heuristic::evaluate(&live_state, 1);
-    let dead_score = Heuristic::evaluate(&dead_state, 1);
+    let live_score = Heuristic::evaluate(&mut live_state, 1);
+    let dead_score = Heuristic::evaluate(&mut dead_state, 1);
     
     // Live pattern should score much higher than half-free pattern
     assert!(live_score > dead_score + 9_000, 
@@ -319,7 +319,7 @@ fn test_heuristic_threat_combinations() {
     state.board.place_stone(2, 8, Player::Max);
     // Can extend at (2,5) or (2,9)
     
-    let score = Heuristic::evaluate(&state, 1);
+    let score = Heuristic::evaluate(&mut state, 1);
     
     // Dead four + live three should create winning threat (based on pattern values)
     // DEAD_FOUR_SCORE (1000) + LIVE_THREE_SCORE (500) = 1500, but patterns might interact
@@ -341,7 +341,7 @@ fn test_heuristic_pattern_counting_accuracy() {
     state.board.place_stone(8, 7, Player::Max);
     state.board.place_stone(9, 7, Player::Max);
     
-    let score = Heuristic::evaluate(&state, 1);
+    let score = Heuristic::evaluate(&mut state, 1);
     
     // Should score as 2 live threes: actual score is 11,000 which includes other pattern bonuses
     assert!(score >= 10_000 && score < 20_000, 
@@ -356,7 +356,7 @@ fn test_heuristic_insufficient_space_near_edge() {
     state.board.place_stone(1, 1, Player::Max);
     state.board.place_stone(1, 2, Player::Max);
 
-    let score = Heuristic::evaluate(&state, 1);
+    let score = Heuristic::evaluate(&mut state, 1);
     
     // Should be 0 because no pattern can reach 5-in-a-row on 4x4 board
     assert_eq!(score, 0, "Pattern on 4x4 board should score 0 (impossible to win)");
@@ -375,8 +375,8 @@ fn test_heuristic_sufficient_space_analysis() {
     state2.board.place_stone(1, 1, Player::Max);
     state2.board.place_stone(1, 2, Player::Max);
 
-    let score1 = Heuristic::evaluate(&state1, 1);
-    let score2 = Heuristic::evaluate(&state2, 1);
+    let score1 = Heuristic::evaluate(&mut state1, 1);
+    let score2 = Heuristic::evaluate(&mut state2, 1);
 
     // Pattern with sufficient space should score positively
     assert!(score1 > 0, "Pattern with sufficient space should score positively: {}", score1);
@@ -397,7 +397,7 @@ fn test_heuristic_space_with_obstacles() {
     // positions 8,9 are empty
     state.board.place_stone(9, 10, Player::Min); // Obstacle on right
 
-    let score = Heuristic::evaluate(&state, 1);
+    let score = Heuristic::evaluate(&mut state, 1);
     
     // Should be 0 because total available space (4) < win_condition (5)
     assert_eq!(score, 0, "Pattern blocked by opponents without sufficient space should score 0");
@@ -415,7 +415,7 @@ fn test_heuristic_space_with_own_stones() {
     state.board.place_stone(9, 9, Player::Max);
     // position 10 is empty
 
-    let score = Heuristic::evaluate(&state, 1);
+    let score = Heuristic::evaluate(&mut state, 1);
     
     // Should score positively because total space (including our stones) = 5
     assert!(score > 0, "Pattern with sufficient space (including own stones) should score positively: {}", score);
@@ -430,7 +430,7 @@ fn test_heuristic_corner_patterns() {
     state.board.place_stone(0, 1, Player::Max);
     state.board.place_stone(1, 0, Player::Max);
 
-    let score = Heuristic::evaluate(&state, 1);
+    let score = Heuristic::evaluate(&mut state, 1);
     
     // Should be 0 because 5-in-a-row is impossible on 4x4 board
     assert_eq!(score, 0, "Patterns on 4x4 board should score 0 (impossible to win)");
@@ -446,7 +446,7 @@ fn test_heuristic_minimal_winning_space() {
     state.board.place_stone(3, 2, Player::Max);
     state.board.place_stone(3, 3, Player::Max);
 
-    let score = Heuristic::evaluate(&state, 1);
+    let score = Heuristic::evaluate(&mut state, 1);
     
     // Should score positively because total space exactly equals win_condition
     assert!(score > 0, "Pattern with exactly sufficient space should score positively: {}", score);
@@ -460,7 +460,7 @@ fn test_heuristic_diagonal_space_analysis() {
     state.board.place_stone(1, 1, Player::Max);
     state.board.place_stone(2, 2, Player::Max);
 
-    let score = Heuristic::evaluate(&state, 1);
+    let score = Heuristic::evaluate(&mut state, 1);
     
     // Should be 0 because 5-in-a-row is impossible on 4x4 board
     assert_eq!(score, 0, "Diagonal pattern on 4x4 board should score 0 (impossible to win)");
@@ -475,7 +475,7 @@ fn test_heuristic_freedom_classification() {
     state.board.place_stone(9, 7, Player::Max);
     state.board.place_stone(9, 8, Player::Max);
     
-    let free_score = Heuristic::evaluate(&state, 1);
+    let free_score = Heuristic::evaluate(&mut state, 1);
     
     // Reset board
     state = GameState::new(19, 5);
@@ -486,7 +486,7 @@ fn test_heuristic_freedom_classification() {
     state.board.place_stone(9, 7, Player::Max);
     state.board.place_stone(9, 8, Player::Max);
     
-    let half_free_score = Heuristic::evaluate(&state, 1);
+    let half_free_score = Heuristic::evaluate(&mut state, 1);
     
     // Reset board
     state = GameState::new(19, 5);
@@ -498,7 +498,7 @@ fn test_heuristic_freedom_classification() {
     state.board.place_stone(9, 8, Player::Max);
     state.board.place_stone(9, 9, Player::Min);
     
-    let flanked_score = Heuristic::evaluate(&state, 1);
+    let flanked_score = Heuristic::evaluate(&mut state, 1);
     
     // Free should score highest, then half-free, then flanked
     assert!(free_score > half_free_score, "Free pattern ({}) should score higher than half-free ({})", free_score, half_free_score);
@@ -516,7 +516,7 @@ fn test_heuristic_half_free_scoring() {
     state.board.place_stone(9, 8, Player::Max);
     state.board.place_stone(9, 9, Player::Max);
     
-    let score = Heuristic::evaluate(&state, 1);
+    let score = Heuristic::evaluate(&mut state, 1);
     
     // Should score 5000 points for half-free four
     assert!(score >= 5000 && score < 10000, "Half-free four should score around 5000 points: {}", score);
@@ -539,7 +539,7 @@ fn test_heuristic_threat_combinations_with_half_free() {
     state.board.place_stone(7, 9, Player::Max);
     state.board.place_stone(7, 10, Player::Max);
     
-    let score = Heuristic::evaluate(&state, 1);
+    let score = Heuristic::evaluate(&mut state, 1);
     
     // Should get winning threat bonus for combination
     assert!(score >= 10000, "Half-free four + live three should get threat bonus: {}", score);
@@ -564,7 +564,7 @@ fn test_heuristic_multiple_half_free_fours() {
     state.board.place_stone(7, 7, Player::Max);
     state.board.place_stone(7, 8, Player::Min);
     
-    let score = Heuristic::evaluate(&state, 1);
+    let score = Heuristic::evaluate(&mut state, 1);
     
     // Should get winning threat bonus for multiple half-free fours
     assert!(score >= 10000, "Multiple half-free fours should get threat bonus: {}", score);

@@ -1,5 +1,6 @@
 use crate::core::board::{Board, Player};
 use crate::core::state::GameState;
+use crate::ai::heuristic_cache::CachedPatternCounts;
 
 pub struct Heuristic;
 
@@ -62,7 +63,7 @@ struct PatternInfo {
 }
 
 impl Heuristic {
-    pub fn evaluate(state: &GameState, depth: i32) -> i32 {
+    pub fn evaluate(state: &mut GameState, depth: i32) -> i32 {
         if let Some(winner) = state.check_winner() {
             return match winner {
                 Player::Max => WINNING_SCORE + depth,
@@ -81,8 +82,19 @@ impl Heuristic {
             return 0;
         }
 
-        let (max_counts, min_counts) =
-            Self::analyze_both_players(&state.board, state.win_condition);
+        // Use cached pattern counts when possible, otherwise fall back to direct analysis
+        let (max_counts, min_counts) = if state.board.count_stones() < 6 {
+            // For very early game positions, direct analysis is fast enough
+            Self::analyze_both_players(&state.board, state.win_condition)
+        } else {
+            // For mid-to-late game, use cache for better performance
+            // But first ensure cache is up to date if stones were placed directly
+            if !state.heuristic_cache.cache_valid && state.board.count_stones() > 0 {
+                state.heuristic_cache.force_rebuild_cache(&state.board, state.win_condition);
+            }
+            let (cached_max, cached_min) = state.heuristic_cache.get_total_counts(&state.board, state.win_condition);
+            (Self::convert_cached_to_pattern_counts(&cached_max), Self::convert_cached_to_pattern_counts(&cached_min))
+        };
 
         if max_counts.five_in_row > 0 || max_counts.live_four > 1 {
             return WINNING_SCORE + depth;
@@ -97,6 +109,20 @@ impl Heuristic {
         let historical_bonus = Self::calculate_historical_bonus(state);
 
         max_score - min_score + capture_bonus + historical_bonus
+    }
+
+    fn convert_cached_to_pattern_counts(cached: &CachedPatternCounts) -> PatternCounts {
+        PatternCounts {
+            five_in_row: cached.five_in_row,
+            live_four: cached.live_four,
+            half_free_four: cached.half_free_four,
+            dead_four: cached.dead_four,
+            live_three: cached.live_three,
+            half_free_three: cached.half_free_three,
+            dead_three: cached.dead_three,
+            live_two: cached.live_two,
+            half_free_two: cached.half_free_two,
+        }
     }
 
     fn calculate_historical_bonus(state: &GameState) -> i32 {
@@ -481,5 +507,81 @@ impl Heuristic {
 
     fn calculate_capture_bonus(state: &GameState) -> i32 {
         (state.max_captures as i32 - state.min_captures as i32) * CAPTURE_BONUS_MULTIPLIER
+    }
+
+    pub fn analyze_zone_patterns(board: &Board, start_row: usize, end_row: usize, start_col: usize, end_col: usize, win_condition: usize) -> (CachedPatternCounts, CachedPatternCounts) {
+        let mut max_counts = CachedPatternCounts::new();
+        let mut min_counts = CachedPatternCounts::new();
+        let mut analyzed = vec![vec![0u8; board.size]; board.size];
+
+        for row in start_row..end_row {
+            for col in start_col..end_col {
+                if row >= board.size || col >= board.size {
+                    continue;
+                }
+                
+                let idx = board.index(row, col);
+                if !Board::is_bit_set(&board.occupied, idx) {
+                    continue;
+                }
+                
+                let player = if Board::is_bit_set(&board.max_bits, idx) {
+                    Player::Max
+                } else {
+                    Player::Min
+                };
+                
+                for (dir_idx, &(dx, dy)) in DIRECTIONS.iter().enumerate() {
+                    let bit_mask = 1u8 << dir_idx;
+
+                    if analyzed[row][col] & bit_mask == 0 {
+                        if let Some(pattern_info) = Self::analyze_pattern(
+                            board,
+                            row,
+                            col,
+                            dx,
+                            dy,
+                            player,
+                            win_condition,
+                            &mut analyzed,
+                            bit_mask,
+                        ) {
+                            match player {
+                                Player::Max => {
+                                    Self::update_cached_counts(&mut max_counts, pattern_info)
+                                }
+                                Player::Min => {
+                                    Self::update_cached_counts(&mut min_counts, pattern_info)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        (max_counts, min_counts)
+    }
+
+    fn update_cached_counts(counts: &mut CachedPatternCounts, pattern: PatternInfo) {
+        match pattern.length {
+            5 => counts.five_in_row = counts.five_in_row.saturating_add(1),
+            4 => match pattern.freedom {
+                PatternFreedom::Free => counts.live_four = counts.live_four.saturating_add(1),
+                PatternFreedom::HalfFree => counts.half_free_four = counts.half_free_four.saturating_add(1),
+                PatternFreedom::Flanked => counts.dead_four = counts.dead_four.saturating_add(1),
+            },
+            3 => match pattern.freedom {
+                PatternFreedom::Free => counts.live_three = counts.live_three.saturating_add(1),
+                PatternFreedom::HalfFree => counts.half_free_three = counts.half_free_three.saturating_add(1),
+                PatternFreedom::Flanked => counts.dead_three = counts.dead_three.saturating_add(1),
+            },
+            2 => match pattern.freedom {
+                PatternFreedom::Free => counts.live_two = counts.live_two.saturating_add(1),
+                PatternFreedom::HalfFree => counts.half_free_two = counts.half_free_two.saturating_add(1),
+                PatternFreedom::Flanked => {}, // Don't count flanked twos
+            },
+            _ => {}
+        }
     }
 }

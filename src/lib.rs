@@ -1,5 +1,6 @@
 pub mod ai {
     pub mod heuristic;
+    pub mod heuristic_cache;
     pub mod minimax;
     pub mod move_ordering;
     pub mod pattern_history;

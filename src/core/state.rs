@@ -1,13 +1,13 @@
 use crate::ai::zobrist::ZobristHash;
 use crate::ai::pattern_history::PatternHistoryAnalyzer;
+use crate::ai::heuristic_cache::IncrementalHeuristicCache;
 use crate::core::board::{Board, Player};
 use crate::core::captures::CaptureHandler;
 use crate::core::moves::MoveHandler;
 use crate::core::rules::WinChecker;
 use bevy::prelude::*;
-use std::hash::Hash;
 
-#[derive(Resource, Component, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Resource, Component, Debug)]
 pub struct GameState {
     pub board: Board,
     pub current_player: Player,
@@ -20,6 +20,27 @@ pub struct GameState {
     pub pattern_analyzer: PatternHistoryAnalyzer,
     pub zobrist_hash: ZobristHash,
     pub current_hash: u64,
+    pub heuristic_cache: IncrementalHeuristicCache,
+}
+
+impl Clone for GameState {
+    fn clone(&self) -> Self {
+        Self {
+            board: self.board.clone(),
+            current_player: self.current_player,
+            win_condition: self.win_condition,
+            winner: self.winner,
+            max_captures: self.max_captures,
+            min_captures: self.min_captures,
+            capture_history: self.capture_history.clone(),
+            move_history: self.move_history.clone(),
+            pattern_analyzer: self.pattern_analyzer.clone(),
+            zobrist_hash: self.zobrist_hash.clone(),
+            current_hash: self.current_hash,
+            // Reset cache for cloned states to avoid sharing cache between search branches
+            heuristic_cache: IncrementalHeuristicCache::new(self.board.size),
+        }
+    }
 }
 
 impl GameState {
@@ -39,6 +60,7 @@ impl GameState {
             pattern_analyzer: PatternHistoryAnalyzer::new(),
             zobrist_hash: zobrist_hash.clone(),
             current_hash: 0,
+            heuristic_cache: IncrementalHeuristicCache::new(board_size),
         };
         state.current_hash = zobrist_hash.compute_hash(&state);
         state
@@ -49,6 +71,9 @@ impl GameState {
     }
 
     pub fn make_move(&mut self, mv: (usize, usize)) {
+        // Invalidate heuristic cache for affected zones
+        self.heuristic_cache.invalidate_position(mv.0, mv.1);
+        
         self.current_hash = self.zobrist_hash.update_hash_make_move(
             self.current_hash,
             mv.0,
@@ -68,6 +93,11 @@ impl GameState {
                 &captures,
                 captured_player,
             );
+            
+            // Invalidate cache for all captured positions
+            for &(cap_row, cap_col) in &captures {
+                self.heuristic_cache.invalidate_position(cap_row, cap_col);
+            }
         }
         
         self.execute_captures(captures);
@@ -95,6 +125,9 @@ impl GameState {
     pub fn undo_move(&mut self, move_: (usize, usize)) {
         let move_player = self.current_player.opponent();
         
+        // Invalidate heuristic cache for the move position
+        self.heuristic_cache.invalidate_position(move_.0, move_.1);
+        
         if let Some(last_captures) = self.capture_history.last() {
             if !last_captures.is_empty() {
                 let captured_player = move_player.opponent();
@@ -103,6 +136,11 @@ impl GameState {
                     last_captures,
                     captured_player,
                 );
+                
+                // Invalidate cache for all positions that will be restored
+                for &(cap_row, cap_col) in last_captures {
+                    self.heuristic_cache.invalidate_position(cap_row, cap_col);
+                }
             }
         }
 

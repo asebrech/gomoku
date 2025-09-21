@@ -21,7 +21,7 @@ fn test_dynamic_heuristic_basic_functionality() {
     assert_eq!(state.pattern_analyzer.get_recent_patterns().len(), 4);
 
     // Test that heuristic evaluation includes historical bonus
-    let eval_with_history = Heuristic::evaluate(&state, 0);
+    let eval_with_history = Heuristic::evaluate(&mut state, 0);
     
     // The evaluation should not crash and should return a reasonable value
     assert!(eval_with_history.abs() < 1_000_000); // Should not be a winning score
@@ -38,13 +38,13 @@ fn test_capture_momentum_bonus() {
     state.make_move((9, 11));  // Min
     
     // Record evaluation before capture
-    let eval_before = Heuristic::evaluate(&state, 0);
+    let eval_before = Heuristic::evaluate(&mut state, 0);
     
     // Make capture move: X-O-O-X pattern
     state.make_move((9, 12));  // Max - this should capture (9,10) and (9,11)
     
     // Record evaluation after capture
-    let eval_after = Heuristic::evaluate(&state, 0);
+    let eval_after = Heuristic::evaluate(&mut state, 0);
     
     // Max should have better evaluation after making a capture
     assert!(eval_after > eval_before);
@@ -75,7 +75,7 @@ fn test_tempo_and_initiative_tracking() {
     assert!(recent_patterns.len() >= 4);
     
     // Evaluate position - Max should get bonus for maintaining initiative
-    let evaluation = Heuristic::evaluate(&state, 0);
+    let evaluation = Heuristic::evaluate(&mut state, 0);
     
     // Should return a valid evaluation (not crash)
     assert!(evaluation.abs() < 1_000_000);
@@ -122,7 +122,7 @@ fn test_move_history_undo() {
 
 #[test]
 fn test_historical_bonus_calculation() {
-    let state = GameState::new(19, 5);
+    let mut state = GameState::new(19, 5);
     
     // Test that historical bonus calculation doesn't crash
     let bonus = state.pattern_analyzer.calculate_historical_bonus(&state);
