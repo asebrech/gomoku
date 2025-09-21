@@ -1,20 +1,18 @@
 use crate::core::board::Player;
 use crate::core::state::GameState;
 
-// Constants for historical pattern scoring
 const TEMPO_BONUS: i32 = 300;
-const INITIATIVE_BONUS: i32 = 200;
 const PATTERN_DEVELOPMENT_BONUS: i32 = 150;
 const RECENT_CAPTURE_BONUS: i32 = 400;
 const DEFENSIVE_SEQUENCE_PENALTY: i32 = -100;
-const HISTORY_WINDOW: usize = 8; // Number of recent moves to analyze
+const HISTORY_WINDOW: usize = 8;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MoveType {
-    Aggressive,   // Creates threats or extends patterns
-    Defensive,    // Blocks opponent threats
-    Positional,   // Neither clearly aggressive nor defensive
-    Capture,      // Results in capturing opponent pieces
+    Aggressive,
+    Defensive,
+    Positional,
+    Capture,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -51,20 +49,18 @@ impl PatternHistoryAnalyzer {
         }
     }
 
-    /// Analyze a new move with simplified parameters to avoid borrowing issues
     pub fn analyze_move_simple(&mut self, position: (usize, usize), player: Player, captures_made: usize) {
         let _move_analysis = MoveAnalysis {
             position,
             player,
             move_type: if captures_made > 0 { MoveType::Capture } else { MoveType::Positional },
             captures_made,
-            threats_created: 0, // Simplified for now
-            threats_blocked: 0, // Simplified for now
+            threats_created: 0,
+            threats_blocked: 0,
         };
 
         self.move_history.push(_move_analysis);
         
-        // Keep only recent moves for analysis
         if self.move_history.len() > HISTORY_WINDOW * 2 {
             self.move_history.drain(0..HISTORY_WINDOW);
         }
@@ -72,9 +68,8 @@ impl PatternHistoryAnalyzer {
         self.update_tempo_and_initiative();
     }
 
-    /// Analyze a new move and update historical patterns
     pub fn analyze_move(&mut self, state: &GameState, last_move: (usize, usize)) {
-        let move_player = state.current_player.opponent(); // Player who just moved
+        let move_player = state.current_player.opponent();
         let captures_made = if let Some(last_captures) = state.capture_history.last() {
             last_captures.len() / 2
         } else {
@@ -92,7 +87,6 @@ impl PatternHistoryAnalyzer {
 
         self.move_history.push(move_analysis);
         
-        // Keep only recent moves for analysis
         if self.move_history.len() > HISTORY_WINDOW * 2 {
             self.move_history.drain(0..HISTORY_WINDOW);
         }
@@ -100,11 +94,9 @@ impl PatternHistoryAnalyzer {
         self.update_tempo_and_initiative();
     }
 
-    /// Calculate historical bonus for the current position
     pub fn calculate_historical_bonus(&self, state: &GameState) -> i32 {
         let mut bonus = 0;
 
-        // Tempo bonus - player with initiative gets bonus
         if let Some(initiative_player) = self.initiative_player {
             if initiative_player == state.current_player {
                 bonus += TEMPO_BONUS;
@@ -113,43 +105,24 @@ impl PatternHistoryAnalyzer {
             }
         }
 
-        // Pattern development bonus
         bonus += self.calculate_pattern_development_bonus(state.current_player);
-
-        // Recent capture momentum
         bonus += self.calculate_capture_momentum_bonus(state.current_player);
-
-        // Defensive sequence penalty
         bonus += self.calculate_defensive_sequence_penalty(state.current_player);
 
         bonus
     }
 
-    /// Reset the analyzer for a new game
     pub fn reset(&mut self) {
         self.move_history.clear();
         self.tempo_score = 0;
         self.initiative_player = None;
     }
 
-    /// Get recent move patterns for debugging/analysis
     pub fn get_recent_patterns(&self) -> Vec<&MoveAnalysis> {
         self.move_history.iter().rev().take(HISTORY_WINDOW).collect()
     }
 
-    // Private helper methods
-
     fn classify_move(&self, state: &GameState, position: (usize, usize), player: Player) -> MoveType {
-        let move_analysis = MoveAnalysis {
-            position,
-            player,
-            move_type: MoveType::Positional, // Temporary
-            captures_made: 0,
-            threats_created: 0,
-            threats_blocked: 0,
-        };
-
-        // Check if move resulted in captures
         if let Some(last_captures) = state.capture_history.last() {
             if !last_captures.is_empty() {
                 return MoveType::Capture;
