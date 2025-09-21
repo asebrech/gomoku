@@ -21,9 +21,9 @@ const DIRECTIONS: [(isize, isize); 4] = [(1, 0), (0, 1), (1, 1), (1, -1)];
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum PatternFreedom {
-    Free,     // Both ends open: . X X X .
-    HalfFree, // One end open:   O X X X . or . X X X O
-    Flanked,  // Both blocked:   O X X X O
+    Free,
+    HalfFree,
+    Flanked,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -459,7 +459,6 @@ impl Heuristic {
             _ => 0,
         };
 
-        // Enhanced threat detection including half-free patterns
         if counts.live_three >= 2
             || counts.dead_four >= 2
             || (counts.dead_four >= 1 && counts.live_three >= 1)

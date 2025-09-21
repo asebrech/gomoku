@@ -71,19 +71,13 @@ impl GameState {
         }
         
         self.execute_captures(captures);
-
-        // Track move history
         self.move_history.push(mv);
-
         self.check_for_wins(mv);
         self.switch_player();
-        
-        // Analyze patterns after all state changes are complete
         self.update_pattern_analysis(mv);
     }
 
     fn update_pattern_analysis(&mut self, last_move: (usize, usize)) {
-        // Extract needed data without borrowing self
         let current_player = self.current_player;
         let capture_history_len = self.capture_history.len();
         let last_captures = if capture_history_len > 0 {
@@ -92,11 +86,9 @@ impl GameState {
             Vec::new()
         };
         
-        // Create a simplified state snapshot for analysis
-        let move_player = current_player.opponent(); // Player who just moved
+        let move_player = current_player.opponent();
         let captures_made = last_captures.len() / 2;
         
-        // Update the analyzer with the move information
         self.pattern_analyzer.analyze_move_simple(last_move, move_player, captures_made);
     }
 
@@ -125,7 +117,6 @@ impl GameState {
         self.current_player = move_player;
         self.winner = None;
 
-        // Undo move history tracking
         if let Some(last_move) = self.move_history.last() {
             if *last_move == move_ {
                 self.move_history.pop();
