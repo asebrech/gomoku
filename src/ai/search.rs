@@ -83,11 +83,15 @@ pub fn find_best_move(
                 time_limit,
             );
             
-            (mv, score, child_nodes)
+            let (local_hits, local_misses) = tt_local.get_stats();
+            (mv, score, child_nodes, local_hits, local_misses)
         }).collect();
         
-        for (mv, score, child_nodes) in move_results {
+        for (mv, score, child_nodes, local_hits, local_misses) in move_results {
             nodes_searched += child_nodes;
+            
+            // Add local TT stats to main TT stats
+            tt.add_stats(local_hits, local_misses);
 
             let is_better = if is_maximizing {
                 score > iteration_best_score

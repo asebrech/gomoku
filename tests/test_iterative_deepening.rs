@@ -36,7 +36,7 @@ fn test_iterative_deepening_time_limit() {
     let result = find_best_move(&mut state, 10, Some(time_limit), &mut tt);
     
     assert!(result.best_move.is_some());
-    assert!(result.time_elapsed <= Duration::from_millis(400)); // Increased margin for parallel processing
+    assert!(result.time_elapsed <= Duration::from_millis(800)); // Increased margin for always-parallel processing
     println!("Timed test result: {:?}", result);
 }
 

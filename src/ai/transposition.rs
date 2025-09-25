@@ -129,6 +129,11 @@ impl TranspositionTable {
         )
     }
     
+    pub fn add_stats(&mut self, hits: u64, misses: u64) {
+        self.hits += hits;
+        self.misses += misses;
+    }
+    
     fn cleanup_old_entries(&mut self) {
         let current_age = self.current_age;
         if current_age < 10 {
