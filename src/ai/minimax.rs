@@ -10,7 +10,7 @@ pub fn minimax(
     mut alpha: i32,
     mut beta: i32,
     maximizing_player: bool,
-    tt: &mut TranspositionTable,
+    tt: &TranspositionTable,
     start_time: &Instant,
     time_limit: Option<Duration>,
 ) -> (i32, u64) {

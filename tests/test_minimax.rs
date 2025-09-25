@@ -10,7 +10,7 @@ fn test_minimax(
     alpha: i32,
     beta: i32,
     maximizing_player: bool,
-    tt: &mut TranspositionTable,
+    tt: &TranspositionTable,
 ) -> (i32, u64) {
     let start_time = Instant::now();
     minimax(state, depth, alpha, beta, maximizing_player, tt, &start_time, None)
@@ -19,7 +19,7 @@ fn test_minimax(
 #[test]
 fn test_minimax_terminal_position() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::default();
+    let tt = TranspositionTable::default();
 
     // Create a winning position
     for i in 0..5 {
@@ -27,7 +27,7 @@ fn test_minimax_terminal_position() {
     }
     state.winner = Some(Player::Max);
 
-    let (score, nodes) = test_minimax(&mut state, 3, i32::MIN, i32::MAX, false, &mut tt);
+    let (score, nodes) = test_minimax(&mut state, 3, i32::MIN, i32::MAX, false, &tt);
 
     // Should return winning score
     assert_eq!(score, 1_000_003);
@@ -37,12 +37,12 @@ fn test_minimax_terminal_position() {
 #[test]
 fn test_minimax_depth_zero() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::default();
+    let tt = TranspositionTable::default();
 
     // Make a simple move
     state.board.place_stone(9, 9, Player::Max);
 
-    let (score, nodes) = test_minimax(&mut state, 0, i32::MIN, i32::MAX, false, &mut tt);
+    let (score, nodes) = test_minimax(&mut state, 0, i32::MIN, i32::MAX, false, &tt);
 
     // Should return heuristic evaluation
     assert!(score != i32::MIN && score != i32::MAX);
@@ -52,7 +52,7 @@ fn test_minimax_depth_zero() {
 #[test]
 fn test_minimax_maximizing_player() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::default();
+    let tt = TranspositionTable::default();
 
     // Set up a position where Max has advantage
     state.board.place_stone(9, 9, Player::Max);
@@ -60,7 +60,7 @@ fn test_minimax_maximizing_player() {
     state.board.place_stone(9, 7, Player::Max);
     state.current_player = Player::Max;
 
-    let (score, nodes) = test_minimax(&mut state, 2, i32::MIN, i32::MAX, true, &mut tt);
+    let (score, nodes) = test_minimax(&mut state, 2, i32::MIN, i32::MAX, true, &tt);
 
     // Should return positive score (favorable for Max)
     assert!(score > 0);
@@ -70,7 +70,7 @@ fn test_minimax_maximizing_player() {
 #[test]
 fn test_minimax_minimizing_player() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::default();
+    let tt = TranspositionTable::default();
 
     // Set up a position where Min has advantage
     state.board.place_stone(9, 9, Player::Min);
@@ -78,7 +78,7 @@ fn test_minimax_minimizing_player() {
     state.board.place_stone(9, 7, Player::Min);
     state.current_player = Player::Min;
 
-    let (score, _) = test_minimax(&mut state, 2, i32::MIN, i32::MAX, false, &mut tt);
+    let (score, _) = test_minimax(&mut state, 2, i32::MIN, i32::MAX, false, &tt);
 
     // Should return negative score (favorable for Min)
     assert!(score < 0);
@@ -87,14 +87,14 @@ fn test_minimax_minimizing_player() {
 #[test]
 fn test_minimax_alpha_beta_pruning() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::default();
+    let tt = TranspositionTable::default();
 
     // Create a position with multiple moves
     state.board.place_stone(9, 9, Player::Max);
     state.current_player = Player::Min;
 
     // Run minimax with tight alpha-beta window
-    let (score1, _) = test_minimax(&mut state, 2, -100, 100, false, &mut tt);
+    let (score1, _) = test_minimax(&mut state, 2, -100, 100, false, &tt);
 
     // Should complete without infinite values
     assert!(score1 > i32::MIN && score1 < i32::MAX);
@@ -103,17 +103,17 @@ fn test_minimax_alpha_beta_pruning() {
 #[test]
 fn test_minimax_transposition_table_usage() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::default();
+    let tt = TranspositionTable::default();
 
     // Make initial move
     state.board.place_stone(9, 9, Player::Max);
     state.current_player = Player::Min;
 
     // First call should populate transposition table
-    let (score1, _) = test_minimax(&mut state, 2, i32::MIN, i32::MAX, false, &mut tt);
+    let (score1, _) = test_minimax(&mut state, 2, i32::MIN, i32::MAX, false, &tt);
 
     // Second call should use transposition table (same result)
-    let (score2, _) = test_minimax(&mut state, 2, i32::MIN, i32::MAX, false, &mut tt);
+    let (score2, _) = test_minimax(&mut state, 2, i32::MIN, i32::MAX, false, &tt);
 
     assert_eq!(score1, score2);
 }
@@ -121,15 +121,15 @@ fn test_minimax_transposition_table_usage() {
 #[test]
 fn test_minimax_different_depths() {
     let mut state = GameState::new(19, 5);
-    let mut tt1 = TranspositionTable::default();
-    let mut tt2 = TranspositionTable::default();
+    let tt1 = TranspositionTable::default();
+    let tt2 = TranspositionTable::default();
 
     // Create a non-terminal position
     state.board.place_stone(9, 9, Player::Max);
     state.current_player = Player::Min;
 
-    let (score_depth1, _) = test_minimax(&mut state, 1, i32::MIN, i32::MAX, false, &mut tt1);
-    let (score_depth3, _) = test_minimax(&mut state, 3, i32::MIN, i32::MAX, false, &mut tt2);
+    let (score_depth1, _) = test_minimax(&mut state, 1, i32::MIN, i32::MAX, false, &tt1);
+    let (score_depth3, _) = test_minimax(&mut state, 3, i32::MIN, i32::MAX, false, &tt2);
 
     // Different depths may give different results
     // (not necessarily, but should complete successfully)
@@ -140,7 +140,7 @@ fn test_minimax_different_depths() {
 #[test]
 fn test_minimax_winning_position_detection() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::default();
+    let tt = TranspositionTable::default();
 
     // Create a position where Max can win in one move
     for i in 0..4 {
@@ -148,7 +148,7 @@ fn test_minimax_winning_position_detection() {
     }
     state.current_player = Player::Max;
 
-    let (score, _) = test_minimax(&mut state, 2, i32::MIN, i32::MAX, true, &mut tt);
+    let (score, _) = test_minimax(&mut state, 2, i32::MIN, i32::MAX, true, &tt);
 
     // Should detect winning opportunity
     assert!(score > 900_000); // Close to winning score
@@ -157,7 +157,7 @@ fn test_minimax_winning_position_detection() {
 #[test]
 fn test_minimax_losing_position_detection() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::default();
+    let tt = TranspositionTable::default();
 
     // Create a position where Min can win in one move
     for i in 0..4 {
@@ -165,7 +165,7 @@ fn test_minimax_losing_position_detection() {
     }
     state.current_player = Player::Min;
 
-    let (score, _) = test_minimax(&mut state, 2, i32::MIN, i32::MAX, false, &mut tt);
+    let (score, _) = test_minimax(&mut state, 2, i32::MIN, i32::MAX, false, &tt);
 
     // Should detect winning opportunity for Min
     assert!(score < -900_000); // Close to losing score
@@ -174,7 +174,7 @@ fn test_minimax_losing_position_detection() {
 #[test]
 fn test_minimax_state_restoration() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::default();
+    let tt = TranspositionTable::default();
 
     // Make a move using proper state management
     state.make_move((9, 9));
@@ -184,7 +184,7 @@ fn test_minimax_state_restoration() {
     let initial_player = state.current_player;
 
     // Run minimax (should restore state)
-    test_minimax(&mut state, 2, i32::MIN, i32::MAX, false, &mut tt);
+    test_minimax(&mut state, 2, i32::MIN, i32::MAX, false, &tt);
 
     // State should be restored
     assert_eq!(state.hash(), initial_hash);
@@ -194,7 +194,7 @@ fn test_minimax_state_restoration() {
 #[test]
 fn test_minimax_captures_evaluation() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::default();
+    let tt = TranspositionTable::default();
 
     // Set up position with capture opportunity
     state.board.place_stone(9, 9, Player::Max);
@@ -202,7 +202,7 @@ fn test_minimax_captures_evaluation() {
     state.board.place_stone(9, 11, Player::Min);
     state.current_player = Player::Max;
 
-    let (score, _) = test_minimax(&mut state, 2, i32::MIN, i32::MAX, true, &mut tt);
+    let (score, _) = test_minimax(&mut state, 2, i32::MIN, i32::MAX, true, &tt);
 
     // Should recognize capture opportunity
     assert!(score > 0); // Favorable for Max
@@ -211,7 +211,7 @@ fn test_minimax_captures_evaluation() {
 #[test]
 fn test_minimax_empty_moves() {
     let mut state = GameState::new(3, 3);
-    let mut tt = TranspositionTable::default();
+    let tt = TranspositionTable::default();
 
     // Fill the board (no moves available)
     for i in 0..3 {
@@ -220,7 +220,7 @@ fn test_minimax_empty_moves() {
         }
     }
 
-    let (score, _) = test_minimax(&mut state, 2, i32::MIN, i32::MAX, false, &mut tt);
+    let (score, _) = test_minimax(&mut state, 2, i32::MIN, i32::MAX, false, &tt);
 
     // Should handle no moves gracefully
     assert!(score != i32::MIN && score != i32::MAX);
@@ -229,14 +229,14 @@ fn test_minimax_empty_moves() {
 #[test]
 fn test_minimax_alternating_players() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::default();
+    let tt = TranspositionTable::default();
 
     // Start with Max to move
     state.board.place_stone(9, 9, Player::Max);
     state.current_player = Player::Min;
 
     // At depth 2, should consider Min's move then Max's response
-    let (score, _) = test_minimax(&mut state, 2, i32::MIN, i32::MAX, false, &mut tt);
+    let (score, _) = test_minimax(&mut state, 2, i32::MIN, i32::MAX, false, &tt);
 
     // Should complete successfully
     assert!(score > i32::MIN && score < i32::MAX);
@@ -245,7 +245,7 @@ fn test_minimax_alternating_players() {
 #[test]
 fn test_minimax_pruning_efficiency() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::default();
+    let tt = TranspositionTable::default();
 
     // Create a position with many possible moves
     state.board.place_stone(9, 9, Player::Max);
@@ -253,7 +253,7 @@ fn test_minimax_pruning_efficiency() {
     state.current_player = Player::Max;
 
     // Should complete in reasonable time even with pruning
-    let (score, _) = test_minimax(&mut state, 3, i32::MIN, i32::MAX, true, &mut tt);
+    let (score, _) = test_minimax(&mut state, 3, i32::MIN, i32::MAX, true, &tt);
 
     assert!(score > i32::MIN && score < i32::MAX);
 }
@@ -261,7 +261,7 @@ fn test_minimax_pruning_efficiency() {
 #[test]
 fn test_minimax_capture_win_detection() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::default();
+    let tt = TranspositionTable::default();
 
     // Set up capture win scenario where Max can win by capturing
     state.max_captures = 8; // Need 10 to win, so 1 capture away
@@ -272,7 +272,7 @@ fn test_minimax_capture_win_detection() {
     state.board.place_stone(9, 11, Player::Min);
     state.current_player = Player::Max;
 
-    let (score, _nodes) = test_minimax(&mut state, 2, i32::MIN, i32::MAX, true, &mut tt);
+    let (score, _nodes) = test_minimax(&mut state, 2, i32::MIN, i32::MAX, true, &tt);
 
     // Should detect capture opportunity and give high score
     assert!(score > 500_000, "Should detect capture win opportunity, got score: {}", score);
@@ -281,7 +281,7 @@ fn test_minimax_capture_win_detection() {
 #[test] 
 fn test_minimax_immediate_win_detection() {
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::default();
+    let tt = TranspositionTable::default();
 
     // Set up 4-in-a-row with one empty spot to complete win
     state.board.place_stone(7, 6, Player::Max);
@@ -291,7 +291,7 @@ fn test_minimax_immediate_win_detection() {
     // Empty at (7, 10) for 5-in-a-row win
     state.current_player = Player::Max;
 
-    let (score, _nodes) = test_minimax(&mut state, 1, i32::MIN, i32::MAX, true, &mut tt);
+    let (score, _nodes) = test_minimax(&mut state, 1, i32::MIN, i32::MAX, true, &tt);
 
     // Should detect immediate win
     assert!(score > 900_000, "Should detect immediate win, got score: {}", score);
@@ -301,7 +301,7 @@ fn test_minimax_immediate_win_detection() {
 fn test_find_immediate_win_or_block() {
     use gomoku::ai::search::find_best_move;
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::default();
+    let tt = TranspositionTable::default();
     
     // Create immediate win scenario for current player
     state.board.place_stone(7, 5, Player::Max);
@@ -310,7 +310,7 @@ fn test_find_immediate_win_or_block() {
     state.board.place_stone(7, 8, Player::Max);
     state.current_player = Player::Max; // Max can win by playing (7,9)
     
-    let result = find_best_move(&mut state, 3, None, &mut tt);
+    let result = find_best_move(&mut state, 3, None, &tt);
     
     // Should find immediate win (either end of the line is valid)
     assert!(result.best_move.is_some());
@@ -325,7 +325,7 @@ fn test_find_immediate_win_or_block() {
 fn test_iterative_deepening_progressive_improvement() {
     use gomoku::ai::search::find_best_move;
     let mut state = GameState::new(15, 5);
-    let mut tt = TranspositionTable::default();
+    let tt = TranspositionTable::default();
     
     // Create complex position
     state.board.place_stone(7, 7, Player::Max);
@@ -334,7 +334,7 @@ fn test_iterative_deepening_progressive_improvement() {
     state.board.place_stone(8, 7, Player::Min);
     state.current_player = Player::Max;
     
-    let result = find_best_move(&mut state, 4, None, &mut tt);
+    let result = find_best_move(&mut state, 4, None, &tt);
     
     // Should reach reasonable depth
     assert!(result.depth_reached >= 3, "Should reach depth 3+, got: {}", result.depth_reached);

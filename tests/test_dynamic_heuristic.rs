@@ -150,7 +150,7 @@ fn test_move_type_classification() {
 #[test]
 fn test_minimax_with_dynamic_heuristic() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new(10_000);
+    let tt = TranspositionTable::new(10_000);
     let start_time = Instant::now();
     
     // Make some initial moves to create history
@@ -173,7 +173,7 @@ fn test_minimax_with_dynamic_heuristic() {
         i32::MIN, 
         i32::MAX, 
         is_maximizing, 
-        &mut tt,
+        &tt,
         &start_time,
         None
     );
@@ -193,7 +193,7 @@ fn test_minimax_with_dynamic_heuristic() {
 #[test]
 fn test_minimax_state_consistency_with_patterns() {
     let mut state = GameState::new(19, 5);
-    let mut tt = TranspositionTable::new(10_000);
+    let tt = TranspositionTable::new(10_000);
     let start_time = Instant::now();
     
     // Create a more complex position with captures and patterns
@@ -215,7 +215,7 @@ fn test_minimax_state_consistency_with_patterns() {
         i32::MIN, 
         i32::MAX, 
         is_min_turn, 
-        &mut tt,
+        &tt,
         &start_time,
         None
     );
@@ -231,7 +231,7 @@ fn test_minimax_state_consistency_with_patterns() {
         i32::MIN, 
         i32::MAX, 
         is_min_turn, 
-        &mut tt,
+        &tt,
         &start_time,
         None
     );
