@@ -69,13 +69,17 @@ pub fn find_best_move(
             }
         }
 
+        // Check time limit before processing moves
         let mut all_moves_searched = true;
+        if let Some(limit) = time_limit {
+            let elapsed = start_time.elapsed();
+            if elapsed >= limit {
+                all_moves_searched = false;
+            }
+        }
         
-        let remaining_time = time_limit.map(|limit| limit.saturating_sub(start_time.elapsed()));
-        let use_parallel = moves.len() <= 15 && (time_limit.is_none() || 
-            remaining_time.map_or(true, |remaining| remaining > Duration::from_millis(50)));
-        
-        if use_parallel {
+        if all_moves_searched {
+            // Always use parallel search for maximum performance
             let move_results: Vec<_> = moves.par_iter().map(|&mv| {
                 let mut state_clone = state.clone();
                 let mut tt_local = TranspositionTable::new(tt.size().min(5_000));
@@ -117,43 +121,8 @@ pub fn find_best_move(
             for _ in 0..total_local_hits {
                 let _ = tt.probe(0, 0, 0, 0);
             }
-        } else {
-            for mv in moves.iter() {
-                if let Some(limit) = time_limit {
-                    let elapsed = start_time.elapsed();
-                    if elapsed >= limit {
-                        all_moves_searched = false;
-                        break;
-                    }
-                }
-
-                state.make_move(*mv);
-                let (score, child_nodes) = minimax(
-                    state,
-                    depth - 1,
-                    i32::MIN,
-                    i32::MAX,
-                    !is_maximizing,
-                    tt,
-                    &start_time,
-                    time_limit,
-                );
-                state.undo_move(*mv);
-                nodes_searched += child_nodes;
-
-                let is_better = if is_maximizing {
-                    score > iteration_best_score
-                } else {
-                    score < iteration_best_score
-                };
-
-                if is_better {
-                    iteration_best_score = score;
-                    iteration_best_move = Some(*mv);
-                }
-            }
         }
-
+        
         if all_moves_searched {
             best_move = iteration_best_move;
             best_score = iteration_best_score;
