@@ -90,7 +90,6 @@ pub fn find_best_move(
         for (mv, score, child_nodes, local_hits, local_misses) in move_results {
             nodes_searched += child_nodes;
             
-            // Add local TT stats to main TT stats
             tt.add_stats(local_hits, local_misses);
 
             let is_better = if is_maximizing {
