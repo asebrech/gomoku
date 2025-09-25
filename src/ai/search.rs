@@ -39,16 +39,6 @@ pub fn find_best_move(
         };
     }
 
-    if let Some(immediate_move) = find_immediate_win_or_block(state) {
-        return SearchResult {
-            best_move: Some(immediate_move),
-            score: if is_maximizing { 1_000_000 } else { -1_000_000 },
-            depth_reached: 1,
-            nodes_searched: initial_moves.len() as u64,
-            time_elapsed: start_time.elapsed(),
-        };
-    }
-
     for depth in 1..=max_depth {
         if let Some(limit) = time_limit {
             let elapsed = start_time.elapsed();
@@ -143,27 +133,4 @@ pub fn find_best_move(
         nodes_searched,
         time_elapsed: start_time.elapsed(),
     }
-}
-
-fn find_immediate_win_or_block(state: &GameState) -> Option<(usize, usize)> {
-    let moves = state.get_possible_moves();
-    
-    for &mv in &moves {
-        let mut temp_board = state.board.clone();
-        temp_board.place_stone(mv.0, mv.1, state.current_player);
-        if crate::core::rules::WinChecker::check_win_around(&temp_board, mv.0, mv.1, state.win_condition) {
-            return Some(mv);
-        }
-    }
-    
-    let opponent = state.current_player.opponent();
-    for &mv in &moves {
-        let mut temp_board = state.board.clone();
-        temp_board.place_stone(mv.0, mv.1, opponent);
-        if crate::core::rules::WinChecker::check_win_around(&temp_board, mv.0, mv.1, state.win_condition) {
-            return Some(mv);
-        }
-    }
-    
-    None
 }
