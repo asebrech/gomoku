@@ -60,68 +60,52 @@ pub fn find_best_move(
         }
 
         // Check time limit before processing moves
-        let mut all_moves_searched = true;
         if let Some(limit) = time_limit {
             let elapsed = start_time.elapsed();
             if elapsed >= limit {
-                all_moves_searched = false;
-            }
-        }
-        
-        if all_moves_searched {
-            // Always use parallel search for maximum performance
-            let move_results: Vec<_> = moves.par_iter().map(|&mv| {
-                let mut state_clone = state.clone();
-                let mut tt_local = TranspositionTable::new(tt.size().min(5_000));
-                
-                state_clone.make_move(mv);
-                let (score, child_nodes) = minimax(
-                    &mut state_clone,
-                    depth - 1,
-                    i32::MIN,
-                    i32::MAX,
-                    !is_maximizing,
-                    &mut tt_local,
-                    &start_time,
-                    time_limit,
-                );
-                
-                let (local_hits, local_misses) = tt_local.get_stats();
-                (mv, score, child_nodes, local_hits, local_misses)
-            }).collect();
-            
-            let mut total_local_hits = 0u64;
-            
-            for (mv, score, child_nodes, local_hits, _local_misses) in move_results {
-                nodes_searched += child_nodes;
-                total_local_hits += local_hits;
-
-                let is_better = if is_maximizing {
-                    score > iteration_best_score
-                } else {
-                    score < iteration_best_score
-                };
-
-                if is_better {
-                    iteration_best_score = score;
-                    iteration_best_move = Some(mv);
-                }
-            }
-            
-            for _ in 0..total_local_hits {
-                let _ = tt.probe(0, 0, 0, 0);
-            }
-        }
-        
-        if all_moves_searched {
-            best_move = iteration_best_move;
-            best_score = iteration_best_score;
-            depth_reached = depth;
-            
-            if best_score.abs() >= 1_000_000 {
                 break;
             }
-        } else {
+        }
+        
+        let move_results: Vec<_> = moves.par_iter().map(|&mv| {
+            let mut state_clone = state.clone();
+            let mut tt_local = TranspositionTable::new(tt.size().min(5_000));
+            
+            state_clone.make_move(mv);
+            let (score, child_nodes) = minimax(
+                &mut state_clone,
+                depth - 1,
+                i32::MIN,
+                i32::MAX,
+                !is_maximizing,
+                &mut tt_local,
+                &start_time,
+                time_limit,
+            );
+            
+            (mv, score, child_nodes)
+        }).collect();
+        
+        for (mv, score, child_nodes) in move_results {
+            nodes_searched += child_nodes;
+
+            let is_better = if is_maximizing {
+                score > iteration_best_score
+            } else {
+                score < iteration_best_score
+            };
+
+            if is_better {
+                iteration_best_score = score;
+                iteration_best_move = Some(mv);
+            }
+        }
+        
+        best_move = iteration_best_move;
+        best_score = iteration_best_score;
+        depth_reached = depth;
+        
+        if best_score.abs() >= 1_000_000 {
             break;
         }
     }
