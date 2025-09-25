@@ -84,11 +84,8 @@ impl Heuristic {
 
         // Use cached pattern counts when possible, otherwise fall back to direct analysis
         let (max_counts, min_counts) = if state.board.count_stones() < 6 {
-            // For very early game positions, direct analysis is fast enough
             Self::analyze_both_players(&state.board, state.win_condition)
         } else {
-            // For mid-to-late game, use cache for better performance
-            // But first ensure cache is up to date if stones were placed directly
             if !state.heuristic_cache.cache_valid && state.board.count_stones() > 0 {
                 state.heuristic_cache.force_rebuild_cache(&state.board, state.win_condition);
             }
@@ -206,7 +203,6 @@ impl Heuristic {
 
         let length = length.min(win_condition);
         
-        // Check if this pattern has sufficient space to develop into a winning line
         if !Self::has_sufficient_space(
             board,
             pattern_start_row,
@@ -217,7 +213,6 @@ impl Heuristic {
             player,
             win_condition,
         ) {
-            // Mark as analyzed but don't score it
             Self::mark_pattern_analyzed(
                 pattern_start_row,
                 pattern_start_col,
@@ -369,10 +364,8 @@ impl Heuristic {
             Player::Min => &board.max_bits,
         };
 
-        // Count total available space in both directions from the pattern
-        let mut total_space = length; // Current pattern length
+        let mut total_space = length;
         
-        // Count backwards from pattern start
         let mut pos_row = start_row as isize - dx;
         let mut pos_col = start_col as isize - dy;
         let mut backward_space = 0;
@@ -385,12 +378,10 @@ impl Heuristic {
         {
             let idx = board.index(pos_row as usize, pos_col as usize);
             
-            // Stop if we hit an opponent stone
             if Board::is_bit_set(opponent_bits, idx) {
                 break;
             }
             
-            // Count empty spaces and our own stones
             if !Board::is_bit_set(&board.occupied, idx) || Board::is_bit_set(player_bits, idx) {
                 backward_space += 1;
                 pos_row -= dx;
@@ -400,7 +391,6 @@ impl Heuristic {
             }
         }
         
-        // Count forwards from pattern end
         let mut pos_row = start_row as isize + (length as isize * dx);
         let mut pos_col = start_col as isize + (length as isize * dy);
         let mut forward_space = 0;
@@ -413,12 +403,10 @@ impl Heuristic {
         {
             let idx = board.index(pos_row as usize, pos_col as usize);
             
-            // Stop if we hit an opponent stone
             if Board::is_bit_set(opponent_bits, idx) {
                 break;
             }
             
-            // Count empty spaces and our own stones
             if !Board::is_bit_set(&board.occupied, idx) || Board::is_bit_set(player_bits, idx) {
                 forward_space += 1;
                 pos_row += dx;

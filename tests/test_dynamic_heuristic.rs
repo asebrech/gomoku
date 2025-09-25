@@ -122,7 +122,7 @@ fn test_move_history_undo() {
 
 #[test]
 fn test_historical_bonus_calculation() {
-    let mut state = GameState::new(19, 5);
+    let state = GameState::new(19, 5);
     
     // Test that historical bonus calculation doesn't crash
     let bonus = state.pattern_analyzer.calculate_historical_bonus(&state);

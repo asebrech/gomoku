@@ -1,7 +1,7 @@
-use crate::core::board::{Board, Player};
+use crate::core::board::Board;
 use std::collections::HashSet;
 
-const CACHE_ZONE_SIZE: usize = 8; // Evaluate in 8x8 zones for efficiency
+const CACHE_ZONE_SIZE: usize = 8;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CachedPatternCounts {
@@ -131,37 +131,28 @@ impl IncrementalHeuristicCache {
     }
 
     pub fn get_affected_zones(&self, row: usize, col: usize) -> Vec<ZoneCoord> {
-        let mut zones = Vec::with_capacity(4); // Maximum 4 zones can be affected realistically
-        
-        // Only invalidate zones that actually contain patterns that cross zone boundaries
-        // Most moves only affect the zone they're in, plus potentially adjacent zones
-        // if the move is near a zone boundary
+        let mut zones = Vec::with_capacity(4);
         
         let zone_coord = self.get_zone_coord(row, col);
         zones.push(zone_coord);
         
-        // Only add adjacent zones if the move is within 2 positions of a zone boundary
         let zone_start_row = zone_coord.zone_row * CACHE_ZONE_SIZE;
         let zone_start_col = zone_coord.zone_col * CACHE_ZONE_SIZE;
         let zone_end_row = (zone_coord.zone_row + 1) * CACHE_ZONE_SIZE;
         let zone_end_col = (zone_coord.zone_col + 1) * CACHE_ZONE_SIZE;
         
-        // Check if close to top boundary
         if row <= zone_start_row + 2 && zone_coord.zone_row > 0 {
             zones.push(ZoneCoord { zone_row: zone_coord.zone_row - 1, zone_col: zone_coord.zone_col });
         }
         
-        // Check if close to bottom boundary  
         if row >= zone_end_row.saturating_sub(3) && zone_coord.zone_row + 1 < self.zone_rows {
             zones.push(ZoneCoord { zone_row: zone_coord.zone_row + 1, zone_col: zone_coord.zone_col });
         }
         
-        // Check if close to left boundary
         if col <= zone_start_col + 2 && zone_coord.zone_col > 0 {
             zones.push(ZoneCoord { zone_row: zone_coord.zone_row, zone_col: zone_coord.zone_col - 1 });
         }
         
-        // Check if close to right boundary
         if col >= zone_end_col.saturating_sub(3) && zone_coord.zone_col + 1 < self.zone_cols {
             zones.push(ZoneCoord { zone_row: zone_coord.zone_row, zone_col: zone_coord.zone_col + 1 });
         }
@@ -200,7 +191,6 @@ impl IncrementalHeuristicCache {
 
         let (start_row, end_row, start_col, end_col) = self.get_zone_bounds(zone_coord);
         
-        // Use the existing heuristic analysis for this zone
         let (max_counts, min_counts) = self.analyze_zone(board, start_row, end_row, start_col, end_col, win_condition);
         
         let zone_cache = &mut self.zones[zone_coord.zone_row][zone_coord.zone_col];
@@ -212,13 +202,11 @@ impl IncrementalHeuristicCache {
     }
 
     pub fn get_total_counts(&mut self, board: &Board, win_condition: usize) -> (CachedPatternCounts, CachedPatternCounts) {
-        // Update any dirty zones first
         let dirty_zones: Vec<_> = self.dirty_zones.iter().cloned().collect();
         for zone_coord in dirty_zones {
             self.update_zone_cache(zone_coord, board, win_condition);
         }
 
-        // Recalculate totals if cache is invalid
         if !self.cache_valid {
             self.cached_max_total = CachedPatternCounts::new();
             self.cached_min_total = CachedPatternCounts::new();
@@ -239,14 +227,11 @@ impl IncrementalHeuristicCache {
     }
 
     fn analyze_zone(&self, board: &Board, start_row: usize, end_row: usize, start_col: usize, end_col: usize, win_condition: usize) -> (CachedPatternCounts, CachedPatternCounts) {
-        // This is a simplified zone analysis - we'll integrate with the existing heuristic logic
-        // For now, delegate to a zone-specific version of the existing analysis
         use crate::ai::heuristic::Heuristic;
         Heuristic::analyze_zone_patterns(board, start_row, end_row, start_col, end_col, win_condition)
     }
 
     pub fn force_rebuild_cache(&mut self, board: &Board, win_condition: usize) {
-        // Clear all cache and mark all zones as dirty to force rebuild
         for zone_row in 0..self.zone_rows {
             for zone_col in 0..self.zone_cols {
                 self.zones[zone_row][zone_col].invalidate();
@@ -255,7 +240,6 @@ impl IncrementalHeuristicCache {
         }
         self.cache_valid = false;
         
-        // Force update by calling get_total_counts
         let _ = self.get_total_counts(board, win_condition);
     }
 
