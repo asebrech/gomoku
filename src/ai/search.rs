@@ -54,8 +54,8 @@ pub fn find_best_move(
         max_depth_reached: AtomicI32::new(0),
     });
 
-    // Determine number of threads (use available parallelism)
-    let num_threads = rayon::current_num_threads().min(8); // Cap at 8 threads
+    // Determine number of threads - maximize for deep search
+    let num_threads = rayon::current_num_threads().min(12).max(8); // Use 8-12 threads for maximum depth coverage
     
     // Launch parallel search threads with different parameters
     let results: Vec<_> = (0..num_threads).into_par_iter().map(|thread_id| {
@@ -104,9 +104,19 @@ fn lazy_smp_thread_search(
     let mut nodes_searched = 0u64;
     let mut depth_reached = 0;
     
-    // Thread diversification strategies
-    let depth_offset = if thread_id == 0 { 0 } else { (thread_id % 3) as i32 - 1 }; // -1, 0, +1
-    let effective_max_depth = (max_depth + depth_offset).max(1); // Allow deeper search, just ensure minimum of 1
+    // Thread diversification strategies for maximum depth
+    let depth_offset = match thread_id {
+        0 => 0,                    // Main thread uses requested depth
+        1 => 2,                    // Thread 1 goes 2 deeper
+        2 => 4,                    // Thread 2 goes 4 deeper  
+        3 => 1,                    // Thread 3 goes 1 deeper
+        4 => 3,                    // Thread 4 goes 3 deeper
+        5 => 6,                    // Thread 5 goes 6 deeper
+        6 => 8,                    // Thread 6 goes 8 deeper
+        7 => 10,                   // Thread 7 goes 10 deeper
+        _ => (thread_id % 8) as i32 + 1, // Other threads cycle with offsets
+    };
+    let effective_max_depth = max_depth + depth_offset; // No minimum limit - go as deep as possible
     
     for depth in 1..=effective_max_depth {
         // Check if we should stop (time limit or another thread found solution)
@@ -115,8 +125,22 @@ fn lazy_smp_thread_search(
         }
         
         if let Some(limit) = time_limit {
-            if start_time.elapsed() >= limit {
-                shared_state.should_stop.store(true, Ordering::Relaxed);
+            // Allow deeper search threads more time - they might find better solutions
+            let time_extension = if depth_offset > 4 { 
+                // Threads searching much deeper get significantly more time
+                Duration::from_millis((depth_offset as u64 * 200).min(2000)) 
+            } else if depth_offset > 0 {
+                // Threads going moderately deeper get some extra time
+                Duration::from_millis(depth_offset as u64 * 100)
+            } else {
+                Duration::from_millis(0) // Main thread sticks to original limit
+            };
+            
+            if start_time.elapsed() >= limit + time_extension {
+                // Only main thread can signal global stop for time limit
+                if thread_id == 0 {
+                    shared_state.should_stop.store(true, Ordering::Relaxed);
+                }
                 break;
             }
         }
@@ -156,13 +180,22 @@ fn lazy_smp_thread_search(
 
             local_state.make_move(mv);
             
-            // Use aspiration windows for threads 1+ 
+            // Optimized aspiration windows for deep search threads
             let (alpha, beta) = if thread_id == 0 {
                 (i32::MIN, i32::MAX) // Full window for main thread
             } else {
-                // Narrow aspiration windows for helper threads
                 let current_best = shared_state.best_score.load(Ordering::Relaxed);
-                let window = 50 + thread_id as i32 * 25; // Wider windows for higher thread IDs
+                
+                // Deeper search threads get wider windows to avoid re-searches
+                let base_window = if depth_offset >= 6 {
+                    200 // Very wide windows for deepest threads (6+ deeper)
+                } else if depth_offset >= 3 {
+                    100 // Wide windows for moderately deep threads (3-5 deeper) 
+                } else {
+                    50  // Standard windows for shallow helper threads
+                };
+                
+                let window = base_window + thread_id as i32 * 15;
                 let alpha = current_best.saturating_sub(window);
                 let beta = current_best.saturating_add(window);
                 (alpha, beta)
@@ -231,10 +264,21 @@ fn lazy_smp_thread_search(
         depth_reached = depth;
         shared_state.max_depth_reached.store(depth, Ordering::Relaxed);
 
-        // Early termination for definitive results
+        // Early termination for definitive results - but allow deeper threads to continue
         if best_score_this_depth.abs() >= 1_000_000 {
-            shared_state.should_stop.store(true, Ordering::Relaxed);
-            break;
+            // Only stop immediately if this is a shallow thread or main thread
+            if thread_id == 0 || depth_offset <= 2 {
+                shared_state.should_stop.store(true, Ordering::Relaxed);
+                break;
+            } else {
+                // Deep search threads continue briefly to potentially find even better solutions
+                // But if multiple threads have found wins, then stop
+                let existing_stop = shared_state.should_stop.load(Ordering::Relaxed);
+                if existing_stop {
+                    break; // Another thread already signaled to stop
+                }
+                // Continue searching for a bit more to verify the solution depth
+            }
         }
     }
 
