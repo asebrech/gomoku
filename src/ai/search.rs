@@ -45,8 +45,10 @@ pub fn find_best_move(
         };
     }
 
+    let fallback_move = initial_moves.first().copied();
+    
     let shared_state = Arc::new(LazySMPState {
-        best_move: Mutex::new(None),
+        best_move: Mutex::new(fallback_move),
         best_score: AtomicI32::new(if is_maximizing { -1_000_000 } else { 1_000_000 }),
         should_stop: AtomicBool::new(false),
         nodes_searched: AtomicU64::new(0),
@@ -56,8 +58,12 @@ pub fn find_best_move(
     let num_threads = match rayon::current_num_threads() {
         1..=2 => 2,
         3..=4 => 3,
-        5..=8 => 4,
-        _ => 6,
+        5..=6 => 4,
+        7..=8 => 6,
+        9..=10 => 10,
+        11..=12 => 12,
+        13..=16 => 14,
+        _ => 16,
     };
     
     let results: Vec<_> = (0..num_threads).into_par_iter().map(|thread_id| {
@@ -73,7 +79,9 @@ pub fn find_best_move(
     }).collect();
 
     let total_nodes: u64 = results.iter().map(|r| r.nodes_searched).sum();
-    let max_depth_reached = results.iter().map(|r| r.depth_reached).max().unwrap_or(0);
+    let max_depth_reached = shared_state.max_depth_reached.load(Ordering::Relaxed).max(
+        results.iter().map(|r| r.depth_reached).max().unwrap_or(0)
+    );
     let final_best_move = shared_state.best_move.lock().unwrap().clone();
     let final_score = shared_state.best_score.load(Ordering::Relaxed);
 
@@ -193,15 +201,6 @@ fn lazy_smp_thread_search(
             
             local_state.undo_move(mv);
             nodes_searched += child_nodes;
-
-            if thread_id == 0 {
-                if let Ok(mut best_move) = shared_state.best_move.lock() {
-                    if best_move.is_none() {
-                        *best_move = Some(mv);
-                        shared_state.best_score.store(score, Ordering::Relaxed);
-                    }
-                }
-            }
 
             let is_better = if is_maximizing {
                 score > best_score_this_depth
