@@ -25,7 +25,7 @@ struct LazySMPState {
 
 pub fn find_best_move(
     state: &mut GameState,
-    max_depth: i32,
+    _max_depth: i32, // Ignored - lazy SMP searches as deep as time allows
     time_limit: Option<Duration>,
     tt: &TranspositionTable,
 ) -> SearchResult {
@@ -61,7 +61,6 @@ pub fn find_best_move(
     let results: Vec<_> = (0..num_threads).into_par_iter().map(|thread_id| {
         lazy_smp_thread_search(
             state, 
-            max_depth, 
             thread_id, 
             num_threads,
             &shared_state, 
@@ -91,7 +90,6 @@ pub fn find_best_move(
 // Individual thread search with diversification
 fn lazy_smp_thread_search(
     state: &GameState,
-    max_depth: i32,
     thread_id: usize,
     _num_threads: usize,
     shared_state: &Arc<LazySMPState>,
@@ -104,21 +102,25 @@ fn lazy_smp_thread_search(
     let mut nodes_searched = 0u64;
     let mut depth_reached = 0;
     
-    // Thread diversification strategies for maximum depth
+    // Thread diversification strategies - go as deep as possible, ignore max_depth
     let depth_offset = match thread_id {
-        0 => 0,                    // Main thread uses requested depth
-        1 => 2,                    // Thread 1 goes 2 deeper
-        2 => 4,                    // Thread 2 goes 4 deeper  
-        3 => 1,                    // Thread 3 goes 1 deeper
-        4 => 3,                    // Thread 4 goes 3 deeper
-        5 => 6,                    // Thread 5 goes 6 deeper
-        6 => 8,                    // Thread 6 goes 8 deeper
-        7 => 10,                   // Thread 7 goes 10 deeper
+        0 => 0,                    // Main thread starts at depth 1
+        1 => 2,                    // Thread 1 starts 2 deeper
+        2 => 4,                    // Thread 2 starts 4 deeper  
+        3 => 1,                    // Thread 3 starts 1 deeper
+        4 => 3,                    // Thread 4 starts 3 deeper
+        5 => 6,                    // Thread 5 starts 6 deeper
+        6 => 8,                    // Thread 6 starts 8 deeper
+        7 => 10,                   // Thread 7 starts 10 deeper
         _ => (thread_id % 8) as i32 + 1, // Other threads cycle with offsets
     };
-    let effective_max_depth = max_depth + depth_offset; // No minimum limit - go as deep as possible
+    // Ignore max_depth parameter - search as deep as time allows
+    let effective_max_depth = i32::MAX; // No depth limit - go until time runs out
     
-    for depth in 1..=effective_max_depth {
+    // Start iterative deepening from the thread's offset depth
+    let starting_depth = 1 + depth_offset;
+    
+    for depth in starting_depth..=effective_max_depth {
         // Check if we should stop (time limit or another thread found solution)
         if shared_state.should_stop.load(Ordering::Relaxed) {
             break;
