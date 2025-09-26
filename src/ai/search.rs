@@ -25,12 +25,13 @@ struct LazySMPState {
 
 pub fn find_best_move(
     state: &mut GameState,
-    _max_depth: i32, // Ignored - lazy SMP searches as deep as time allows
-    time_limit: Option<Duration>,
     tt: &TranspositionTable,
 ) -> SearchResult {
     let start_time = Instant::now();
     let is_maximizing = state.current_player == crate::core::board::Player::Max;
+    
+    // Hardcoded time limit - 500ms is mandatory for consistent AI performance
+    let time_limit = Some(Duration::from_millis(500));
     
     tt.advance_age();
 
@@ -54,8 +55,13 @@ pub fn find_best_move(
         max_depth_reached: AtomicI32::new(0),
     });
 
-    // Determine number of threads - maximize for deep search
-    let num_threads = rayon::current_num_threads().min(12).max(8); // Use 8-12 threads for maximum depth coverage
+    // Optimal thread count for 500ms searches - balance parallelism vs overhead
+    let num_threads = match rayon::current_num_threads() {
+        1..=2 => 2,  // Minimum 2 threads
+        3..=4 => 3,  // Use 3 threads for quad-core
+        5..=8 => 4,  // Use 4 threads for 6-8 core systems  
+        _ => 6,      // Maximum 6 threads for high-core systems (diminishing returns)
+    };
     
     // Launch parallel search threads with different parameters
     let results: Vec<_> = (0..num_threads).into_par_iter().map(|thread_id| {
@@ -102,20 +108,20 @@ fn lazy_smp_thread_search(
     let mut nodes_searched = 0u64;
     let mut depth_reached = 0;
     
-    // Thread diversification strategies - go as deep as possible, ignore max_depth
+    // Optimized thread diversification for 500ms searches
+    // Focus on reachable depths within time limit
     let depth_offset = match thread_id {
-        0 => 0,                    // Main thread starts at depth 1
-        1 => 2,                    // Thread 1 starts 2 deeper
-        2 => 4,                    // Thread 2 starts 4 deeper  
-        3 => 1,                    // Thread 3 starts 1 deeper
-        4 => 3,                    // Thread 4 starts 3 deeper
-        5 => 6,                    // Thread 5 starts 6 deeper
-        6 => 8,                    // Thread 6 starts 8 deeper
-        7 => 10,                   // Thread 7 starts 10 deeper
-        _ => (thread_id % 8) as i32 + 1, // Other threads cycle with offsets
+        0 => 0,  // Main thread: standard iterative deepening from depth 1
+        1 => 1,  // Thread 1: starts 1 deeper (tactical search)
+        2 => 2,  // Thread 2: starts 2 deeper (medium-term planning)
+        3 => 0,  // Thread 3: duplicate main thread (different move ordering)
+        4 => 3,  // Thread 4: starts 3 deeper (longer-term evaluation)
+        5 => 1,  // Thread 5: another tactical search with different ordering
+        _ => (thread_id % 4) as i32, // Additional threads cycle through proven patterns
     };
-    // Ignore max_depth parameter - search as deep as time allows
-    let effective_max_depth = i32::MAX; // No depth limit - go until time runs out
+    
+    // Reasonable upper bound for 500ms searches
+    let effective_max_depth = 25i32; 
     
     // Start iterative deepening from the thread's offset depth
     let starting_depth = 1 + depth_offset;
@@ -127,19 +133,22 @@ fn lazy_smp_thread_search(
         }
         
         if let Some(limit) = time_limit {
-            // Allow deeper search threads more time - they might find better solutions
-            let time_extension = if depth_offset > 4 { 
-                // Threads searching much deeper get significantly more time
-                Duration::from_millis((depth_offset as u64 * 200).min(2000)) 
-            } else if depth_offset > 0 {
-                // Threads going moderately deeper get some extra time
-                Duration::from_millis(depth_offset as u64 * 100)
+            // Smart time management for 500ms budget
+            // Different threads get different time allocations for optimal use
+            let elapsed = start_time.elapsed();
+            
+            let should_stop = if depth_offset == 0 {
+                // Main thread: use 80% of time budget for guaranteed results
+                elapsed >= Duration::from_millis(400)
+            } else if depth_offset <= 1 {
+                // Tactical threads: use 90% of time budget for quick tactical insights
+                elapsed >= Duration::from_millis(450)
             } else {
-                Duration::from_millis(0) // Main thread sticks to original limit
+                // Deep search threads: use full time budget for best moves
+                elapsed >= limit
             };
             
-            if start_time.elapsed() >= limit + time_extension {
-                // Only main thread can signal global stop for time limit
+            if should_stop {
                 if thread_id == 0 {
                     shared_state.should_stop.store(true, Ordering::Relaxed);
                 }
@@ -152,15 +161,22 @@ fn lazy_smp_thread_search(
             break;
         }
 
-        // Diversify move ordering per thread
+        // Enhanced move ordering with tactical intelligence
         MoveOrdering::order_moves(&local_state, &mut moves);
         
-        // Thread 0 uses standard ordering, others use variations
-        // Only diversify if we have enough moves to make it worthwhile
+        // Intelligent thread diversification that preserves tactical moves
         if thread_id > 0 && moves.len() > 4 {
-            // Rotate moves based on thread_id to explore different parts first
-            let rotation = thread_id % moves.len();
-            moves.rotate_left(rotation);
+            // Only diversify if we're not in a tactical position (few total moves available)
+            let is_tactical = local_state.get_possible_moves().len() < 20;
+            
+            if !is_tactical {
+                // Keep the top 2 moves (likely best), diversify the rest
+                let rotation = thread_id % (moves.len() - 2).max(1);
+                if moves.len() > 2 && rotation > 0 {
+                    let rest = &mut moves[2..];
+                    rest.rotate_left(rotation.min(rest.len()));
+                }
+            }
         }
 
         // Try to get previous best move from shared state for move ordering

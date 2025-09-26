@@ -24,12 +24,12 @@ fn test_shared_transposition_table() {
     
     let handle1 = thread::spawn(move || {
         let mut state_copy = state1;
-        find_best_move(&mut state_copy, 2, None, &tt1)
+        find_best_move(&mut state_copy, &tt1)
     });
     
     let handle2 = thread::spawn(move || {
         let mut state_copy = state2;
-        find_best_move(&mut state_copy, 2, None, &tt2)
+        find_best_move(&mut state_copy, &tt2)
     });
     
     let result1 = handle1.join().unwrap();
@@ -66,11 +66,11 @@ fn test_shared_vs_separate_tt_performance() {
     let mut state2 = base_state.clone();
     
     let handle1 = thread::spawn(move || {
-        find_best_move(&mut state1, 3, None, &tt_ref1)
+        find_best_move(&mut state1, &tt_ref1)
     });
     
     let handle2 = thread::spawn(move || {
-        find_best_move(&mut state2, 3, None, &tt_ref2)  
+        find_best_move(&mut state2, &tt_ref2)  
     });
     
     let result1 = handle1.join().unwrap();
@@ -95,11 +95,11 @@ fn test_shared_vs_separate_tt_performance() {
     let mut state2 = base_state;
     
     let handle1 = thread::spawn(move || {
-        find_best_move(&mut state1, 3, None, &separate_tt1)
+        find_best_move(&mut state1, &separate_tt1)
     });
     
     let handle2 = thread::spawn(move || {
-        find_best_move(&mut state2, 3, None, &separate_tt2)
+        find_best_move(&mut state2, &separate_tt2)
     });
     
     let sep_result1 = handle1.join().unwrap();
@@ -137,7 +137,7 @@ fn demo_lazy_smp_functionality() {
     
     println!("🎯 Testing with depth 4...");
     let start = std::time::Instant::now();
-    let result = find_best_move(&mut state, 4, None, &tt);
+    let result = find_best_move(&mut state, &tt);
     let elapsed = start.elapsed();
     
     println!("✅ Lazy SMP Results:");
@@ -153,9 +153,9 @@ fn demo_lazy_smp_functionality() {
     assert!(result.depth_reached >= 4, "Should reach requested depth");
     assert!(result.nodes_searched > 0, "Should search some nodes");
     
-    // Test with time limit
-    println!("\n🎯 Testing with 100ms time limit...");
-    let result_timed = find_best_move(&mut state, 8, Some(Duration::from_millis(100)), &tt);
+    // Test with time limit (now hardcoded to 500ms)
+    println!("\n🎯 Testing with hardcoded 500ms time limit...");
+    let result_timed = find_best_move(&mut state, &tt);
     
     println!("✅ Timed Search Results:");
     println!("   Best move: {:?}", result_timed.best_move);
@@ -196,15 +196,15 @@ fn test_enhanced_deep_search_capability() {
         state.make_move(mv);
     }
     
-    println!("🎯 Testing depth 5 with 1.5 second time limit...");
+    println!("🎯 Testing with hardcoded 500ms time limit...");
     let start = std::time::Instant::now();
-    let result = find_best_move(&mut state, 5, Some(Duration::from_millis(1500)), &tt);
+    let result = find_best_move(&mut state, &tt);
     let elapsed = start.elapsed();
     
     println!("✅ Enhanced Deep Search Results:");
     println!("   Best move: {:?}", result.best_move);
     println!("   Score: {}", result.score);  
-    println!("   Depth reached: {} (requested: 5)", result.depth_reached);
+    println!("   Depth reached: {}", result.depth_reached);
     println!("   Nodes searched: {}", result.nodes_searched);
     println!("   Time taken: {:?}", elapsed);
     

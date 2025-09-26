@@ -310,7 +310,7 @@ fn test_find_immediate_win_or_block() {
     state.board.place_stone(7, 8, Player::Max);
     state.current_player = Player::Max; // Max can win by playing (7,9)
     
-    let result = find_best_move(&mut state, 3, None, &tt);
+    let result = find_best_move(&mut state, &tt);
     
     // Should find immediate win (either end of the line is valid)
     assert!(result.best_move.is_some());
@@ -334,7 +334,7 @@ fn test_iterative_deepening_progressive_improvement() {
     state.board.place_stone(8, 7, Player::Min);
     state.current_player = Player::Max;
     
-    let result = find_best_move(&mut state, 4, None, &tt);
+    let result = find_best_move(&mut state, &tt);
     
     // Should reach reasonable depth
     assert!(result.depth_reached >= 3, "Should reach depth 3+, got: {}", result.depth_reached);
