@@ -14,7 +14,6 @@ pub struct SearchResult {
     pub time_elapsed: Duration,
 }
 
-// Shared state for lazy SMP coordination
 struct LazySMPState {
     best_move: Mutex<Option<(usize, usize)>>,
     best_score: AtomicI32,
@@ -46,7 +45,6 @@ pub fn find_best_move(
         };
     }
 
-    // Shared state for lazy SMP coordination
     let shared_state = Arc::new(LazySMPState {
         best_move: Mutex::new(None),
         best_score: AtomicI32::new(if is_maximizing { -1_000_000 } else { 1_000_000 }),
@@ -55,20 +53,17 @@ pub fn find_best_move(
         max_depth_reached: AtomicI32::new(0),
     });
 
-    // Optimal thread count for 500ms searches - balance parallelism vs overhead
     let num_threads = match rayon::current_num_threads() {
-        1..=2 => 2,  // Minimum 2 threads
-        3..=4 => 3,  // Use 3 threads for quad-core
-        5..=8 => 4,  // Use 4 threads for 6-8 core systems  
-        _ => 6,      // Maximum 6 threads for high-core systems (diminishing returns)
+        1..=2 => 2,
+        3..=4 => 3,
+        5..=8 => 4,
+        _ => 6,
     };
     
-    // Launch parallel search threads with different parameters
     let results: Vec<_> = (0..num_threads).into_par_iter().map(|thread_id| {
         lazy_smp_thread_search(
             state, 
-            thread_id, 
-            num_threads,
+            thread_id,
             &shared_state, 
             &start_time, 
             time_limit, 
@@ -77,10 +72,8 @@ pub fn find_best_move(
         )
     }).collect();
 
-    // Collect results from all threads
     let total_nodes: u64 = results.iter().map(|r| r.nodes_searched).sum();
     let max_depth_reached = results.iter().map(|r| r.depth_reached).max().unwrap_or(0);
-    
     let final_best_move = shared_state.best_move.lock().unwrap().clone();
     let final_score = shared_state.best_score.load(Ordering::Relaxed);
 
@@ -97,7 +90,6 @@ pub fn find_best_move(
 fn lazy_smp_thread_search(
     state: &GameState,
     thread_id: usize,
-    _num_threads: usize,
     shared_state: &Arc<LazySMPState>,
     start_time: &Instant,
     time_limit: Option<Duration>,
@@ -108,43 +100,31 @@ fn lazy_smp_thread_search(
     let mut nodes_searched = 0u64;
     let mut depth_reached = 0;
     
-    // Optimized thread diversification for 500ms searches
-    // Focus on reachable depths within time limit
     let depth_offset = match thread_id {
-        0 => 0,  // Main thread: standard iterative deepening from depth 1
-        1 => 1,  // Thread 1: starts 1 deeper (tactical search)
-        2 => 2,  // Thread 2: starts 2 deeper (medium-term planning)
-        3 => 0,  // Thread 3: duplicate main thread (different move ordering)
-        4 => 3,  // Thread 4: starts 3 deeper (longer-term evaluation)
-        5 => 1,  // Thread 5: another tactical search with different ordering
-        _ => (thread_id % 4) as i32, // Additional threads cycle through proven patterns
+        0 => 0,
+        1 => 1,
+        2 => 2,
+        3 => 0,
+        4 => 3,
+        5 => 1,
+        _ => (thread_id % 4) as i32,
     };
     
-    // Reasonable upper bound for 500ms searches
-    let effective_max_depth = 25i32; 
-    
-    // Start iterative deepening from the thread's offset depth
+    let effective_max_depth = 25i32;
     let starting_depth = 1 + depth_offset;
     
     for depth in starting_depth..=effective_max_depth {
-        // Check if we should stop (time limit or another thread found solution)
         if shared_state.should_stop.load(Ordering::Relaxed) {
             break;
         }
         
         if let Some(limit) = time_limit {
-            // Smart time management for 500ms budget
-            // Different threads get different time allocations for optimal use
             let elapsed = start_time.elapsed();
-            
             let should_stop = if depth_offset == 0 {
-                // Main thread: use 80% of time budget for guaranteed results
                 elapsed >= Duration::from_millis(400)
             } else if depth_offset <= 1 {
-                // Tactical threads: use 90% of time budget for quick tactical insights
                 elapsed >= Duration::from_millis(450)
             } else {
-                // Deep search threads: use full time budget for best moves
                 elapsed >= limit
             };
             
@@ -161,16 +141,11 @@ fn lazy_smp_thread_search(
             break;
         }
 
-        // Enhanced move ordering with tactical intelligence
         MoveOrdering::order_moves(&local_state, &mut moves);
         
-        // Intelligent thread diversification that preserves tactical moves
         if thread_id > 0 && moves.len() > 4 {
-            // Only diversify if we're not in a tactical position (few total moves available)
             let is_tactical = local_state.get_possible_moves().len() < 20;
-            
             if !is_tactical {
-                // Keep the top 2 moves (likely best), diversify the rest
                 let rotation = thread_id % (moves.len() - 2).max(1);
                 if moves.len() > 2 && rotation > 0 {
                     let rest = &mut moves[2..];
@@ -179,7 +154,6 @@ fn lazy_smp_thread_search(
             }
         }
 
-        // Try to get previous best move from shared state for move ordering
         if let Ok(shared_best) = shared_state.best_move.lock() {
             if let Some(prev_best) = *shared_best {
                 if let Some(pos) = moves.iter().position(|&m| m == prev_best) {
@@ -188,7 +162,6 @@ fn lazy_smp_thread_search(
             }
         }
 
-        let mut _best_move_this_depth = None;
         let mut best_score_this_depth = if is_maximizing { -1_000_000 } else { 1_000_000 };
 
         for &mv in &moves {
@@ -198,25 +171,13 @@ fn lazy_smp_thread_search(
 
             local_state.make_move(mv);
             
-            // Optimized aspiration windows for deep search threads
             let (alpha, beta) = if thread_id == 0 {
-                (i32::MIN, i32::MAX) // Full window for main thread
+                (i32::MIN, i32::MAX)
             } else {
                 let current_best = shared_state.best_score.load(Ordering::Relaxed);
-                
-                // Deeper search threads get wider windows to avoid re-searches
-                let base_window = if depth_offset >= 6 {
-                    200 // Very wide windows for deepest threads (6+ deeper)
-                } else if depth_offset >= 3 {
-                    100 // Wide windows for moderately deep threads (3-5 deeper) 
-                } else {
-                    50  // Standard windows for shallow helper threads
-                };
-                
+                let base_window = if depth_offset >= 3 { 100 } else { 50 };
                 let window = base_window + thread_id as i32 * 15;
-                let alpha = current_best.saturating_sub(window);
-                let beta = current_best.saturating_add(window);
-                (alpha, beta)
+                (current_best.saturating_sub(window), current_best.saturating_add(window))
             };
             
             let (score, child_nodes) = minimax(
@@ -233,10 +194,7 @@ fn lazy_smp_thread_search(
             local_state.undo_move(mv);
             nodes_searched += child_nodes;
 
-            // Always ensure we have at least one move stored (first valid move for this thread)
-            if thread_id == 0 && _best_move_this_depth.is_none() {
-                _best_move_this_depth = Some(mv);
-                best_score_this_depth = score;
+            if thread_id == 0 {
                 if let Ok(mut best_move) = shared_state.best_move.lock() {
                     if best_move.is_none() {
                         *best_move = Some(mv);
@@ -245,7 +203,6 @@ fn lazy_smp_thread_search(
                 }
             }
 
-            // Update shared state if this is a better move
             let is_better = if is_maximizing {
                 score > best_score_this_depth
             } else {
@@ -254,9 +211,7 @@ fn lazy_smp_thread_search(
 
             if is_better {
                 best_score_this_depth = score;
-                _best_move_this_depth = Some(mv);
                 
-                // Update global best if this is better
                 let current_best = shared_state.best_score.load(Ordering::Relaxed);
                 let should_update = if is_maximizing {
                     score > current_best
@@ -270,7 +225,6 @@ fn lazy_smp_thread_search(
                         *best_move = Some(mv);
                     }
                     
-                    // If we found a winning/losing position, signal other threads to stop
                     if score.abs() >= 1_000_000 {
                         shared_state.should_stop.store(true, Ordering::Relaxed);
                         break;
@@ -282,20 +236,12 @@ fn lazy_smp_thread_search(
         depth_reached = depth;
         shared_state.max_depth_reached.store(depth, Ordering::Relaxed);
 
-        // Early termination for definitive results - but allow deeper threads to continue
         if best_score_this_depth.abs() >= 1_000_000 {
-            // Only stop immediately if this is a shallow thread or main thread
             if thread_id == 0 || depth_offset <= 2 {
                 shared_state.should_stop.store(true, Ordering::Relaxed);
                 break;
-            } else {
-                // Deep search threads continue briefly to potentially find even better solutions
-                // But if multiple threads have found wins, then stop
-                let existing_stop = shared_state.should_stop.load(Ordering::Relaxed);
-                if existing_stop {
-                    break; // Another thread already signaled to stop
-                }
-                // Continue searching for a bit more to verify the solution depth
+            } else if shared_state.should_stop.load(Ordering::Relaxed) {
+                break;
             }
         }
     }
@@ -303,7 +249,7 @@ fn lazy_smp_thread_search(
     shared_state.nodes_searched.fetch_add(nodes_searched, Ordering::Relaxed);
 
     SearchResult {
-        best_move: None, // Individual thread doesn't return best move
+        best_move: None,
         score: 0,
         depth_reached,
         nodes_searched,
