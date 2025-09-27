@@ -17,7 +17,7 @@ pub fn find_best_move(
     state: &mut GameState,
     max_depth: i32,
     time_limit: Option<Duration>,
-    tt: &mut TranspositionTable,
+    tt: &TranspositionTable,
 ) -> SearchResult {
     let start_time = Instant::now();
     let mut best_move = None;
@@ -69,7 +69,6 @@ pub fn find_best_move(
         
         let move_results: Vec<_> = moves.par_iter().map(|&mv| {
             let mut state_clone = state.clone();
-            let mut tt_local = TranspositionTable::new(tt.size().min(5_000));
             
             state_clone.make_move(mv);
             let (score, child_nodes) = minimax(
@@ -78,19 +77,16 @@ pub fn find_best_move(
                 i32::MIN,
                 i32::MAX,
                 !is_maximizing,
-                &mut tt_local,
+                tt,
                 &start_time,
                 time_limit,
             );
             
-            let (local_hits, local_misses) = tt_local.get_stats();
-            (mv, score, child_nodes, local_hits, local_misses)
+            (mv, score, child_nodes)
         }).collect();
         
-        for (mv, score, child_nodes, local_hits, local_misses) in move_results {
+        for (mv, score, child_nodes) in move_results {
             nodes_searched += child_nodes;
-            
-            tt.add_stats(local_hits, local_misses);
 
             let is_better = if is_maximizing {
                 score > iteration_best_score

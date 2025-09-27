@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 use bevy::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -17,8 +18,8 @@ pub struct TranspositionEntry {
     pub age: u32,
 }
 
-#[derive(Resource)]
-pub struct TranspositionTable {
+#[derive(Debug)]
+struct TranspositionTableInner {
     table: HashMap<u64, TranspositionEntry>,
     current_age: u32,
     max_size: usize,
@@ -26,23 +27,32 @@ pub struct TranspositionTable {
     misses: u64,
 }
 
+#[derive(Resource, Clone)]
+pub struct TranspositionTable {
+    inner: Arc<RwLock<TranspositionTableInner>>,
+}
+
 impl TranspositionTable {
     pub fn new(max_size: usize) -> Self {
         Self {
-            table: HashMap::with_capacity(max_size.min(1024 * 1024)),
-            current_age: 0,
-            max_size,
-            hits: 0,
-            misses: 0,
+            inner: Arc::new(RwLock::new(TranspositionTableInner {
+                table: HashMap::with_capacity(max_size.min(1024 * 1024)),
+                current_age: 0,
+                max_size,
+                hits: 0,
+                misses: 0,
+            })),
         }
     }
     
-    pub fn store(&mut self, key: u64, value: i32, depth: i32, entry_type: EntryType, best_move: Option<(usize, usize)>) {
-        if self.table.len() >= self.max_size {
-            self.cleanup_old_entries();
+    pub fn store(&self, key: u64, value: i32, depth: i32, entry_type: EntryType, best_move: Option<(usize, usize)>) {
+        let mut inner = self.inner.write().unwrap();
+        
+        if inner.table.len() >= inner.max_size {
+            Self::cleanup_old_entries_inner(&mut inner);
         }
         
-        let current_age = self.current_age;
+        let current_age = inner.current_age;
         let new_entry = TranspositionEntry {
             value,
             depth,
@@ -51,65 +61,87 @@ impl TranspositionTable {
             age: current_age,
         };
         
-        match self.table.get(&key) {
+        match inner.table.get(&key) {
             Some(existing) => {
                 if depth > existing.depth || (depth == existing.depth && current_age >= existing.age) {
-                    self.table.insert(key, new_entry);
+                    inner.table.insert(key, new_entry);
                 }
             }
             None => {
-                self.table.insert(key, new_entry);
+                inner.table.insert(key, new_entry);
             }
         }
     }
     
-    pub fn probe(&mut self, key: u64, depth: i32, alpha: i32, beta: i32) -> TTResult {
-        if let Some(entry) = self.table.get(&key) {
-            self.hits += 1;
-            
-            if entry.depth >= depth {
+    pub fn probe(&self, key: u64, depth: i32, alpha: i32, beta: i32) -> TTResult {
+        let inner = self.inner.read().unwrap();
+        
+        if let Some(entry) = inner.table.get(&key) {
+            // We need to release the read lock before acquiring write lock for stats
+            let result = if entry.depth >= depth {
                 match entry.entry_type {
                     EntryType::Exact => {
-                        return TTResult::hit_with_cutoff(entry.value, entry.best_move);
+                        Some(TTResult::hit_with_cutoff(entry.value, entry.best_move))
                     }
                     EntryType::LowerBound => {
                         if entry.value >= beta {
-                            return TTResult::hit_with_cutoff(entry.value, entry.best_move);
+                            Some(TTResult::hit_with_cutoff(entry.value, entry.best_move))
+                        } else {
+                            None
                         }
                     }
                     EntryType::UpperBound => {
                         if entry.value <= alpha {
-                            return TTResult::hit_with_cutoff(entry.value, entry.best_move);
+                            Some(TTResult::hit_with_cutoff(entry.value, entry.best_move))
+                        } else {
+                            None
                         }
                     }
                 }
-            }
+            } else {
+                None
+            };
             
-            return TTResult::hit_move_only(entry.best_move);
+            let best_move = entry.best_move;
+            drop(inner); // Release read lock
+            
+            // Update stats with write lock
+            self.inner.write().unwrap().hits += 1;
+            
+            if let Some(result) = result {
+                return result;
+            } else {
+                return TTResult::hit_move_only(best_move);
+            }
         }
         
-        self.misses += 1;
+        drop(inner); // Release read lock
+        self.inner.write().unwrap().misses += 1;
         TTResult::miss()
     }
     
     pub fn get_best_move(&self, key: u64) -> Option<(usize, usize)> {
-        self.table.get(&key).and_then(|entry| entry.best_move)
+        let inner = self.inner.read().unwrap();
+        inner.table.get(&key).and_then(|entry| entry.best_move)
     }
     
-    pub fn clear(&mut self) {
-        self.table.clear();
-        self.current_age = 0;
-        self.hits = 0;
-        self.misses = 0;
+    pub fn clear(&self) {
+        let mut inner = self.inner.write().unwrap();
+        inner.table.clear();
+        inner.current_age = 0;
+        inner.hits = 0;
+        inner.misses = 0;
     }
     
-    pub fn advance_age(&mut self) {
-        self.current_age += 1;
+    pub fn advance_age(&self) {
+        let mut inner = self.inner.write().unwrap();
+        inner.current_age += 1;
     }
     
     pub fn hit_rate(&self) -> f64 {
-        let hits = self.hits;
-        let misses = self.misses;
+        let inner = self.inner.read().unwrap();
+        let hits = inner.hits;
+        let misses = inner.misses;
         let total = hits + misses;
         if total == 0 {
             0.0
@@ -119,36 +151,36 @@ impl TranspositionTable {
     }
     
     pub fn size(&self) -> usize {
-        self.table.len()
+        let inner = self.inner.read().unwrap();
+        inner.table.len()
     }
     
     pub fn get_stats(&self) -> (u64, u64) {
-        (
-            self.hits,
-            self.misses,
-        )
+        let inner = self.inner.read().unwrap();
+        (inner.hits, inner.misses)
     }
     
-    pub fn add_stats(&mut self, hits: u64, misses: u64) {
-        self.hits += hits;
-        self.misses += misses;
+    pub fn add_stats(&self, hits: u64, misses: u64) {
+        let mut inner = self.inner.write().unwrap();
+        inner.hits += hits;
+        inner.misses += misses;
     }
     
-    fn cleanup_old_entries(&mut self) {
-        let current_age = self.current_age;
+    fn cleanup_old_entries_inner(inner: &mut TranspositionTableInner) {
+        let current_age = inner.current_age;
         if current_age < 10 {
             return;
         }
         
         let cutoff_age = current_age - 5;
         
-        self.table.retain(|_, entry| {
+        inner.table.retain(|_, entry| {
             entry.age >= cutoff_age || entry.depth > 10
         });
         
-        if self.table.len() > self.max_size * 3 / 4 {
+        if inner.table.len() > inner.max_size * 3 / 4 {
             let cutoff_age = current_age - 2;
-            self.table.retain(|_, entry| {
+            inner.table.retain(|_, entry| {
                 entry.age >= cutoff_age && entry.depth > 5
             });
         }
