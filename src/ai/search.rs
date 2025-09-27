@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use std::thread;
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}, RwLock};
 use std::collections::HashMap;
-use rand::{Rng, SeedableRng};
+use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 
 use super::{minimax::minimax, move_ordering::MoveOrdering, transposition::TranspositionTable};
@@ -49,7 +49,9 @@ pub fn find_best_move(
     time_limit: Option<Duration>,
     tt: &TranspositionTable,
 ) -> SearchResult {
-    find_best_move_with_threads(state, max_depth, time_limit, tt, None)
+    let thread_count = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).min(8).max(2);
+    println!("🚀 Starting Lazy SMP search with {} threads, max depth {}", thread_count, max_depth);
+    lazy_smp_search(state, max_depth, time_limit, tt, thread_count)
 }
 
 pub fn find_best_move_with_threads(
@@ -60,114 +62,14 @@ pub fn find_best_move_with_threads(
     num_threads: Option<usize>,
 ) -> SearchResult {
     let thread_count = num_threads.unwrap_or_else(|| {
-        let logical_cpus = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1);
-        (logical_cpus.min(8)).max(1) // Use up to 8 threads, minimum 1
-    });
-
-    if thread_count == 1 {
-        return single_thread_search(state, max_depth, time_limit, tt);
-    }
-
+        std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4)
+    }).min(8).max(2);
+    
+    println!("🚀 Starting Lazy SMP search with {} threads, max depth {}", thread_count, max_depth);
     lazy_smp_search(state, max_depth, time_limit, tt, thread_count)
 }
 
-fn single_thread_search(
-    state: &mut GameState,
-    max_depth: i32,
-    time_limit: Option<Duration>,
-    tt: &TranspositionTable,
-) -> SearchResult {
-    let start_time = Instant::now();
-    let mut best_move = None;
-    let is_maximizing = state.current_player == crate::core::board::Player::Max;
-    let mut best_score = if is_maximizing { i32::MIN } else { i32::MAX };
-    let mut nodes_searched = 0u64;
-    let mut depth_reached = 0;
 
-    tt.advance_age();
-
-    let initial_moves = state.get_possible_moves();
-    if initial_moves.is_empty() {
-        return SearchResult {
-            best_move: None,
-            score: 0,
-            depth_reached: 0,
-            nodes_searched: 0,
-            time_elapsed: start_time.elapsed(),
-        };
-    }
-
-    for depth in 1..=max_depth {
-        if let Some(limit) = time_limit {
-            let elapsed = start_time.elapsed();
-            if elapsed >= limit {
-                break;
-            }
-        }
-
-        let mut iteration_best_move = None;
-        let mut iteration_best_score = if is_maximizing { i32::MIN } else { i32::MAX };
-
-        let mut moves = state.get_possible_moves();
-        MoveOrdering::order_moves(state, &mut moves);
-        
-        if let Some(prev_best) = best_move {
-            if let Some(pos) = moves.iter().position(|&m| m == prev_best) {
-                moves.swap(0, pos);
-            }
-        }
-
-        for mv in moves {
-            if let Some(limit) = time_limit {
-                let elapsed = start_time.elapsed();
-                if elapsed >= limit {
-                    break;
-                }
-            }
-            
-            state.make_move(mv);
-            let (score, child_nodes) = minimax(
-                state,
-                depth - 1,
-                i32::MIN,
-                i32::MAX,
-                !is_maximizing,
-                tt,
-                &start_time,
-                time_limit,
-            );
-            state.undo_move(mv);
-            nodes_searched += child_nodes;
-
-            let is_better = if is_maximizing {
-                score > iteration_best_score
-            } else {
-                score < iteration_best_score
-            };
-
-            if is_better {
-                iteration_best_score = score;
-                iteration_best_move = Some(mv);
-            }
-        }
-        
-        best_move = iteration_best_move;
-        best_score = iteration_best_score;
-        depth_reached = depth;
-        
-        if best_score.abs() >= 1_000_000 {
-            break;
-        }
-    }
-
-    SearchResult {
-        best_move,
-        score: best_score,
-        depth_reached,
-        nodes_searched,
-        time_elapsed: start_time.elapsed(),
-    }
-}
 
 fn lazy_smp_search(
     state: &mut GameState,
@@ -223,14 +125,16 @@ fn lazy_smp_search(
         handles.push(handle);
     }
 
-    // Wait for threads to complete or time out
+    // Monitor threads and handle time limits
     if let Some(time_limit) = time_limit {
-        // Wait for time limit, then signal abort
-        thread::sleep(time_limit);
+        let check_interval = Duration::from_millis(10);
+        while start_time.elapsed() < time_limit {
+            thread::sleep(check_interval);
+        }
         shared_state.abort_flag.store(true, Ordering::Relaxed);
     }
 
-    // Collect results from all threads
+    // Wait for all threads to complete
     for handle in handles {
         let _ = handle.join(); // Ignore thread panic results
     }
@@ -258,6 +162,9 @@ fn lazy_smp_search(
 
     let total_nodes: u64 = completed_results.iter().map(|r| r.nodes_searched).sum();
     let max_depth_reached = completed_results.iter().map(|r| r.depth).max().unwrap_or(0);
+
+    println!("🎯 Lazy SMP completed: {} threads finished, best move: {:?}, nodes: {}", 
+             completed_results.len(), best_move, total_nodes);
 
     SearchResult {
         best_move,
@@ -419,7 +326,9 @@ fn apply_thread_move_ordering(
         // Randomly swap some moves from the front with moves from later
         for i in 1..=num_to_randomize {
             if i < moves.len() {
-                let swap_target = rng.random_range(i..moves.len());
+                let range_size = moves.len() - i;
+                let random_offset = (rng.next_u32() as usize) % range_size;
+                let swap_target = i + random_offset;
                 moves.swap(i, swap_target);
             }
         }
