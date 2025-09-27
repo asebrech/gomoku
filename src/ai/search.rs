@@ -1,3 +1,7 @@
+//! Lazy SMP (Symmetric Multi-Processing) parallel search implementation
+//! Uses multiple threads with different search depths and slight randomization
+//! to explore the game tree in parallel, then votes on the best move.
+
 use crate::core::state::GameState;
 use std::time::{Duration, Instant};
 use std::thread;
@@ -19,6 +23,7 @@ pub struct SearchResult {
 
 #[derive(Debug, Clone)]
 struct ThreadResult {
+    #[allow(dead_code)]
     thread_id: usize,
     best_move: Option<(usize, usize)>,
     score: i32,
@@ -50,10 +55,10 @@ pub fn find_best_move(
     tt: &TranspositionTable,
 ) -> SearchResult {
     let thread_count = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).min(8).max(2);
-    println!("🚀 Starting Lazy SMP search with {} threads, max depth {}", thread_count, max_depth);
     lazy_smp_search(state, max_depth, time_limit, tt, thread_count)
 }
 
+/// Advanced version that allows specifying the number of threads
 pub fn find_best_move_with_threads(
     state: &mut GameState,
     max_depth: i32,
@@ -65,11 +70,8 @@ pub fn find_best_move_with_threads(
         std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4)
     }).min(8).max(2);
     
-    println!("🚀 Starting Lazy SMP search with {} threads, max depth {}", thread_count, max_depth);
     lazy_smp_search(state, max_depth, time_limit, tt, thread_count)
 }
-
-
 
 fn lazy_smp_search(
     state: &mut GameState,
@@ -79,9 +81,8 @@ fn lazy_smp_search(
     num_threads: usize,
 ) -> SearchResult {
     let start_time = Instant::now();
-    let initial_moves = state.get_possible_moves();
     
-    if initial_moves.is_empty() {
+    if state.get_possible_moves().is_empty() {
         return SearchResult {
             best_move: None,
             score: 0,
@@ -101,7 +102,6 @@ fn lazy_smp_search(
 
     let mut handles = Vec::new();
 
-    // Spawn worker threads
     for thread_id in 0..num_threads {
         let thread_params = create_thread_params(thread_id, max_depth);
         let state_clone = state.clone();
@@ -125,7 +125,6 @@ fn lazy_smp_search(
         handles.push(handle);
     }
 
-    // Monitor threads and handle time limits
     if let Some(time_limit) = time_limit {
         let check_interval = Duration::from_millis(10);
         while start_time.elapsed() < time_limit {
@@ -134,12 +133,10 @@ fn lazy_smp_search(
         shared_state.abort_flag.store(true, Ordering::Relaxed);
     }
 
-    // Wait for all threads to complete
     for handle in handles {
         let _ = handle.join(); // Ignore thread panic results
     }
 
-    // Analyze results and vote for best move
     let results = shared_state.thread_results.read().unwrap();
     let completed_results: Vec<_> = results.iter().filter_map(|r| r.as_ref()).cloned().collect();
     
@@ -153,7 +150,6 @@ fn lazy_smp_search(
         };
     }
 
-    // Thread voting to select best move
     let best_move = select_best_move_by_voting(&completed_results);
     let best_result = completed_results.iter()
         .find(|r| r.best_move == best_move)
@@ -162,9 +158,6 @@ fn lazy_smp_search(
 
     let total_nodes: u64 = completed_results.iter().map(|r| r.nodes_searched).sum();
     let max_depth_reached = completed_results.iter().map(|r| r.depth).max().unwrap_or(0);
-
-    println!("🎯 Lazy SMP completed: {} threads finished, best move: {:?}, nodes: {}", 
-             completed_results.len(), best_move, total_nodes);
 
     SearchResult {
         best_move,
@@ -178,7 +171,7 @@ fn lazy_smp_search(
 fn create_thread_params(thread_id: usize, base_depth: i32) -> ThreadParams {
     // Depth offset pattern: 0, 1, 0, 1, 2, 0, 1, 2, ...
     let depth_offset = match thread_id {
-        0 => 0, // Main thread
+        0 => 0,
         1 => 1,
         2 => 0,
         3 => 1,
@@ -186,7 +179,7 @@ fn create_thread_params(thread_id: usize, base_depth: i32) -> ThreadParams {
         _ => (thread_id - 2) % 3,
     };
 
-    let min_depth = if thread_id == 0 { 1 } else { 1i32.max(depth_offset as i32) };
+    let min_depth = 1.max(depth_offset as i32);
 
     ThreadParams {
         thread_id,
@@ -278,6 +271,7 @@ fn thread_search_worker(
         best_score = iteration_best_score;
         depth_reached = depth;
         
+        // Early termination for mate scores
         if best_score.abs() >= 1_000_000 {
             break;
         }
@@ -315,7 +309,6 @@ fn apply_thread_move_ordering(
     params: &ThreadParams,
     rng: &mut ChaCha8Rng,
 ) {
-    // Apply base move ordering
     MoveOrdering::order_moves(state, moves);
     
     // Add thread-specific randomization for helper threads
@@ -343,7 +336,6 @@ fn select_best_move_by_voting(results: &[ThreadResult]) -> Option<(usize, usize)
     let mut vote_map: HashMap<(usize, usize), f32> = HashMap::new();
     let worst_score = results.iter().map(|r| r.score).min().unwrap_or(0);
     
-    // Collect votes from all threads
     for result in results {
         if let Some(best_move) = result.best_move {
             let vote_weight = calculate_vote_weight(result, worst_score);
@@ -355,14 +347,13 @@ fn select_best_move_by_voting(results: &[ThreadResult]) -> Option<(usize, usize)
         return None;
     }
     
-    // Find move with highest vote total
     vote_map.into_iter()
         .max_by(|(_, v1), (_, v2)| v1.partial_cmp(v2).unwrap_or(std::cmp::Ordering::Equal))
         .map(|(mv, _)| mv)
 }
 
 fn calculate_vote_weight(result: &ThreadResult, worst_score: i32) -> f32 {
-    let score_component = (result.score - worst_score + 10) as f32;
+    let score_component = (result.score - worst_score + 1).max(1) as f32;
     let depth_component = result.depth as f32;
     let completion_component = if result.is_complete { 1.2 } else { 1.0 };
     let confidence_component = result.confidence;
