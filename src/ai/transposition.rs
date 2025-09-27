@@ -77,7 +77,6 @@ impl TranspositionTable {
         let inner = self.inner.read().unwrap();
         
         if let Some(entry) = inner.table.get(&key) {
-            // We need to release the read lock before acquiring write lock for stats
             let result = if entry.depth >= depth {
                 match entry.entry_type {
                     EntryType::Exact => {
@@ -103,9 +102,8 @@ impl TranspositionTable {
             };
             
             let best_move = entry.best_move;
-            drop(inner); // Release read lock
+            drop(inner);
             
-            // Update stats with write lock
             self.inner.write().unwrap().hits += 1;
             
             if let Some(result) = result {
@@ -115,7 +113,7 @@ impl TranspositionTable {
             }
         }
         
-        drop(inner); // Release read lock
+        drop(inner);
         self.inner.write().unwrap().misses += 1;
         TTResult::miss()
     }
