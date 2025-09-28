@@ -89,7 +89,7 @@ fn test_ai_vs_ai_game() {
     let mut tt = TranspositionTable::default();
 
     while !state.is_terminal() && move_count < max_moves {
-        let result = find_best_move(&mut state, 2, None, &mut tt);
+        let result = find_best_move(&mut state, &mut tt);
 
         if let Some(mv) = result.best_move {
             let current_player = state.current_player;
@@ -233,7 +233,7 @@ fn test_ai_decision_quality() {
     state.current_player = Player::Max;
     let mut tt = TranspositionTable::default();
 
-    let result = find_best_move(&mut state, 3, None, &mut tt);
+    let result = find_best_move(&mut state, &mut tt);
 
     // Should block the threat
     assert!(result.best_move.is_some());
@@ -262,7 +262,7 @@ fn test_performance_constraints() {
     use std::time::Instant;
     let start = Instant::now();
 
-    let _result = find_best_move(&mut state, 3, None, &mut tt);
+    let _result = find_best_move(&mut state, &mut tt);
 
     let elapsed = start.elapsed();
 
@@ -316,7 +316,7 @@ fn test_simultaneous_threats() {
     println!("Critical blocking positions: (9,8), (9,13), (8,9), (13,9)");
 
     // AI should prioritize blocking one of the immediate threats
-    let result = find_best_move(&mut state, 3, None, &mut tt);
+    let result = find_best_move(&mut state, &mut tt);
     assert!(result.best_move.is_some());
 
     let (row, col) = result.best_move.unwrap();

@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use bevy::prelude::*;
 use crate::{ai::{search::find_best_move, transposition::TranspositionTable}, core::{board::Player, state::GameState}, ui::{app::{AppState, GameSettings}, screens::{game::{board::{BoardRoot, BoardUtils, PreviewDot}, settings::spawn_settings_panel}, utils::despawn_screen}}};
 
@@ -229,13 +227,12 @@ pub fn process_next_round(
             // AI's turn
             
             if !game_state.is_terminal() {
-                let placement = if let Some(time_limit_ms) = settings.time_limit {
-                    let time_limit = Duration::from_millis(time_limit_ms as u64);
-                    info!("AI using time-based search with {}ms limit", time_limit_ms);
-                    find_best_move(&mut game_state, settings.ai_depth, Some(time_limit), &tt)
+                let placement = if let Some(_time_limit_ms) = settings.time_limit {
+                    info!("AI using time-based search with hardcoded 500ms limit");
+                    find_best_move(&mut game_state, &tt)
                 } else {
-                    info!("AI using depth-based search to depth {}", settings.ai_depth);
-                    find_best_move(&mut game_state, settings.ai_depth, None, &tt)
+                    info!("AI using depth-based search with hardcoded depth 12");
+                    find_best_move(&mut game_state, &tt)
                 };
                 ai_time.micros = placement.time_elapsed.as_micros();
                 ai_depth.depth = placement.depth_reached;

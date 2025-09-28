@@ -27,11 +27,11 @@ fn test_shared_transposition_table() {
     
     // Run searches in different threads using the shared TT
     let handle1 = thread::spawn(move || {
-        find_best_move(&mut state_clone1, 3, None, &tt_clone1)
+        find_best_move(&mut state_clone1, &tt_clone1)
     });
     
     let handle2 = thread::spawn(move || {
-        find_best_move(&mut state_clone2, 3, None, &tt_clone2)
+        find_best_move(&mut state_clone2, &tt_clone2)
     });
     
     let result1 = handle1.join().unwrap();
@@ -64,7 +64,7 @@ fn test_tt_cache_sharing_between_threads() {
     let tt_clone1 = shared_tt.clone();
     let mut state_clone1 = base_state.clone();
     let handle1 = thread::spawn(move || {
-        find_best_move(&mut state_clone1, 4, None, &tt_clone1)
+        find_best_move(&mut state_clone1, &tt_clone1)
     });
     let result1 = handle1.join().unwrap();
     
@@ -75,7 +75,7 @@ fn test_tt_cache_sharing_between_threads() {
     let tt_clone2 = shared_tt.clone();
     let mut state_clone2 = base_state.clone();
     let handle2 = thread::spawn(move || {
-        find_best_move(&mut state_clone2, 4, None, &tt_clone2)
+        find_best_move(&mut state_clone2, &tt_clone2)
     });
     let result2 = handle2.join().unwrap();
     
@@ -140,7 +140,7 @@ fn test_concurrent_tt_access_stress() {
                 }
                 
                 let (_initial_hits, _) = tt_clone.get_stats();
-                let result = find_best_move(&mut state, 3, None, &tt_clone);
+                let result = find_best_move(&mut state, &tt_clone);
                 let (final_hits, _) = tt_clone.get_stats();
                 
                 hit_counter.store(final_hits as usize, Ordering::Relaxed);
@@ -206,7 +206,7 @@ fn test_tt_data_consistency_across_threads() {
         
         thread::spawn(move || {
             // Each thread does the same search from the same position
-            let result = find_best_move(&mut state_clone, 3, None, &tt_clone);
+            let result = find_best_move(&mut state_clone, &tt_clone);
             (thread_id, result.best_move, result.score, result.nodes_searched)
         })
     }).collect();
@@ -254,7 +254,7 @@ fn test_tt_age_and_cleanup_with_threading() {
     let tt_clone = shared_tt.clone();
     let mut state_clone = base_state.clone();
     let handle = thread::spawn(move || {
-        find_best_move(&mut state_clone, 2, None, &tt_clone)
+        find_best_move(&mut state_clone, &tt_clone)
     });
     handle.join().unwrap();
     
@@ -271,7 +271,7 @@ fn test_tt_age_and_cleanup_with_threading() {
     let mut state_clone2 = base_state.clone();
     state_clone2.make_move((8, 8)); // Slightly different position
     let handle2 = thread::spawn(move || {
-        find_best_move(&mut state_clone2, 2, None, &tt_clone2)
+        find_best_move(&mut state_clone2, &tt_clone2)
     });
     handle2.join().unwrap();
     
@@ -311,7 +311,7 @@ fn test_tt_thread_safety_rapid_access() {
                 // Alternate between search operations and TT queries
                 if op_id % 2 == 0 {
                     // Do a quick search
-                    let result = find_best_move(&mut state_clone, 2, None, &tt_clone);
+                    let result = find_best_move(&mut state_clone, &tt_clone);
                     if result.best_move.is_some() {
                         operations_completed += 1;
                     }

@@ -50,19 +50,15 @@ struct SharedSearchState {
 
 pub fn find_best_move(
     state: &mut GameState,
-    max_depth: i32,
-    time_limit: Option<Duration>,
     tt: &TranspositionTable,
 ) -> SearchResult {
     let thread_count = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).min(8).max(2);
-    lazy_smp_search(state, max_depth, time_limit, tt, thread_count)
+    lazy_smp_search(state, tt, thread_count)
 }
 
 /// Advanced version that allows specifying the number of threads
 pub fn find_best_move_with_threads(
     state: &mut GameState,
-    max_depth: i32,
-    time_limit: Option<Duration>,
     tt: &TranspositionTable,
     num_threads: Option<usize>,
 ) -> SearchResult {
@@ -70,16 +66,16 @@ pub fn find_best_move_with_threads(
         std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4)
     }).min(8).max(2);
     
-    lazy_smp_search(state, max_depth, time_limit, tt, thread_count)
+    lazy_smp_search(state, tt, thread_count)
 }
 
 fn lazy_smp_search(
     state: &mut GameState,
-    max_depth: i32,
-    time_limit: Option<Duration>,
     tt: &TranspositionTable,
     num_threads: usize,
 ) -> SearchResult {
+    let max_depth = 12;
+    let time_limit = Some(Duration::from_millis(500));
     let start_time = Instant::now();
     
     if state.get_possible_moves().is_empty() {
