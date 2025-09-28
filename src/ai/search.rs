@@ -23,8 +23,6 @@ pub struct SearchResult {
 
 #[derive(Debug, Clone)]
 struct ThreadResult {
-    #[allow(dead_code)]
-    thread_id: usize,
     best_move: Option<(usize, usize)>,
     score: i32,
     depth: i32,
@@ -269,7 +267,6 @@ fn thread_search_worker(
     };
 
     let result = ThreadResult {
-        thread_id: params.thread_id,
         best_move,
         score: best_score,
         depth: depth_reached,
