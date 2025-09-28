@@ -56,19 +56,6 @@ pub fn find_best_move(
     lazy_smp_search(state, tt, thread_count)
 }
 
-/// Advanced version that allows specifying the number of threads
-pub fn find_best_move_with_threads(
-    state: &mut GameState,
-    tt: &TranspositionTable,
-    num_threads: Option<usize>,
-) -> SearchResult {
-    let thread_count = num_threads.unwrap_or_else(|| {
-        std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4)
-    }).min(8).max(2);
-    
-    lazy_smp_search(state, tt, thread_count)
-}
-
 fn lazy_smp_search(
     state: &mut GameState,
     tt: &TranspositionTable,
