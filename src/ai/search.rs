@@ -1,8 +1,7 @@
 use crate::core::state::GameState;
 use std::time::{Duration, Instant};
-use rayon::prelude::*;
 
-use super::{minimax::minimax, move_ordering::MoveOrdering, transposition::TranspositionTable};
+use super::{minimax::mtdf, transposition::TranspositionTable};
 
 #[derive(Debug)]
 pub struct SearchResult {
@@ -39,127 +38,47 @@ pub fn find_best_move(
         };
     }
 
+    // Iterative deepening with MTD(f)
     for depth in 1..=max_depth {
         if let Some(limit) = time_limit {
             let elapsed = start_time.elapsed();
+            // Stop if we've used 80% of time or exceeded limit
             if elapsed >= limit || elapsed > limit * 4 / 5 {
                 break;
             }
         }
 
-        let mut iteration_best_move = None;
-        let mut iteration_best_score = if is_maximizing { i32::MIN } else { i32::MAX };
-
-        let mut moves = state.get_possible_moves();
-        MoveOrdering::order_moves(state, &mut moves);
+        // Use MTD(f) with the previous iteration's score as first guess
+        let (score, iteration_nodes, iteration_best_move) = mtdf(
+            state,
+            best_score,
+            depth,
+            tt,
+            &start_time,
+            time_limit,
+        );
         
-        if let Some(prev_best) = best_move {
-            if let Some(pos) = moves.iter().position(|&m| m == prev_best) {
-                moves.swap(0, pos);
-            }
-        }
-
-        let mut all_moves_searched = true;
+        nodes_searched += iteration_nodes;
         
+        // Check if time ran out during search
         if let Some(limit) = time_limit {
-            let elapsed = start_time.elapsed();
-            if elapsed >= limit {
+            if start_time.elapsed() >= limit {
                 break;
             }
         }
         
-        let remaining_time = time_limit.map(|limit| limit.saturating_sub(start_time.elapsed()));
-        let use_parallel = moves.len() <= 10 && (time_limit.is_none() || 
-            remaining_time.map_or(true, |remaining| remaining > Duration::from_millis(200)));
-        
-        if use_parallel {
-            let move_results: Vec<_> = moves.par_iter().map(|&mv| {
-                let mut state_clone = state.clone();
-                let mut tt_local = TranspositionTable::new(tt.size().min(5_000));
-                
-                state_clone.make_move(mv);
-                let (score, child_nodes) = minimax(
-                    &mut state_clone,
-                    depth - 1,
-                    i32::MIN,
-                    i32::MAX,
-                    !is_maximizing,
-                    &mut tt_local,
-                    &start_time,
-                    time_limit,
-                );
-                
-                let (local_hits, local_misses) = tt_local.get_stats();
-                (mv, score, child_nodes, local_hits, local_misses)
-            }).collect();
-            
-            let mut total_local_hits = 0u64;
-            
-            for (mv, score, child_nodes, local_hits, _local_misses) in move_results {
-                nodes_searched += child_nodes;
-                total_local_hits += local_hits;
-
-                let is_better = if is_maximizing {
-                    score > iteration_best_score
-                } else {
-                    score < iteration_best_score
-                };
-
-                if is_better {
-                    iteration_best_score = score;
-                    iteration_best_move = Some(mv);
-                }
-            }
-            
-            for _ in 0..total_local_hits {
-                let _ = tt.probe(0, 0, 0, 0);
-            }
-        } else {
-            for (i, mv) in moves.iter().enumerate() {
-                if let Some(limit) = time_limit {
-                    let elapsed = start_time.elapsed();
-                    if elapsed >= limit || (i > 2 && elapsed > limit / 2) {
-                        all_moves_searched = false;
-                        break;
-                    }
-                }
-
-                state.make_move(*mv);
-                let (score, child_nodes) = minimax(
-                    state,
-                    depth - 1,
-                    i32::MIN,
-                    i32::MAX,
-                    !is_maximizing,
-                    tt,
-                    &start_time,
-                    time_limit,
-                );
-                state.undo_move(*mv);
-                nodes_searched += child_nodes;
-
-                let is_better = if is_maximizing {
-                    score > iteration_best_score
-                } else {
-                    score < iteration_best_score
-                };
-
-                if is_better {
-                    iteration_best_score = score;
-                    iteration_best_move = Some(*mv);
-                }
-            }
-        }
-
-        if all_moves_searched {
+        // Update best results
+        if iteration_best_move.is_some() {
             best_move = iteration_best_move;
-            best_score = iteration_best_score;
+            best_score = score;
             depth_reached = depth;
             
+            // If we found a winning or losing position, we can stop
             if best_score.abs() >= 1_000_000 {
                 break;
             }
         } else {
+            // If MTD(f) couldn't find a best move, stop iterating
             break;
         }
     }
