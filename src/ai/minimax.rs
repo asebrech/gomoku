@@ -186,18 +186,4 @@ pub fn mtdf(
     (g, total_nodes, best_move)
 }
 
-/// Legacy minimax function for backward compatibility
-/// This now calls MTD(f) with a first guess of 0
-pub fn minimax(
-    state: &mut GameState,
-    depth: i32,
-    alpha: i32,
-    beta: i32,
-    maximizing_player: bool,
-    tt: &mut TranspositionTable,
-    start_time: &Instant,
-    time_limit: Option<Duration>,
-) -> (i32, u64) {
-    // For compatibility, use the traditional alpha-beta search
-    alpha_beta_with_memory(state, depth, alpha, beta, maximizing_player, tt, start_time, time_limit)
-}
+

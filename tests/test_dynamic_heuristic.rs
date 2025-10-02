@@ -1,5 +1,5 @@
 use gomoku::ai::heuristic::Heuristic;
-use gomoku::ai::minimax::minimax;
+use gomoku::ai::minimax::mtdf;
 use gomoku::ai::pattern_history::{MoveType, PatternHistoryAnalyzer};
 use gomoku::ai::transposition::TranspositionTable;
 use gomoku::core::board::Player;
@@ -164,15 +164,12 @@ fn test_minimax_with_dynamic_heuristic() {
     let initial_pattern_count = state.pattern_analyzer.get_recent_patterns().len();
     let initial_hash = state.hash();
     let initial_player = state.current_player;
-    let is_maximizing = initial_player == Player::Max;
     
-    // Run minimax - this should not corrupt the state
-    let (evaluation, _nodes) = minimax(
+    // Run mtdf - this should not corrupt the state
+    let (evaluation, _nodes, _) = mtdf(
         &mut state, 
+        0, 
         2, 
-        i32::MIN, 
-        i32::MAX, 
-        is_maximizing, 
         &mut tt,
         &start_time,
         None
@@ -205,16 +202,12 @@ fn test_minimax_state_consistency_with_patterns() {
     
     let pre_search_patterns = state.pattern_analyzer.get_recent_patterns().len();
     let pre_search_moves = state.move_history.len();
-    let current_player = state.current_player;
-    let is_min_turn = current_player == Player::Min;
     
-    // Run deeper minimax
-    let (eval1, _) = minimax(
+    // Run deeper mtdf
+    let (eval1, _, _) = mtdf(
         &mut state, 
+        0, 
         3, 
-        i32::MIN, 
-        i32::MAX, 
-        is_min_turn, 
         &mut tt,
         &start_time,
         None
@@ -225,12 +218,10 @@ fn test_minimax_state_consistency_with_patterns() {
     assert_eq!(state.move_history.len(), pre_search_moves);
     
     // Run again - should get same result
-    let (eval2, _) = minimax(
+    let (eval2, _, _) = mtdf(
         &mut state, 
+        eval1, 
         3, 
-        i32::MIN, 
-        i32::MAX, 
-        is_min_turn, 
         &mut tt,
         &start_time,
         None
