@@ -1,9 +1,9 @@
 pub mod ai {
     pub mod heuristic;
+    pub mod lazy_smp;
     pub mod minimax;
     pub mod move_ordering;
     pub mod pattern_history;
-    pub mod search;
     pub mod transposition;
     pub mod zobrist;
 }

@@ -1,4 +1,4 @@
-use gomoku::ai::{search::find_best_move, transposition::TranspositionTable};
+use gomoku::ai::lazy_smp::lazy_smp_search;
 use gomoku::core::state::GameState;
 use std::time::Duration;
 
@@ -8,9 +8,9 @@ fn test_parallel_search_functionality() {
     state.make_move((7, 7));
     state.make_move((7, 8));
     
-    let mut tt = TranspositionTable::new(50_000);
     
-    let result = find_best_move(&mut state, 4, None, &mut tt);
+    
+    let result = lazy_smp_search(&mut state, 4, None, Some(4));
     
     assert!(result.best_move.is_some());
     assert!(result.depth_reached >= 1);
@@ -22,10 +22,10 @@ fn test_parallel_search_with_time_limit() {
     let mut state = GameState::new(15, 5);
     state.make_move((7, 7));
     
-    let mut tt = TranspositionTable::new(10_000);
+    
     
     let time_limit = Duration::from_millis(50);
-    let result = find_best_move(&mut state, 8, Some(time_limit), &mut tt);
+    let result = lazy_smp_search(&mut state, 8, Some(time_limit), Some(4));
     
     assert!(result.time_elapsed <= Duration::from_millis(100));
     assert!(result.best_move.is_some());
@@ -41,11 +41,11 @@ fn test_parallel_search_consistency() {
         state2.make_move(mv);
     }
     
-    let mut tt1 = TranspositionTable::new(20_000);
-    let mut tt2 = TranspositionTable::new(20_000);
     
-    let result1 = find_best_move(&mut state1, 3, None, &mut tt1);
-    let result2 = find_best_move(&mut state2, 3, None, &mut tt2);
+    
+    
+    let result1 = lazy_smp_search(&mut state1, 3, None, Some(4));
+    let result2 = lazy_smp_search(&mut state2, 3, None, Some(4));
     
     assert_eq!(result1.best_move, result2.best_move);
     assert_eq!(result1.score, result2.score);

@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use bevy::prelude::*;
-use crate::{ai::{search::find_best_move, transposition::TranspositionTable}, core::{board::Player, state::GameState}, ui::{app::{AppState, GameSettings}, screens::{game::{board::{BoardRoot, BoardUtils, PreviewDot}, settings::spawn_settings_panel}, utils::despawn_screen}}};
+use crate::{ai::lazy_smp::lazy_smp_search, core::{board::Player, state::GameState}, ui::{app::{AppState, GameSettings}, screens::{game::{board::{BoardRoot, BoardUtils, PreviewDot}, settings::spawn_settings_panel}, utils::despawn_screen}}};
 
 // Game status resource
 #[derive(Resource, Default)]
@@ -205,7 +205,6 @@ pub fn process_next_round(
     mut ai_depth: ResMut<AIDepthReached>,
     mut update_ai_time: EventWriter<UpdateAITimeDisplay>,
     mut update_ai_depth: EventWriter<UpdateAIDepthDisplay>,
-    mut tt: ResMut<TranspositionTable>,
 ) {
     for _ in move_played.read() {
         // Check for game end first
@@ -231,11 +230,11 @@ pub fn process_next_round(
             if !game_state.is_terminal() {
                 let placement = if let Some(time_limit_ms) = settings.time_limit {
                     let time_limit = Duration::from_millis(time_limit_ms as u64);
-                    info!("AI using time-based search with {}ms limit", time_limit_ms);
-                    find_best_move(&mut game_state, settings.ai_depth, Some(time_limit), &mut tt)
+                    info!("AI using Lazy SMP search with {}ms limit", time_limit_ms);
+                    lazy_smp_search(&mut game_state, settings.ai_depth, Some(time_limit), None)
                 } else {
-                    info!("AI using depth-based search to depth {}", settings.ai_depth);
-                    find_best_move(&mut game_state, settings.ai_depth, None, &mut tt)
+                    info!("AI using Lazy SMP search to depth {}", settings.ai_depth);
+                    lazy_smp_search(&mut game_state, settings.ai_depth, None, None)
                 };
                 ai_time.micros = placement.time_elapsed.as_micros();
                 ai_depth.depth = placement.depth_reached;

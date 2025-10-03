@@ -1,7 +1,7 @@
-use gomoku::ai::transposition::TranspositionTable;
+
 use gomoku::core::board::Player;
 use gomoku::core::state::GameState;
-use gomoku::ai::search::find_best_move;
+use gomoku::ai::lazy_smp::lazy_smp_search;
 
 #[test]
 fn test_full_game_flow_simple() {
@@ -86,10 +86,10 @@ fn test_ai_vs_ai_game() {
     let mut state = GameState::new(13, 5); // Smaller board for faster test
     let max_moves = 50;
     let mut move_count = 0;
-    let mut tt = TranspositionTable::default();
+    
 
     while !state.is_terminal() && move_count < max_moves {
-        let result = find_best_move(&mut state, 2, None, &mut tt);
+        let result = lazy_smp_search(&mut state, 2, None, Some(1));
 
         if let Some(mv) = result.best_move {
             let current_player = state.current_player;
@@ -231,9 +231,9 @@ fn test_ai_decision_quality() {
     state.board.place_stone(9, 11, Player::Min);
     state.board.place_stone(9, 12, Player::Min);
     state.current_player = Player::Max;
-    let mut tt = TranspositionTable::default();
+    
 
-    let result = find_best_move(&mut state, 3, None, &mut tt);
+    let result = lazy_smp_search(&mut state, 3, None, Some(1));
 
     // Should recognize this is a losing position
     assert!(result.best_move.is_some());
@@ -277,13 +277,13 @@ fn test_performance_constraints() {
     state.board.place_stone(9, 9, Player::Max);
     state.board.place_stone(9, 10, Player::Min);
     state.current_player = Player::Max;
-    let mut tt = TranspositionTable::default();
+    
 
     // AI should complete search in reasonable time
     use std::time::Instant;
     let start = Instant::now();
 
-    let _result = find_best_move(&mut state, 3, None, &mut tt);
+    let _result = lazy_smp_search(&mut state, 3, None, Some(1));
 
     let elapsed = start.elapsed();
 
@@ -329,7 +329,7 @@ fn test_simultaneous_threats() {
     state.board.place_stone(12, 9, Player::Max);
 
     state.current_player = Player::Min;
-    let mut tt = TranspositionTable::default();
+    
 
     // Debug: Print the position
     println!("Horizontal threat: (9,9), (9,10), (9,11), (9,12) - 4 in a row");
@@ -337,7 +337,7 @@ fn test_simultaneous_threats() {
     println!("Critical blocking positions: (9,8), (9,13), (8,9), (13,9)");
 
     // AI should prioritize blocking one of the immediate threats
-    let result = find_best_move(&mut state, 3, None, &mut tt);
+    let result = lazy_smp_search(&mut state, 3, None, Some(1));
     assert!(result.best_move.is_some());
 
     let (row, col) = result.best_move.unwrap();
