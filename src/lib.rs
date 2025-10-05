@@ -12,6 +12,7 @@ pub mod core {
     pub mod board;
     pub mod captures;
     pub mod moves;
+    pub mod pattern_analysis;
     pub mod rules;
     pub mod state;
 }

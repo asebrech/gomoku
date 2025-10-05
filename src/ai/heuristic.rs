@@ -1,5 +1,6 @@
 use crate::core::board::{Board, Player};
 use crate::core::state::GameState;
+use crate::core::pattern_analysis::{PatternAnalyzer, PatternFreedom, DIRECTIONS};
 
 pub struct Heuristic;
 
@@ -16,15 +17,6 @@ const DEAD_THREE_SCORE: i32 = 100;
 const LIVE_TWO_SCORE: i32 = 50;
 const HALF_FREE_TWO_SCORE: i32 = 20;
 const CAPTURE_BONUS_MULTIPLIER: i32 = 1_000;
-
-const DIRECTIONS: [(isize, isize); 4] = [(1, 0), (0, 1), (1, 1), (1, -1)];
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum PatternFreedom {
-    Free,
-    HalfFree,
-    Flanked,
-}
 
 #[derive(Debug, Clone, Copy)]
 struct PatternCounts {
@@ -165,14 +157,14 @@ impl Heuristic {
         bit_mask: u8,
     ) -> Option<PatternInfo> {
         let (pattern_start_row, pattern_start_col) =
-            Self::find_pattern_start(board, start_row, start_col, dx, dy, player);
+            PatternAnalyzer::find_pattern_start(board, start_row, start_col, dx, dy, player);
 
         if analyzed[pattern_start_row][pattern_start_col] & bit_mask != 0 {
             return None;
         }
 
         let length =
-            Self::count_consecutive(board, pattern_start_row, pattern_start_col, dx, dy, player);
+            PatternAnalyzer::count_consecutive(board, pattern_start_row, pattern_start_col, dx, dy, player);
 
         if length < 2 {
             return None;
@@ -205,7 +197,7 @@ impl Heuristic {
         }
         
         let freedom =
-            Self::analyze_pattern_freedom(board, pattern_start_row, pattern_start_col, dx, dy, length);
+            PatternAnalyzer::analyze_pattern_freedom(board, pattern_start_row, pattern_start_col, dx, dy, length);
 
         Self::mark_pattern_analyzed(
             pattern_start_row,
@@ -220,109 +212,13 @@ impl Heuristic {
         Some(PatternInfo { length, freedom })
     }
 
-    fn count_consecutive(
-        board: &Board,
-        row: usize,
-        col: usize,
-        dx: isize,
-        dy: isize,
-        player: Player,
-    ) -> usize {
-        let player_bits = match player {
-            Player::Max => &board.max_bits,
-            Player::Min => &board.min_bits,
-        };
-        let mut count = 0;
-        let mut current_row = row as isize;
-        let mut current_col = col as isize;
 
-        while current_row >= 0
-            && current_row < board.size as isize
-            && current_col >= 0
-            && current_col < board.size as isize
-        {
-            let idx = board.index(current_row as usize, current_col as usize);
-            if Board::is_bit_set(player_bits, idx) {
-                count += 1;
-                current_row += dx;
-                current_col += dy;
-            } else {
-                break;
-            }
-        }
-        count
-    }
 
-    fn find_pattern_start(
-        board: &Board,
-        row: usize,
-        col: usize,
-        dx: isize,
-        dy: isize,
-        player: Player,
-    ) -> (usize, usize) {
-        let player_bits = match player {
-            Player::Max => &board.max_bits,
-            Player::Min => &board.min_bits,
-        };
-        let mut current_row = row as isize;
-        let mut current_col = col as isize;
 
-        loop {
-            let prev_row = current_row - dx;
-            let prev_col = current_col - dy;
 
-            if prev_row >= 0
-                && prev_row < board.size as isize
-                && prev_col >= 0
-                && prev_col < board.size as isize
-            {
-                let idx = board.index(prev_row as usize, prev_col as usize);
-                if Board::is_bit_set(player_bits, idx) {
-                    current_row = prev_row;
-                    current_col = prev_col;
-                } else {
-                    break;
-                }
-            } else {
-                break;
-            }
-        }
 
-        (current_row as usize, current_col as usize)
-    }
 
-    fn analyze_pattern_freedom(
-        board: &Board,
-        start_row: usize,
-        start_col: usize,
-        dx: isize,
-        dy: isize,
-        length: usize,
-    ) -> PatternFreedom {
-        let before_row = start_row as isize - dx;
-        let before_col = start_col as isize - dy;
-        let start_open = Self::is_position_empty(board, before_row, before_col);
 
-        let end_row = start_row as isize + (length as isize * dx);
-        let end_col = start_col as isize + (length as isize * dy);
-        let end_open = Self::is_position_empty(board, end_row, end_col);
-
-        match (start_open, end_open) {
-            (true, true) => PatternFreedom::Free,
-            (true, false) | (false, true) => PatternFreedom::HalfFree,
-            (false, false) => PatternFreedom::Flanked,
-        }
-    }
-
-    #[inline(always)]
-    fn is_position_empty(board: &Board, row: isize, col: isize) -> bool {
-        if row < 0 || col < 0 || row >= board.size as isize || col >= board.size as isize {
-            return false;
-        }
-        let idx = board.index(row as usize, col as usize);
-        !Board::is_bit_set(&board.occupied, idx)
-    }
 
     fn has_sufficient_space(
         board: &Board,

@@ -1,19 +1,8 @@
 use crate::core::board::{Board, Player};
 use crate::core::state::GameState;
+use crate::core::pattern_analysis::{PatternAnalyzer, DIRECTIONS};
 
 pub struct MoveOrdering;
-
-const DIRECTIONS: [(isize, isize); 4] = [(1, 0), (0, 1), (1, 1), (1, -1)];
-const ALL_DIRECTIONS: [(isize, isize); 8] = [
-    (-1, -1),
-    (-1, 0),
-    (-1, 1),
-    (0, -1),
-    (0, 1),
-    (1, -1),
-    (1, 0),
-    (1, 1),
-];
 
 impl MoveOrdering {
     pub fn order_moves(state: &GameState, moves: &mut [(usize, usize)]) {
@@ -78,65 +67,16 @@ impl MoveOrdering {
         dy: isize,
         player: Player,
     ) -> usize {
-        let backwards = Self::count_direction(board, row, col, -dx, -dy, player);
-        let forwards = Self::count_direction(board, row, col, dx, dy, player);
-        backwards + forwards + 1
+        PatternAnalyzer::count_consecutive_bidirectional(board, row, col, dx, dy, player)
     }
 
-    fn count_direction(
-        board: &Board,
-        row: usize,
-        col: usize,
-        dx: isize,
-        dy: isize,
-        player: Player,
-    ) -> usize {
-        let player_bits = match player {
-            Player::Max => &board.max_bits,
-            Player::Min => &board.min_bits,
-        };
-        let mut count = 0;
-        let mut current_row = row as isize + dx;
-        let mut current_col = col as isize + dy;
 
-        while current_row >= 0
-            && current_row < board.size as isize
-            && current_col >= 0
-            && current_col < board.size as isize
-        {
-            let idx = board.index(current_row as usize, current_col as usize);
-            if Board::is_bit_set(player_bits, idx) {
-                count += 1;
-                current_row += dx;
-                current_col += dy;
-            } else {
-                break;
-            }
-        }
-        count
-    }
 
     fn calculate_adjacency_bonus(board: &Board, row: usize, col: usize) -> i32 {
-        let mut neighbor_mask = vec![0u64; board.u64_count];
-        let mut num_adjacent = 0;
-
-        for &(dx, dy) in &ALL_DIRECTIONS {
-            let nr = row as isize + dx;
-            let nc = col as isize + dy;
-            if nr >= 0 && nc >= 0 && nr < board.size as isize && nc < board.size as isize {
-                let idx = board.index(nr as usize, nc as usize);
-                Board::set_bit(&mut neighbor_mask, idx);
-            }
-        }
-
-        for (&o, &m) in board.occupied.iter().zip(&neighbor_mask) {
-            num_adjacent += (o & m).count_ones() as i32;
-        }
-
-        num_adjacent * 50
+        PatternAnalyzer::count_adjacent_stones(board, row, col) * 50
     }
 
     fn manhattan_distance(row1: usize, col1: usize, row2: usize, col2: usize) -> usize {
-        ((row1 as isize - row2 as isize).abs() + (col1 as isize - col2 as isize).abs()) as usize
+        PatternAnalyzer::manhattan_distance(row1, col1, row2, col2)
     }
 }

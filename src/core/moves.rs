@@ -1,7 +1,7 @@
 use crate::core::board::{Board, Player};
+use crate::core::pattern_analysis::{PatternAnalyzer, DIRECTIONS};
 use std::collections::HashSet;
 
-const DIRECTIONS: [(isize, isize); 4] = [(0, 1), (1, 0), (1, 1), (1, -1)];
 const FREE_THREE_LENGTH: usize = 3;
 const MAX_SEARCH_DISTANCE: isize = 4;
 
@@ -76,8 +76,8 @@ impl MoveHandler {
         player: Player,
     ) -> Option<(usize, usize)> {
         // Count consecutive stones in both directions
-        let backward = Self::count_consecutive_dir(board, row, col, -dx, -dy, player);
-        let forward = Self::count_consecutive_dir(board, row, col, dx, dy, player);
+        let backward = PatternAnalyzer::count_consecutive(board, row, col, -dx, -dy, player);
+        let forward = PatternAnalyzer::count_consecutive(board, row, col, dx, dy, player);
         let total = backward + forward + 1;
 
         if total >= 4 {
@@ -127,45 +127,14 @@ impl MoveHandler {
     /// Check if placing stone creates 5-in-a-row
     fn creates_five_in_row(board: &Board, pos: (usize, usize), player: Player) -> bool {
         for &(dx, dy) in &DIRECTIONS {
-            let backward = Self::count_consecutive_dir(board, pos.0, pos.1, -dx, -dy, player);
-            let forward = Self::count_consecutive_dir(board, pos.0, pos.1, dx, dy, player);
-            if backward + forward + 1 >= 5 {
+            let total = PatternAnalyzer::count_consecutive_bidirectional(board, pos.0, pos.1, dx, dy, player);
+            if total >= 5 {
                 return true;
             }
         }
         false
     }
 
-    /// Count consecutive stones in one direction
-    fn count_consecutive_dir(
-        board: &Board,
-        row: usize,
-        col: usize,
-        dx: isize,
-        dy: isize,
-        player: Player,
-    ) -> usize {
-        let player_bits = match player {
-            Player::Max => &board.max_bits,
-            Player::Min => &board.min_bits,
-        };
-
-        let mut count = 0;
-        let mut r = row as isize + dx;
-        let mut c = col as isize + dy;
-
-        while r >= 0 && r < board.size as isize && c >= 0 && c < board.size as isize {
-            let idx = board.index(r as usize, c as usize);
-            if Board::is_bit_set(player_bits, idx) {
-                count += 1;
-                r += dx;
-                c += dy;
-            } else {
-                break;
-            }
-        }
-        count
-    }
 
     /// Find moves that must block opponent's winning threats
     fn find_must_block_moves(board: &Board, opponent: Player) -> Option<Vec<(usize, usize)>> {
@@ -201,8 +170,8 @@ impl MoveHandler {
                     let col = global_idx % board.size;
 
                     for &(dx, dy) in &DIRECTIONS {
-                        let backward = Self::count_consecutive_dir(board, row, col, -dx, -dy, player);
-                        let forward = Self::count_consecutive_dir(board, row, col, dx, dy, player);
+                        let backward = PatternAnalyzer::count_consecutive(board, row, col, -dx, -dy, player);
+                        let forward = PatternAnalyzer::count_consecutive(board, row, col, dx, dy, player);
                         
                         if backward + forward + 1 == 4 {
                             // Check if both ends are open
@@ -265,8 +234,8 @@ impl MoveHandler {
                     let col = global_idx % board.size;
 
                     for &(dx, dy) in &DIRECTIONS {
-                        let backward = Self::count_consecutive_dir(board, row, col, -dx, -dy, player);
-                        let forward = Self::count_consecutive_dir(board, row, col, dx, dy, player);
+                        let backward = PatternAnalyzer::count_consecutive(board, row, col, -dx, -dy, player);
+                        let forward = PatternAnalyzer::count_consecutive(board, row, col, dx, dy, player);
                         let total = backward + forward + 1;
 
                         // Look for 3-in-row or 4-in-row patterns
