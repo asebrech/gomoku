@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use bevy::prelude::*;
-use crate::{ai::lazy_smp::lazy_smp_search, core::{board::Player, state::GameState}, ui::{app::{AppState, GameSettings}, screens::{game::{board::{BoardRoot, BoardUtils, PreviewDot}, settings::spawn_settings_panel}, utils::despawn_screen}}};
+use crate::{ai::lazy_smp::lazy_smp_search, core::{board::Player, moves::RuleValidator, state::GameState}, ui::{app::{AppState, GameSettings}, screens::{game::{board::{BoardRoot, BoardUtils, PreviewDot}, settings::spawn_settings_panel}, utils::despawn_screen}}};
 
 // Game status resource
 #[derive(Resource, Default)]
@@ -102,10 +102,13 @@ pub fn update_available_placement(
     // Consume events
     for _ in ev_board_update.read() {}
 
-    let possible_moves = game_state.get_possible_moves();
     info!("Updating stone preview...");
     for (entity, children, cell) in parents.iter() {
-        if possible_moves.contains(&(cell.x, cell.y)) {
+        // Check if position is empty and doesn't create double-three
+        let is_valid = game_state.board.is_empty_position(cell.x, cell.y)
+            && !RuleValidator::creates_double_three(&game_state.board, cell.x, cell.y, game_state.current_player);
+        
+        if is_valid {
             for &child in children {
                 if let Ok((mut bg, mut visibility)) = dots.get_mut(child) {
                     *bg = BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.4));
