@@ -158,8 +158,43 @@ fn lazy_smp_worker(
     (best_score, best_move, depth_reached, total_nodes)
 }
 
-/// Parallel search using Lazy SMP
+/// Parallel search using Lazy SMP with time limit
+/// 
+/// Searches iteratively deeper until time runs out, going as deep as possible.
+/// This is the recommended function for gameplay.
+/// 
+/// # Arguments
+/// * `state` - The game state to search from
+/// * `time_limit_ms` - Time limit for the search in milliseconds (e.g., 500 for 500ms)
+/// * `num_threads` - Number of worker threads (None = auto-detect CPU cores, capped at 8)
 pub fn lazy_smp_search(
+    state: &mut GameState,
+    time_limit_ms: u64,
+    num_threads: Option<usize>,
+) -> SearchResult {
+    lazy_smp_search_internal(state, 100, Some(Duration::from_millis(time_limit_ms)), num_threads)
+}
+
+/// Parallel search using Lazy SMP with depth limit (for testing)
+/// 
+/// Searches up to a specific depth. Useful for tests that need predictable behavior.
+/// 
+/// # Arguments
+/// * `state` - The game state to search from
+/// * `max_depth` - Maximum depth to search
+/// * `time_limit` - Optional time limit
+/// * `num_threads` - Number of worker threads
+pub fn lazy_smp_search_depth(
+    state: &mut GameState,
+    max_depth: i32,
+    time_limit: Option<Duration>,
+    num_threads: Option<usize>,
+) -> SearchResult {
+    lazy_smp_search_internal(state, max_depth, time_limit, num_threads)
+}
+
+/// Internal search implementation used by both public functions
+fn lazy_smp_search_internal(
     state: &mut GameState,
     max_depth: i32,
     time_limit: Option<Duration>,

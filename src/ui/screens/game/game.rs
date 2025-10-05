@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use bevy::prelude::*;
 use crate::{ai::lazy_smp::lazy_smp_search, core::{board::Player, moves::RuleValidator, state::GameState}, ui::{app::{AppState, GameSettings}, screens::{game::{board::{BoardRoot, BoardUtils, PreviewDot}, settings::spawn_settings_panel}, utils::despawn_screen}}};
 
@@ -231,14 +229,9 @@ pub fn process_next_round(
             // AI's turn
             
             if !game_state.is_terminal() {
-                let placement = if let Some(time_limit_ms) = settings.time_limit {
-                    let time_limit = Duration::from_millis(time_limit_ms as u64);
-                    info!("AI using Lazy SMP search with {}ms limit", time_limit_ms);
-                    lazy_smp_search(&mut game_state, settings.ai_depth, Some(time_limit), None)
-                } else {
-                    info!("AI using Lazy SMP search to depth {}", settings.ai_depth);
-                    lazy_smp_search(&mut game_state, settings.ai_depth, None, None)
-                };
+                let time_limit_ms = settings.time_limit.unwrap_or(500); // Default 500ms if not set
+                info!("AI using Lazy SMP search with {}ms time limit (will search as deep as possible)", time_limit_ms);
+                let placement = lazy_smp_search(&mut game_state, time_limit_ms as u64, None);
                 ai_time.micros = placement.time_elapsed.as_micros();
                 ai_depth.depth = placement.depth_reached;
                 update_ai_time.write(UpdateAITimeDisplay);
