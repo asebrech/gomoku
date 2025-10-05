@@ -21,6 +21,22 @@ impl MoveOrdering {
         moves.sort_unstable_by_key(|&mv| -Self::calculate_move_priority(state, mv, center));
     }
 
+    /// Order and limit moves based on search depth for aggressive pruning
+    pub fn order_and_limit_moves(state: &GameState, moves: &mut Vec<(usize, usize)>, depth: i32) {
+        let center = state.board.size / 2;
+        moves.sort_unstable_by_key(|&mv| -Self::calculate_move_priority(state, mv, center));
+        
+        // Aggressive move limiting at higher depths
+        let limit = match depth {
+            d if d >= 8 => 12,   // Deep search: only top 12 moves
+            d if d >= 6 => 18,   // Medium: top 18 moves
+            d if d >= 4 => 25,   // Shallow: top 25 moves
+            _ => moves.len(),    // Very shallow: all moves
+        };
+        
+        moves.truncate(limit.min(moves.len()));
+    }
+
     fn calculate_move_priority(state: &GameState, mv: (usize, usize), center: usize) -> i32 {
         let (row, col) = mv;
         let mut priority = 0;

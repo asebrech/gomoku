@@ -41,9 +41,15 @@ fn alpha_beta_with_memory(
         return (eval, nodes_visited);
     }
 
-    // Get and order moves
+    // Get and order moves with depth-based limiting
     let mut moves = state.get_possible_moves();
-    MoveOrdering::order_moves(state, &mut moves);
+    
+    // Apply aggressive move limiting at high depths
+    if depth >= 4 {
+        MoveOrdering::order_and_limit_moves(state, &mut moves, depth);
+    } else {
+        MoveOrdering::order_moves(state, &mut moves);
+    }
     
     // Use TT best move first
     if let Some(best_move) = tt_result.best_move {
