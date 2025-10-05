@@ -215,22 +215,30 @@ impl PatternHistoryAnalyzer {
         self.update_tempo_and_initiative();
     }
 
-    pub fn calculate_historical_bonus(&self, state: &GameState) -> i32 {
-        let mut bonus = 0;
+    pub fn calculate_historical_bonus(&self, _state: &GameState) -> i32 {
+        // Calculate historical advantage for Max - Min (consistent with heuristic's Max perspective)
+        let mut max_bonus = 0;
+        let mut min_bonus = 0;
 
+        // Tempo/initiative bonus
         if let Some(initiative_player) = self.initiative_player {
-            if initiative_player == state.current_player {
-                bonus += TEMPO_BONUS;
-            } else {
-                bonus -= TEMPO_BONUS;
+            match initiative_player {
+                Player::Max => max_bonus += TEMPO_BONUS,
+                Player::Min => min_bonus += TEMPO_BONUS,
             }
         }
 
-        bonus += self.calculate_pattern_development_bonus(state.current_player);
-        bonus += self.calculate_capture_momentum_bonus(state.current_player);
-        bonus += self.calculate_defensive_sequence_penalty(state.current_player);
+        // Pattern development, capture momentum, and defensive penalties
+        max_bonus += self.calculate_pattern_development_bonus(Player::Max);
+        max_bonus += self.calculate_capture_momentum_bonus(Player::Max);
+        max_bonus += self.calculate_defensive_sequence_penalty(Player::Max);
 
-        bonus
+        min_bonus += self.calculate_pattern_development_bonus(Player::Min);
+        min_bonus += self.calculate_capture_momentum_bonus(Player::Min);
+        min_bonus += self.calculate_defensive_sequence_penalty(Player::Min);
+
+        // Return from Max's perspective (positive = good for Max)
+        max_bonus - min_bonus
     }
 
     pub fn reset(&mut self) {

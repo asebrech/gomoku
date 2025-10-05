@@ -81,8 +81,9 @@ fn test_heuristic_capture_advantage() {
     // Should favor Max due to capture advantage
     assert!(score > 0);
 
-    // Should include capture bonus (3-1)*1000 = 2000
-    assert!(score >= 2000);
+    // With exponential scaling: 3 captures = 3,375, 1 capture = 1,500
+    // Difference: 1,875
+    assert!(score >= 1800, "Score should reflect exponential capture advantage: {}", score);
 }
 
 #[test]
@@ -269,9 +270,10 @@ fn test_heuristic_multiple_live_four_detection() {
     
     let score = Heuristic::evaluate(&state, 1);
     
-    // The actual score is 15,200 which suggests one live four (15,000) + some pattern bonus (200)
-    // Let's adjust our expectation to match the implementation
-    assert!(score >= 15_000 && score < 25_000, "Live four pattern should score around 15,000: {}", score);
+    // A single live four is a winning position (can't be blocked effectively)
+    // When opponent blocks one end, we complete the five at the other end
+    // So it should return WINNING_SCORE (1,000,000) + depth
+    assert!(score >= 1_000_000, "Single live four is a winning position, should return WINNING_SCORE: {}", score);
 }
 
 #[test]

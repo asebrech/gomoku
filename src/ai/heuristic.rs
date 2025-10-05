@@ -84,12 +84,14 @@ impl Heuristic {
         let (max_counts, min_counts) =
             Self::analyze_both_players(&state.board, state.win_condition);
 
-        // Check for winning positions: multiple live fours (can't be blocked)
+        // Check for winning positions with live fours:
+        // - Single live four: Can't be blocked (opponent blocks one end, we complete at the other)
+        // - Multiple live fours: Definitely can't block both
         // Note: Five-in-a-row is already checked by check_winner() above
-        if max_counts.live_four > 1 {
+        if max_counts.live_four >= 1 {
             return WINNING_SCORE + depth;
         }
-        if min_counts.live_four > 1 {
+        if min_counts.live_four >= 1 {
             return -WINNING_SCORE - depth;
         }
 
@@ -494,6 +496,29 @@ impl Heuristic {
     }
 
     fn calculate_capture_bonus(state: &GameState) -> i32 {
-        (state.max_captures as i32 - state.min_captures as i32) * CAPTURE_BONUS_MULTIPLIER
+        // Use exponential scaling for captures to reflect their increasing strategic value
+        // As you approach 5 captures (win condition), each capture becomes exponentially more valuable
+        // Formula: base_value * (1.5^captures) - creates escalating importance
+        let max_value = Self::exponential_capture_value(state.max_captures);
+        let min_value = Self::exponential_capture_value(state.min_captures);
+        max_value - min_value
+    }
+    
+    /// Calculate exponential value for capture count
+    /// Each additional capture is worth more than the last
+    fn exponential_capture_value(captures: usize) -> i32 {
+        if captures == 0 {
+            return 0;
+        }
+        
+        // Exponential scaling: 1000 * 1.5^captures
+        // 1 capture: 1,500
+        // 2 captures: 2,250
+        // 3 captures: 3,375
+        // 4 captures: 5,062 (close to win - very valuable)
+        // 5+ captures: handled as win condition before this
+        let base = CAPTURE_BONUS_MULTIPLIER as f64;
+        let exponent = 1.5_f64.powi(captures as i32);
+        (base * exponent) as i32
     }
 }
