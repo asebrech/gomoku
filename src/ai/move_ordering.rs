@@ -7,13 +7,23 @@ pub struct MoveOrdering;
 impl MoveOrdering {
     pub fn order_moves(state: &GameState, moves: &mut [(usize, usize)]) {
         let center = state.board.size / 2;
-        moves.sort_unstable_by_key(|&mv| -Self::calculate_move_priority(state, mv, center));
+        // Use stable sort with position-based tie-breaker for determinism
+        moves.sort_by_key(|&(row, col)| {
+            let priority = Self::calculate_move_priority(state, (row, col), center);
+            // Tie-breaker: use position (row, col) for stable ordering
+            (-priority, row, col)
+        });
     }
 
     /// Order and limit moves based on search depth for aggressive pruning
     pub fn order_and_limit_moves(state: &GameState, moves: &mut Vec<(usize, usize)>, depth: i32) {
         let center = state.board.size / 2;
-        moves.sort_unstable_by_key(|&mv| -Self::calculate_move_priority(state, mv, center));
+        // Use stable sort with position-based tie-breaker for determinism
+        moves.sort_by_key(|&(row, col)| {
+            let priority = Self::calculate_move_priority(state, (row, col), center);
+            // Tie-breaker: use position (row, col) for stable ordering
+            (-priority, row, col)
+        });
         
         // Aggressive move limiting at higher depths
         let limit = match depth {

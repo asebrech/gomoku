@@ -163,8 +163,11 @@ impl Heuristic {
             return None;
         }
 
-        let length =
+        let consecutive_after_start =
             PatternAnalyzer::count_consecutive(board, pattern_start_row, pattern_start_col, dx, dy, player);
+
+        // count_consecutive counts stones AFTER the start position, so add 1 for the start itself
+        let length = consecutive_after_start + 1;
 
         if length < 2 {
             return None;
@@ -172,28 +175,19 @@ impl Heuristic {
 
         let length = length.min(win_condition);
         
-        // Check if this pattern has sufficient space to develop into a winning line
-        if !Self::has_sufficient_space(
+        // Check if there's enough total space (including pattern itself) to reach win_condition
+        // This is a simple bounds check - pattern freedom analysis handles tactical evaluation
+        let total_available_space = Self::count_total_space(
             board,
             pattern_start_row,
             pattern_start_col,
             dx,
             dy,
             length,
-            player,
-            win_condition,
-        ) {
-            // Mark as analyzed but don't score it
-            Self::mark_pattern_analyzed(
-                pattern_start_row,
-                pattern_start_col,
-                dx,
-                dy,
-                length,
-                analyzed,
-                bit_mask,
-            );
-            return None;
+        );
+        
+        if total_available_space < win_condition {
+            return None; // Pattern can never lead to a win due to board size
         }
         
         let freedom =
@@ -212,96 +206,6 @@ impl Heuristic {
         Some(PatternInfo { length, freedom })
     }
 
-
-
-
-
-
-
-
-
-    fn has_sufficient_space(
-        board: &Board,
-        start_row: usize,
-        start_col: usize,
-        dx: isize,
-        dy: isize,
-        length: usize,
-        player: Player,
-        win_condition: usize,
-    ) -> bool {
-        let player_bits = match player {
-            Player::Max => &board.max_bits,
-            Player::Min => &board.min_bits,
-        };
-        let opponent_bits = match player {
-            Player::Max => &board.min_bits,
-            Player::Min => &board.max_bits,
-        };
-
-        // Count total available space in both directions from the pattern
-        let mut total_space = length; // Current pattern length
-        
-        // Count backwards from pattern start
-        let mut pos_row = start_row as isize - dx;
-        let mut pos_col = start_col as isize - dy;
-        let mut backward_space = 0;
-        
-        while pos_row >= 0 
-            && pos_row < board.size as isize 
-            && pos_col >= 0 
-            && pos_col < board.size as isize 
-            && backward_space < win_condition
-        {
-            let idx = board.index(pos_row as usize, pos_col as usize);
-            
-            // Stop if we hit an opponent stone
-            if Board::is_bit_set(opponent_bits, idx) {
-                break;
-            }
-            
-            // Count empty spaces and our own stones
-            if !Board::is_bit_set(&board.occupied, idx) || Board::is_bit_set(player_bits, idx) {
-                backward_space += 1;
-                pos_row -= dx;
-                pos_col -= dy;
-            } else {
-                break;
-            }
-        }
-        
-        // Count forwards from pattern end
-        let mut pos_row = start_row as isize + (length as isize * dx);
-        let mut pos_col = start_col as isize + (length as isize * dy);
-        let mut forward_space = 0;
-        
-        while pos_row >= 0 
-            && pos_row < board.size as isize 
-            && pos_col >= 0 
-            && pos_col < board.size as isize 
-            && forward_space < win_condition
-        {
-            let idx = board.index(pos_row as usize, pos_col as usize);
-            
-            // Stop if we hit an opponent stone
-            if Board::is_bit_set(opponent_bits, idx) {
-                break;
-            }
-            
-            // Count empty spaces and our own stones
-            if !Board::is_bit_set(&board.occupied, idx) || Board::is_bit_set(player_bits, idx) {
-                forward_space += 1;
-                pos_row += dx;
-                pos_col += dy;
-            } else {
-                break;
-            }
-        }
-        
-        total_space += backward_space + forward_space;
-        total_space >= win_condition
-    }
-
     fn mark_pattern_analyzed(
         start_row: usize,
         start_col: usize,
@@ -318,6 +222,60 @@ impl Heuristic {
                 analyzed[row][col] |= bit_mask;
             }
         }
+    }
+
+    /// Count the maximum possible space available in a line direction
+    /// This includes the pattern itself plus empty spaces in both directions
+    /// Used to determine if a pattern can theoretically reach win_condition
+    fn count_total_space(
+        board: &Board,
+        start_row: usize,
+        start_col: usize,
+        dx: isize,
+        dy: isize,
+        pattern_length: usize,
+    ) -> usize {
+        let mut space = pattern_length; // Include the pattern itself
+        
+        // Count empty spaces backward from start
+        let mut current_row = start_row as isize - dx;
+        let mut current_col = start_col as isize - dy;
+        while current_row >= 0
+            && current_row < board.size as isize
+            && current_col >= 0
+            && current_col < board.size as isize
+        {
+            let idx = board.index(current_row as usize, current_col as usize);
+            if !Board::is_bit_set(&board.occupied, idx) {
+                space += 1;
+                current_row -= dx;
+                current_col -= dy;
+            } else {
+                break; // Stop at any stone (own or opponent)
+            }
+        }
+        
+        // Count empty spaces forward from end of pattern
+        let end_row = start_row as isize + (pattern_length - 1) as isize * dx;
+        let end_col = start_col as isize + (pattern_length - 1) as isize * dy;
+        current_row = end_row + dx;
+        current_col = end_col + dy;
+        while current_row >= 0
+            && current_row < board.size as isize
+            && current_col >= 0
+            && current_col < board.size as isize
+        {
+            let idx = board.index(current_row as usize, current_col as usize);
+            if !Board::is_bit_set(&board.occupied, idx) {
+                space += 1;
+                current_row += dx;
+                current_col += dy;
+            } else {
+                break; // Stop at any stone (own or opponent)
+            }
+        }
+        
+        space
     }
 
     fn update_counts(counts: &mut PatternCounts, pattern: PatternInfo) {

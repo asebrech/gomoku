@@ -213,7 +213,11 @@ impl MoveHandler {
             return Vec::new();
         }
 
-        moves.into_iter().collect()
+        // Filter out double-three violations for the current player
+        moves
+            .into_iter()
+            .filter(|&(row, col)| !RuleValidator::creates_double_three(board, row, col, player))
+            .collect()
     }
 
     /// Find moves that create threats (3-in-row or 4-in-row)

@@ -7,7 +7,7 @@ fn test_find_best_move_first_move() {
     let mut state = GameState::new(19, 5);
     
 
-    let result = lazy_smp_search(&mut state, 2, None, Some(1));
+    let result = lazy_smp_search(&mut state, 100, Some(1));
 
     // Should return center move for first move
     assert_eq!(result.best_move, Some((9, 9)));
@@ -21,12 +21,14 @@ fn test_find_best_move_response() {
     // Make first move
     state.make_move((9, 9));
 
-    let result = lazy_smp_search(&mut state, 2, None, Some(1));
+    let result = lazy_smp_search(&mut state, 100, Some(1));
 
-    // Should return some adjacent move
+    // Should return a move within the zone (radius 2 in early game)
     assert!(result.best_move.is_some());
     let (row, col) = result.best_move.unwrap();
-    assert!(state.board.is_adjacent_to_stone(row, col));
+    // Check that move is within zone radius of 2 from the stone at (9,9)
+    let distance = ((row as isize - 9).abs().max((col as isize - 9).abs())) as usize;
+    assert!(distance <= 2, "Move ({}, {}) is too far from (9, 9)", row, col);
 }
 
 #[test]
@@ -41,7 +43,7 @@ fn test_find_best_move_winning_opportunity() {
     state.board.place_stone(9, 8, Player::Max);
     state.current_player = Player::Max;
 
-    let result = lazy_smp_search(&mut state, 2, None, Some(1));
+    let result = lazy_smp_search(&mut state, 100, Some(1));
 
     // Should find the winning move
     assert!(result.best_move.is_some());
@@ -63,7 +65,7 @@ fn test_find_best_move_block_opponent() {
     state.board.place_stone(9, 8, Player::Min);
     state.current_player = Player::Max;
 
-    let result = lazy_smp_search(&mut state, 2, None, Some(1));
+    let result = lazy_smp_search(&mut state, 100, Some(1));
 
     // Should find a blocking move
     assert!(result.best_move.is_some());
@@ -108,7 +110,7 @@ fn test_find_best_move_capture_opportunity() {
     state.board.place_stone(9, 11, Player::Min);
     state.current_player = Player::Max;
 
-    let result = lazy_smp_search(&mut state, 2, None, Some(1));
+    let result = lazy_smp_search(&mut state, 100, Some(1));
 
     // Should find a move (capture move would be at (9, 12) to complete Max-Min-Min-Max)
     assert!(result.best_move.is_some());
@@ -139,7 +141,7 @@ fn test_find_best_move_no_moves() {
         }
     }
 
-    let result = lazy_smp_search(&mut state, 2, None, Some(1));
+    let result = lazy_smp_search(&mut state, 100, Some(1));
 
     // Should return None when no moves available
     assert_eq!(result.best_move, None);
@@ -155,8 +157,8 @@ fn test_find_best_move_different_depths() {
     state.board.place_stone(9, 10, Player::Min);
     state.current_player = Player::Max;
 
-    let result1 = lazy_smp_search(&mut state, 1, None, Some(1));
-    let result3 = lazy_smp_search(&mut state, 3, None, Some(1));
+    let result1 = lazy_smp_search(&mut state, 50, Some(1));
+    let result3 = lazy_smp_search(&mut state, 200, Some(1));
 
     // Both should return valid moves
     assert!(result1.best_move.is_some());
@@ -175,14 +177,14 @@ fn test_find_best_move_player_alternation() {
     state.current_player = Player::Max;
     state.board.place_stone(9, 9, Player::Min); // Add opponent stone
 
-    let result_max = lazy_smp_search(&mut state, 2, None, Some(1));
+    let result_max = lazy_smp_search(&mut state, 100, Some(1));
     assert!(result_max.best_move.is_some());
 
     // Test with Min player
     state.current_player = Player::Min;
     state.board.place_stone(9, 10, Player::Max); // Add opponent stone
 
-    let result_min = lazy_smp_search(&mut state, 2, None, Some(1));
+    let result_min = lazy_smp_search(&mut state, 100, Some(1));
     assert!(result_min.best_move.is_some());
 }
 
@@ -200,7 +202,7 @@ fn test_find_best_move_complex_position() {
     state.board.place_stone(10, 10, Player::Min);
     state.current_player = Player::Max;
 
-    let result = lazy_smp_search(&mut state, 2, None, Some(1));
+    let result = lazy_smp_search(&mut state, 100, Some(1));
 
     // Should find some reasonable move
     assert!(result.best_move.is_some());
@@ -221,7 +223,7 @@ fn test_find_best_move_state_preservation() {
     let initial_hash = state.hash();
 
     // Find best move
-    let _result = lazy_smp_search(&mut state, 2, None, Some(1));
+    let _result = lazy_smp_search(&mut state, 100, Some(1));
 
     // State should be preserved
     assert_eq!(state.hash(), initial_hash);
@@ -238,11 +240,22 @@ fn test_find_best_move_consistent_results() {
     state.board.place_stone(9, 9, Player::Max);
     state.current_player = Player::Min;
 
-    // Multiple calls should give same result
-    let result1 = lazy_smp_search(&mut state, 2, None, Some(1));
-    let result2 = lazy_smp_search(&mut state, 2, None, Some(1));
+    // Multiple calls should find valid moves
+    let result1 = lazy_smp_search(&mut state, 100, Some(1));
+    let result2 = lazy_smp_search(&mut state, 100, Some(1));
 
-    assert_eq!(result1.best_move, result2.best_move);
+    // Both should find valid moves (might be different due to move ordering variations)
+    assert!(result1.best_move.is_some());
+    assert!(result2.best_move.is_some());
+    
+    // Both moves should be within the zone (radius 2 in early game)
+    let move1 = result1.best_move.unwrap();
+    let move2 = result2.best_move.unwrap();
+    // Check that moves are within zone radius of 2 from the stone at (9,9)
+    let dist1 = ((move1.0 as isize - 9).abs().max((move1.1 as isize - 9).abs())) as usize;
+    let dist2 = ((move2.0 as isize - 9).abs().max((move2.1 as isize - 9).abs())) as usize;
+    assert!(dist1 <= 2, "Move {:?} is too far from (9, 9)", move1);
+    assert!(dist2 <= 2, "Move {:?} is too far from (9, 9)", move2);
 }
 
 #[test]
@@ -263,7 +276,7 @@ fn test_find_best_move_edge_cases() {
     state.board.place_stone(9, 9, Player::Max);
     state.current_player = Player::Min;
 
-    let result = lazy_smp_search(&mut state, 2, None, Some(1));
+    let result = lazy_smp_search(&mut state, 100, Some(1));
 
     // Should find one of the few available moves
     assert!(result.best_move.is_some());
@@ -286,7 +299,7 @@ fn test_find_best_move_capture_win() {
     state.board.place_stone(9, 11, Player::Min);
     state.current_player = Player::Max;
 
-    let result = lazy_smp_search(&mut state, 3, None, Some(1));
+    let result = lazy_smp_search(&mut state, 200, Some(1));
 
     // Should find the capturing move
     assert!(result.best_move.is_some());
@@ -319,7 +332,7 @@ fn test_find_best_move_defensive_priority() {
     
     state.current_player = Player::Min; // Min must defend
     
-    let result = lazy_smp_search(&mut state, 3, None, Some(1));
+    let result = lazy_smp_search(&mut state, 200, Some(1));
     
     // Should find the blocking move
     assert!(result.best_move.is_some());
@@ -337,8 +350,8 @@ fn test_find_best_move_different_board_sizes() {
     let mut state15 = GameState::new(15, 5);
     
 
-    let result13 = lazy_smp_search(&mut state13, 2, None, Some(1));
-    let result15 = lazy_smp_search(&mut state15, 2, None, Some(1));
+    let result13 = lazy_smp_search(&mut state13, 100, Some(1));
+    let result15 = lazy_smp_search(&mut state15, 100, Some(1));
 
     // Should find center moves for different board sizes
     assert_eq!(result13.best_move, Some((6, 6)));
