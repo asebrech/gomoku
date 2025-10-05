@@ -1,5 +1,6 @@
 use crate::core::board::{Board, Player};
 use crate::core::state::GameState;
+use crate::ai::incremental_patterns::IncrementalPatternCounts;
 
 pub struct Heuristic;
 
@@ -17,8 +18,11 @@ const LIVE_TWO_SCORE: i32 = 50;
 const HALF_FREE_TWO_SCORE: i32 = 20;
 const CAPTURE_BONUS_MULTIPLIER: i32 = 1_000;
 
+// Old full-board pattern analysis (kept for reference, now unused)
+#[allow(dead_code)]
 const DIRECTIONS: [(isize, isize); 4] = [(1, 0), (0, 1), (1, 1), (1, -1)];
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum PatternFreedom {
     Free,
@@ -26,6 +30,7 @@ enum PatternFreedom {
     Flanked,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
 struct PatternCounts {
     five_in_row: u8,
@@ -40,6 +45,7 @@ struct PatternCounts {
 }
 
 impl PatternCounts {
+    #[allow(dead_code)]
     const fn new() -> Self {
         Self {
             five_in_row: 0,
@@ -55,6 +61,7 @@ impl PatternCounts {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
 struct PatternInfo {
     length: usize,
@@ -81,28 +88,131 @@ impl Heuristic {
             return 0;
         }
 
-        let (max_counts, min_counts) =
-            Self::analyze_both_players(&state.board, state.win_condition);
+        // Use lightweight evaluation for deep searches (depth > 7)
+        if depth > 7 {
+            return Self::evaluate_tactical(state, depth);
+        }
 
-        if max_counts.five_in_row > 0 || max_counts.live_four > 1 {
+        // Use incremental pattern counts from state
+        let pattern_counts = &state.pattern_counts;
+
+        if pattern_counts.max_five_in_row > 0 || pattern_counts.max_live_four > 1 {
             return WINNING_SCORE + depth;
         }
-        if min_counts.five_in_row > 0 || min_counts.live_four > 1 {
+        if pattern_counts.min_five_in_row > 0 || pattern_counts.min_live_four > 1 {
             return -WINNING_SCORE - depth;
         }
 
-        let max_score = Self::calculate_pattern_score(max_counts);
-        let min_score = Self::calculate_pattern_score(min_counts);
+        let max_score = Self::calculate_pattern_score_from_incremental(pattern_counts, Player::Max);
+        let min_score = Self::calculate_pattern_score_from_incremental(pattern_counts, Player::Min);
         let capture_bonus = Self::calculate_capture_bonus(state);
-        let historical_bonus = Self::calculate_historical_bonus(state);
+        
+        // Only calculate historical bonus at shallow depths (< 3)
+        let historical_bonus = if depth < 3 {
+            Self::calculate_historical_bonus(state)
+        } else {
+            0
+        };
 
         max_score - min_score + capture_bonus + historical_bonus
+    }
+
+    /// Fast tactical evaluation for deep searches - only counts immediate threats
+    fn evaluate_tactical(state: &GameState, depth: i32) -> i32 {
+        let pattern_counts = &state.pattern_counts;
+
+        // Check for immediate wins
+        if pattern_counts.max_five_in_row > 0 || pattern_counts.max_live_four > 1 {
+            return WINNING_SCORE + depth;
+        }
+        if pattern_counts.min_five_in_row > 0 || pattern_counts.min_live_four > 1 {
+            return -WINNING_SCORE - depth;
+        }
+
+        // Simplified scoring - only critical patterns
+        let mut score = 0;
+
+        // Max player threats
+        score += (pattern_counts.max_live_four as i32) * LIVE_FOUR_SINGLE_SCORE;
+        score += (pattern_counts.max_half_free_four as i32) * HALF_FREE_FOUR_SCORE;
+        score += (pattern_counts.max_live_three as i32) * LIVE_THREE_SCORE;
+
+        // Min player threats
+        score -= (pattern_counts.min_live_four as i32) * LIVE_FOUR_SINGLE_SCORE;
+        score -= (pattern_counts.min_half_free_four as i32) * HALF_FREE_FOUR_SCORE;
+        score -= (pattern_counts.min_live_three as i32) * LIVE_THREE_SCORE;
+
+        // Capture bonus
+        score += Self::calculate_capture_bonus(state);
+
+        score
     }
 
     fn calculate_historical_bonus(state: &GameState) -> i32 {
         state.pattern_analyzer.calculate_historical_bonus(state)
     }
 
+    /// Calculate pattern score from incremental pattern counts
+    fn calculate_pattern_score_from_incremental(counts: &IncrementalPatternCounts, player: Player) -> i32 {
+        let mut score = 0;
+
+        let (five, live_four, half_free_four, dead_four, live_three, half_free_three, dead_three, live_two, half_free_two) = match player {
+            Player::Max => (
+                counts.max_five_in_row,
+                counts.max_live_four,
+                counts.max_half_free_four,
+                counts.max_dead_four,
+                counts.max_live_three,
+                counts.max_half_free_three,
+                counts.max_dead_three,
+                counts.max_live_two,
+                counts.max_half_free_two,
+            ),
+            Player::Min => (
+                counts.min_five_in_row,
+                counts.min_live_four,
+                counts.min_half_free_four,
+                counts.min_dead_four,
+                counts.min_live_three,
+                counts.min_half_free_three,
+                counts.min_dead_three,
+                counts.min_live_two,
+                counts.min_half_free_two,
+            ),
+        };
+
+        if five > 0 {
+            score += FIVE_IN_ROW_SCORE;
+        }
+
+        score += match live_four {
+            1 => LIVE_FOUR_SINGLE_SCORE,
+            n if n > 1 => LIVE_FOUR_MULTIPLE_SCORE,
+            _ => 0,
+        };
+
+        if live_three >= 2
+            || dead_four >= 2
+            || (dead_four >= 1 && live_three >= 1)
+            || (half_free_four >= 1 && live_three >= 1)
+            || (half_free_four >= 2)
+        {
+            score += WINNING_THREAT_SCORE;
+        }
+
+        score += (half_free_four as i32) * HALF_FREE_FOUR_SCORE
+            + (dead_four as i32) * DEAD_FOUR_SCORE
+            + (live_three as i32) * LIVE_THREE_SCORE
+            + (half_free_three as i32) * HALF_FREE_THREE_SCORE
+            + (dead_three as i32) * DEAD_THREE_SCORE
+            + (live_two as i32) * LIVE_TWO_SCORE
+            + (half_free_two as i32) * HALF_FREE_TWO_SCORE;
+
+        score
+    }
+
+    // ===== OLD PATTERN ANALYSIS METHODS (unused, kept for reference) =====
+    #[allow(dead_code)]
     fn analyze_both_players(board: &Board, win_condition: usize) -> (PatternCounts, PatternCounts) {
         let mut max_counts = PatternCounts::new();
         let mut min_counts = PatternCounts::new();
@@ -446,6 +556,7 @@ impl Heuristic {
         }
     }
 
+    #[allow(dead_code)]
     fn calculate_pattern_score(counts: PatternCounts) -> i32 {
         let mut score = 0;
 

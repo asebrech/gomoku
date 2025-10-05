@@ -2,7 +2,12 @@ use crate::core::state::GameState;
 use std::cmp::{max, min};
 use std::time::{Duration, Instant};
 
-use super::{heuristic::Heuristic, move_ordering::MoveOrdering, transposition::{TranspositionTable, EntryType}};
+use super::{
+    eval_cache::EvalCache,
+    heuristic::Heuristic,
+    move_ordering::MoveOrdering,
+    transposition::{TranspositionTable, EntryType},
+};
 
 /// Zero-window alpha-beta search with memory (transposition table)
 /// This is the core search function used by MTD(f)
@@ -13,6 +18,7 @@ fn alpha_beta_with_memory(
     mut beta: i32,
     maximizing_player: bool,
     tt: &mut TranspositionTable,
+    eval_cache: &mut EvalCache,
     start_time: &Instant,
     time_limit: Option<Duration>,
 ) -> (i32, u64) {
@@ -36,7 +42,13 @@ fn alpha_beta_with_memory(
 
     // Terminal node or leaf node
     if depth == 0 || state.is_terminal() {
+        // Try eval cache first (faster than TT for pure evaluation)
+        if let Some(cached_eval) = eval_cache.probe(hash_key, depth) {
+            return (cached_eval, nodes_visited);
+        }
+        
         let eval = Heuristic::evaluate(state, depth);
+        eval_cache.store(hash_key, eval, depth);
         tt.store(hash_key, eval, depth, EntryType::Exact, None);
         return (eval, nodes_visited);
     }
@@ -60,7 +72,7 @@ fn alpha_beta_with_memory(
         for move_ in moves {
             state.make_move(move_);
             let (eval, child_nodes) = alpha_beta_with_memory(
-                state, depth - 1, alpha, beta, false, tt, start_time, time_limit
+                state, depth - 1, alpha, beta, false, tt, eval_cache, start_time, time_limit
             );
             state.undo_move(move_);
             nodes_visited += child_nodes;
@@ -81,7 +93,7 @@ fn alpha_beta_with_memory(
         for move_ in moves {
             state.make_move(move_);
             let (eval, child_nodes) = alpha_beta_with_memory(
-                state, depth - 1, alpha, beta, true, tt, start_time, time_limit
+                state, depth - 1, alpha, beta, true, tt, eval_cache, start_time, time_limit
             );
             state.undo_move(move_);
             nodes_visited += child_nodes;
@@ -120,6 +132,7 @@ fn alpha_beta_with_memory(
 /// * `first_guess` - Initial guess for the minimax value (from previous iteration)
 /// * `depth` - Search depth
 /// * `tt` - Transposition table
+/// * `eval_cache` - Evaluation cache
 /// * `start_time` - Search start time for time management
 /// * `time_limit` - Optional time limit for the search
 /// 
@@ -130,6 +143,7 @@ pub fn mtdf(
     first_guess: i32,
     depth: i32,
     tt: &mut TranspositionTable,
+    eval_cache: &mut EvalCache,
     start_time: &Instant,
     time_limit: Option<Duration>,
 ) -> (i32, u64, Option<(usize, usize)>) {
@@ -161,6 +175,7 @@ pub fn mtdf(
             beta,
             is_maximizing,
             tt,
+            eval_cache,
             start_time,
             time_limit,
         );

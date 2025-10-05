@@ -4,7 +4,11 @@ use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use rayon::prelude::*;
 
-use super::{minimax::mtdf, transposition::TranspositionTable};
+use super::{
+    eval_cache::EvalCache,
+    minimax::mtdf,
+    transposition::TranspositionTable,
+};
 
 /// Search result structure
 #[derive(Debug)]
@@ -81,6 +85,7 @@ fn lazy_smp_worker(
 ) -> (i32, Option<(usize, usize)>, i32, u64) {
     let mut local_state = state.clone();
     let mut tt = TranspositionTable::new(1_000_000); // Each worker gets its own TT
+    let mut eval_cache = EvalCache::new(100_000); // Each worker gets its own eval cache
     
     let mut best_move = None;
     let mut best_score = 0;
@@ -127,6 +132,7 @@ fn lazy_smp_worker(
             first_guess,
             search_depth,
             &mut tt,
+            &mut eval_cache,
             &start_time,
             time_limit,
         );

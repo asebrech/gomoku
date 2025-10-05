@@ -1,5 +1,6 @@
 use crate::ai::zobrist::ZobristHash;
 use crate::ai::pattern_history::PatternHistoryAnalyzer;
+use crate::ai::incremental_patterns::IncrementalPatternCounts;
 use crate::core::board::{Board, Player};
 use crate::core::captures::CaptureHandler;
 use crate::core::moves::MoveHandler;
@@ -20,6 +21,7 @@ pub struct GameState {
     pub pattern_analyzer: PatternHistoryAnalyzer,
     pub zobrist_hash: ZobristHash,
     pub current_hash: u64,
+    pub pattern_counts: IncrementalPatternCounts,
 }
 
 impl GameState {
@@ -39,6 +41,7 @@ impl GameState {
             pattern_analyzer: PatternHistoryAnalyzer::new(),
             zobrist_hash: zobrist_hash.clone(),
             current_hash: 0,
+            pattern_counts: IncrementalPatternCounts::new(),
         };
         state.current_hash = zobrist_hash.compute_hash(&state);
         state
@@ -49,6 +52,8 @@ impl GameState {
     }
 
     pub fn make_move(&mut self, mv: (usize, usize)) {
+        let move_player = self.current_player;
+        
         self.current_hash = self.zobrist_hash.update_hash_make_move(
             self.current_hash,
             mv.0,
@@ -71,6 +76,10 @@ impl GameState {
         }
         
         self.execute_captures(captures);
+        
+        // Update incremental pattern counts after the move and captures
+        self.pattern_counts.update_after_move(&self.board, mv.0, mv.1, move_player, self.win_condition);
+        
         self.move_history.push(mv);
         self.check_for_wins(mv);
         self.switch_player();
@@ -125,6 +134,9 @@ impl GameState {
         }
 
         self.restore_captured_stones();
+        
+        // Recompute pattern counts after undo (safer than trying to reverse incremental updates)
+        self.pattern_counts.recompute_full(&self.board, self.win_condition);
     }
 
     pub fn is_terminal(&self) -> bool {
