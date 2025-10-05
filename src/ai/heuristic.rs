@@ -1,3 +1,4 @@
+use crate::ai::precompute::DirectionTables;
 use crate::core::board::{Board, Player};
 use crate::core::state::GameState;
 
@@ -16,8 +17,6 @@ const DEAD_THREE_SCORE: i32 = 100;
 const LIVE_TWO_SCORE: i32 = 50;
 const HALF_FREE_TWO_SCORE: i32 = 20;
 const CAPTURE_BONUS_MULTIPLIER: i32 = 1_000;
-
-const DIRECTIONS: [(isize, isize); 4] = [(1, 0), (0, 1), (1, 1), (1, -1)];
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum PatternFreedom {
@@ -82,7 +81,7 @@ impl Heuristic {
         }
 
         let (max_counts, min_counts) =
-            Self::analyze_both_players(&state.board, state.win_condition);
+            Self::analyze_both_players(&state.board, state.win_condition, &state.direction_tables);
 
         if max_counts.five_in_row > 0 || max_counts.live_four > 1 {
             return WINNING_SCORE + depth;
@@ -103,10 +102,11 @@ impl Heuristic {
         state.pattern_analyzer.calculate_historical_bonus(state)
     }
 
-    fn analyze_both_players(board: &Board, win_condition: usize) -> (PatternCounts, PatternCounts) {
+    fn analyze_both_players(board: &Board, win_condition: usize, dir_tables: &DirectionTables) -> (PatternCounts, PatternCounts) {
         let mut max_counts = PatternCounts::new();
         let mut min_counts = PatternCounts::new();
-        let mut analyzed = vec![vec![0u8; board.size]; board.size];
+        let total_cells = board.size * board.size;
+        let mut analyzed = vec![0u8; total_cells];
 
         for row in 0..board.size {
             for col in 0..board.size {
@@ -121,20 +121,20 @@ impl Heuristic {
                     Player::Min
                 };
                 
-                for (dir_idx, &(dx, dy)) in DIRECTIONS.iter().enumerate() {
-                    let bit_mask = 1u8 << dir_idx;
+                // Check all 4 directions using precomputed rays
+                for direction in 0..4 {
+                    let bit_mask = 1u8 << direction;
 
-                    if analyzed[row][col] & bit_mask == 0 {
+                    if analyzed[idx] & bit_mask == 0 {
                         if let Some(pattern_info) = Self::analyze_pattern(
                             board,
-                            row,
-                            col,
-                            dx,
-                            dy,
+                            idx,
+                            direction,
                             player,
                             win_condition,
                             &mut analyzed,
                             bit_mask,
+                            dir_tables,
                         ) {
                             match player {
                                 Player::Max => {
@@ -155,24 +155,23 @@ impl Heuristic {
 
     fn analyze_pattern(
         board: &Board,
-        start_row: usize,
-        start_col: usize,
-        dx: isize,
-        dy: isize,
+        start_idx: usize,
+        direction: usize,
         player: Player,
         win_condition: usize,
-        analyzed: &mut [Vec<u8>],
+        analyzed: &mut [u8],
         bit_mask: u8,
+        dir_tables: &DirectionTables,
     ) -> Option<PatternInfo> {
-        let (pattern_start_row, pattern_start_col) =
-            Self::find_pattern_start(board, start_row, start_col, dx, dy, player);
+        let pattern_start_idx =
+            Self::find_pattern_start(board, start_idx, direction, player, dir_tables);
 
-        if analyzed[pattern_start_row][pattern_start_col] & bit_mask != 0 {
+        if analyzed[pattern_start_idx] & bit_mask != 0 {
             return None;
         }
 
         let length =
-            Self::count_consecutive(board, pattern_start_row, pattern_start_col, dx, dy, player);
+            Self::count_consecutive(board, pattern_start_idx, direction, player, dir_tables);
 
         if length < 2 {
             return None;
@@ -183,38 +182,35 @@ impl Heuristic {
         // Check if this pattern has sufficient space to develop into a winning line
         if !Self::has_sufficient_space(
             board,
-            pattern_start_row,
-            pattern_start_col,
-            dx,
-            dy,
+            pattern_start_idx,
+            direction,
             length,
             player,
             win_condition,
+            dir_tables,
         ) {
             // Mark as analyzed but don't score it
             Self::mark_pattern_analyzed(
-                pattern_start_row,
-                pattern_start_col,
-                dx,
-                dy,
+                pattern_start_idx,
+                direction,
                 length,
                 analyzed,
                 bit_mask,
+                dir_tables,
             );
             return None;
         }
         
         let freedom =
-            Self::analyze_pattern_freedom(board, pattern_start_row, pattern_start_col, dx, dy, length);
+            Self::analyze_pattern_freedom(board, pattern_start_idx, direction, length, dir_tables);
 
         Self::mark_pattern_analyzed(
-            pattern_start_row,
-            pattern_start_col,
-            dx,
-            dy,
+            pattern_start_idx,
+            direction,
             length,
             analyzed,
             bit_mask,
+            dir_tables,
         );
 
         Some(PatternInfo { length, freedom })
@@ -222,91 +218,78 @@ impl Heuristic {
 
     fn count_consecutive(
         board: &Board,
-        row: usize,
-        col: usize,
-        dx: isize,
-        dy: isize,
+        start_idx: usize,
+        direction: usize,
         player: Player,
+        dir_tables: &DirectionTables,
     ) -> usize {
         let player_bits = match player {
             Player::Max => &board.max_bits,
             Player::Min => &board.min_bits,
         };
-        let mut count = 0;
-        let mut current_row = row as isize;
-        let mut current_col = col as isize;
-
-        while current_row >= 0
-            && current_row < board.size as isize
-            && current_col >= 0
-            && current_col < board.size as isize
-        {
-            let idx = board.index(current_row as usize, current_col as usize);
+        
+        let ray = dir_tables.get_ray_forward(start_idx, direction);
+        let mut count = 1; // Count the starting position
+        
+        for &idx in ray {
             if Board::is_bit_set(player_bits, idx) {
                 count += 1;
-                current_row += dx;
-                current_col += dy;
             } else {
                 break;
             }
         }
+        
         count
     }
 
     fn find_pattern_start(
         board: &Board,
-        row: usize,
-        col: usize,
-        dx: isize,
-        dy: isize,
+        idx: usize,
+        direction: usize,
         player: Player,
-    ) -> (usize, usize) {
+        dir_tables: &DirectionTables,
+    ) -> usize {
         let player_bits = match player {
             Player::Max => &board.max_bits,
             Player::Min => &board.min_bits,
         };
-        let mut current_row = row as isize;
-        let mut current_col = col as isize;
-
-        loop {
-            let prev_row = current_row - dx;
-            let prev_col = current_col - dy;
-
-            if prev_row >= 0
-                && prev_row < board.size as isize
-                && prev_col >= 0
-                && prev_col < board.size as isize
-            {
-                let idx = board.index(prev_row as usize, prev_col as usize);
-                if Board::is_bit_set(player_bits, idx) {
-                    current_row = prev_row;
-                    current_col = prev_col;
-                } else {
-                    break;
-                }
+        
+        let backward_ray = dir_tables.get_ray_backward(idx, direction);
+        let mut pattern_start = idx;
+        
+        for &back_idx in backward_ray {
+            if Board::is_bit_set(player_bits, back_idx) {
+                pattern_start = back_idx;
             } else {
                 break;
             }
         }
-
-        (current_row as usize, current_col as usize)
+        
+        pattern_start
     }
 
     fn analyze_pattern_freedom(
         board: &Board,
-        start_row: usize,
-        start_col: usize,
-        dx: isize,
-        dy: isize,
+        start_idx: usize,
+        direction: usize,
         length: usize,
+        dir_tables: &DirectionTables,
     ) -> PatternFreedom {
-        let before_row = start_row as isize - dx;
-        let before_col = start_col as isize - dy;
-        let start_open = Self::is_position_empty(board, before_row, before_col);
+        // Check before the pattern
+        let backward_ray = dir_tables.get_ray_backward(start_idx, direction);
+        let start_open = if let Some(&before_idx) = backward_ray.first() {
+            !Board::is_bit_set(&board.occupied, before_idx)
+        } else {
+            false
+        };
 
-        let end_row = start_row as isize + (length as isize * dx);
-        let end_col = start_col as isize + (length as isize * dy);
-        let end_open = Self::is_position_empty(board, end_row, end_col);
+        // Check after the pattern
+        let forward_ray = dir_tables.get_ray_forward(start_idx, direction);
+        let end_open = if let Some(&after_idx) = forward_ray.get(length - 1) {
+            !Board::is_bit_set(&board.occupied, after_idx)
+        } else {
+            false
+        };
 
         match (start_open, end_open) {
             (true, true) => PatternFreedom::Free,
@@ -315,24 +298,16 @@ impl Heuristic {
         }
     }
 
-    #[inline(always)]
-    fn is_position_empty(board: &Board, row: isize, col: isize) -> bool {
-        if row < 0 || col < 0 || row >= board.size as isize || col >= board.size as isize {
-            return false;
-        }
-        let idx = board.index(row as usize, col as usize);
-        !Board::is_bit_set(&board.occupied, idx)
-    }
+
 
     fn has_sufficient_space(
         board: &Board,
-        start_row: usize,
-        start_col: usize,
-        dx: isize,
-        dy: isize,
+        start_idx: usize,
+        direction: usize,
         length: usize,
         player: Player,
         win_condition: usize,
+        dir_tables: &DirectionTables,
     ) -> bool {
         let player_bits = match player {
             Player::Max => &board.max_bits,
@@ -343,60 +318,31 @@ impl Heuristic {
             Player::Min => &board.max_bits,
         };
 
-        // Count total available space in both directions from the pattern
-        let mut total_space = length; // Current pattern length
+        let mut total_space = length;
         
-        // Count backwards from pattern start
-        let mut pos_row = start_row as isize - dx;
-        let mut pos_col = start_col as isize - dy;
+        // Count backwards
+        let backward_ray = dir_tables.get_ray_backward(start_idx, direction);
         let mut backward_space = 0;
-        
-        while pos_row >= 0 
-            && pos_row < board.size as isize 
-            && pos_col >= 0 
-            && pos_col < board.size as isize 
-            && backward_space < win_condition
-        {
-            let idx = board.index(pos_row as usize, pos_col as usize);
-            
-            // Stop if we hit an opponent stone
+        for &idx in backward_ray.iter().take(win_condition) {
             if Board::is_bit_set(opponent_bits, idx) {
                 break;
             }
-            
-            // Count empty spaces and our own stones
             if !Board::is_bit_set(&board.occupied, idx) || Board::is_bit_set(player_bits, idx) {
                 backward_space += 1;
-                pos_row -= dx;
-                pos_col -= dy;
             } else {
                 break;
             }
         }
         
-        // Count forwards from pattern end
-        let mut pos_row = start_row as isize + (length as isize * dx);
-        let mut pos_col = start_col as isize + (length as isize * dy);
+        // Count forwards
+        let forward_ray = dir_tables.get_ray_forward(start_idx, direction);
         let mut forward_space = 0;
-        
-        while pos_row >= 0 
-            && pos_row < board.size as isize 
-            && pos_col >= 0 
-            && pos_col < board.size as isize 
-            && forward_space < win_condition
-        {
-            let idx = board.index(pos_row as usize, pos_col as usize);
-            
-            // Stop if we hit an opponent stone
+        for &idx in forward_ray.iter().skip(length - 1).take(win_condition) {
             if Board::is_bit_set(opponent_bits, idx) {
                 break;
             }
-            
-            // Count empty spaces and our own stones
             if !Board::is_bit_set(&board.occupied, idx) || Board::is_bit_set(player_bits, idx) {
                 forward_space += 1;
-                pos_row += dx;
-                pos_col += dy;
             } else {
                 break;
             }
@@ -407,20 +353,17 @@ impl Heuristic {
     }
 
     fn mark_pattern_analyzed(
-        start_row: usize,
-        start_col: usize,
-        dx: isize,
-        dy: isize,
+        start_idx: usize,
+        direction: usize,
         length: usize,
-        analyzed: &mut [Vec<u8>],
+        analyzed: &mut [u8],
         bit_mask: u8,
+        dir_tables: &DirectionTables,
     ) {
-        for i in 0..length {
-            let row = (start_row as isize + i as isize * dx) as usize;
-            let col = (start_col as isize + i as isize * dy) as usize;
-            if row < analyzed.len() && col < analyzed[0].len() {
-                analyzed[row][col] |= bit_mask;
-            }
+        analyzed[start_idx] |= bit_mask;
+        let ray = dir_tables.get_ray_forward(start_idx, direction);
+        for &idx in ray.iter().take(length - 1) {
+            analyzed[idx] |= bit_mask;
         }
     }
 

@@ -1,5 +1,6 @@
 use crate::ai::zobrist::ZobristHash;
 use crate::ai::pattern_history::PatternHistoryAnalyzer;
+use crate::ai::precompute::DirectionTables;
 use crate::core::board::{Board, Player};
 use crate::core::captures::CaptureHandler;
 use crate::core::moves::MoveHandler;
@@ -20,6 +21,7 @@ pub struct GameState {
     pub pattern_analyzer: PatternHistoryAnalyzer,
     pub zobrist_hash: ZobristHash,
     pub current_hash: u64,
+    pub direction_tables: DirectionTables,
 }
 
 impl GameState {
@@ -27,6 +29,7 @@ impl GameState {
         let zobrist_hash = ZobristHash::new(board_size);
         let board = Board::new(board_size);
         let current_player = Player::Max;
+        let direction_tables = DirectionTables::new(board_size, win_condition + 1);
         let mut state = GameState {
             board,
             current_player,
@@ -39,13 +42,14 @@ impl GameState {
             pattern_analyzer: PatternHistoryAnalyzer::new(),
             zobrist_hash: zobrist_hash.clone(),
             current_hash: 0,
+            direction_tables,
         };
         state.current_hash = zobrist_hash.compute_hash(&state);
         state
     }
 
     pub fn get_possible_moves(&self) -> Vec<(usize, usize)> {
-        MoveHandler::get_possible_moves(&self.board, self.current_player)
+        MoveHandler::get_possible_moves(&self.board, self.current_player, &self.direction_tables)
     }
 
     pub fn make_move(&mut self, mv: (usize, usize)) {
@@ -59,7 +63,7 @@ impl GameState {
         self.board.place_stone(mv.0, mv.1, self.current_player);
 
         let captures =
-            CaptureHandler::detect_captures(&self.board, mv.0, mv.1, self.current_player);
+            CaptureHandler::detect_captures(&self.board, mv.0, mv.1, self.current_player, &self.direction_tables);
         
         if !captures.is_empty() {
             let captured_player = self.current_player.opponent();
@@ -218,7 +222,7 @@ impl GameState {
     }
 
     fn check_win_around(&self, mv: (usize, usize)) -> bool {
-        WinChecker::check_win_around(&self.board, mv.0, mv.1, self.win_condition)
+        WinChecker::check_win_around(&self.board, mv.0, mv.1, self.win_condition, &self.direction_tables)
     }
 
     pub fn check_capture_win(&self) -> Option<Player> {

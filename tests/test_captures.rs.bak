@@ -17,7 +17,7 @@ fn test_horizontal_capture() {
     board.place_stone(5, 8, Player::Max);
 
     // Test capture detection
-    let captures = CaptureHandler::detect_captures(&board, 5, 8, Player::Max, &create_dir_tables(board.size));
+    let captures = CaptureHandler::detect_captures(&board, 5, 8, Player::Max);
     assert_eq!(captures.len(), 2);
     assert!(captures.contains(&(5, 6)));
     assert!(captures.contains(&(5, 7)));
@@ -34,7 +34,7 @@ fn test_vertical_capture() {
     board.place_stone(8, 5, Player::Max);
 
     // Test capture detection
-    let captures = CaptureHandler::detect_captures(&board, 8, 5, Player::Max, &create_dir_tables(board.size));
+    let captures = CaptureHandler::detect_captures(&board, 8, 5, Player::Max);
     assert_eq!(captures.len(), 2);
     assert!(captures.contains(&(6, 5)));
     assert!(captures.contains(&(7, 5)));
@@ -51,7 +51,7 @@ fn test_diagonal_capture() {
     board.place_stone(8, 8, Player::Max);
 
     // Test capture detection
-    let captures = CaptureHandler::detect_captures(&board, 8, 8, Player::Max, &create_dir_tables(board.size));
+    let captures = CaptureHandler::detect_captures(&board, 8, 8, Player::Max);
     assert_eq!(captures.len(), 2);
     assert!(captures.contains(&(6, 6)));
     assert!(captures.contains(&(7, 7)));
@@ -68,7 +68,7 @@ fn test_anti_diagonal_capture() {
     board.place_stone(5, 8, Player::Max);
 
     // Test capture detection
-    let captures = CaptureHandler::detect_captures(&board, 5, 8, Player::Max, &create_dir_tables(board.size));
+    let captures = CaptureHandler::detect_captures(&board, 5, 8, Player::Max);
     assert_eq!(captures.len(), 2);
     assert!(captures.contains(&(7, 6)));
     assert!(captures.contains(&(6, 7)));
@@ -91,7 +91,7 @@ fn test_multiple_captures() {
 
     // Place the final stone that creates both captures
     board.place_stone(5, 8, Player::Max);
-    let captures = CaptureHandler::detect_captures(&board, 5, 8, Player::Max, &create_dir_tables(board.size));
+    let captures = CaptureHandler::detect_captures(&board, 5, 8, Player::Max);
 
     // Should detect both horizontal and vertical captures
     assert_eq!(captures.len(), 4);
@@ -111,7 +111,7 @@ fn test_no_capture_empty_space() {
     // Empty space at (5, 7)
     board.place_stone(5, 8, Player::Max);
 
-    let captures = CaptureHandler::detect_captures(&board, 5, 8, Player::Max, &create_dir_tables(board.size));
+    let captures = CaptureHandler::detect_captures(&board, 5, 8, Player::Max);
     assert_eq!(captures.len(), 0);
 }
 
@@ -125,7 +125,7 @@ fn test_no_capture_same_player() {
     board.place_stone(5, 7, Player::Max);
     board.place_stone(5, 8, Player::Max);
 
-    let captures = CaptureHandler::detect_captures(&board, 5, 8, Player::Max, &create_dir_tables(board.size));
+    let captures = CaptureHandler::detect_captures(&board, 5, 8, Player::Max);
     assert_eq!(captures.len(), 0);
 }
 
@@ -139,7 +139,7 @@ fn test_execute_captures() {
     board.place_stone(5, 7, Player::Min);
     board.place_stone(5, 8, Player::Max);
 
-    let captures = CaptureHandler::detect_captures(&board, 5, 8, Player::Max, &create_dir_tables(board.size));
+    let captures = CaptureHandler::detect_captures(&board, 5, 8, Player::Max);
     CaptureHandler::execute_captures(&mut board, &captures);
 
     // Check that captured stones are removed
@@ -161,7 +161,7 @@ fn test_edge_case_captures() {
     board.place_stone(0, 2, Player::Min);
     board.place_stone(0, 3, Player::Max);
 
-    let captures = CaptureHandler::detect_captures(&board, 0, 3, Player::Max, &create_dir_tables(board.size));
+    let captures = CaptureHandler::detect_captures(&board, 0, 3, Player::Max);
     assert_eq!(captures.len(), 2);
     assert!(captures.contains(&(0, 1)));
     assert!(captures.contains(&(0, 2)));

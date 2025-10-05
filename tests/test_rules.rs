@@ -1,9 +1,15 @@
+use gomoku::ai::precompute::DirectionTables;
 use gomoku::core::board::{Board, Player};
 use gomoku::core::rules::WinChecker;
+
+fn create_dir_tables(size: usize) -> DirectionTables {
+    DirectionTables::new(size, 6)
+}
 
 #[test]
 fn test_horizontal_win() {
     let mut board = Board::new(19);
+    let dir_tables = create_dir_tables(19);
 
     // Place 5 stones horizontally
     for i in 0..5 {
@@ -11,14 +17,15 @@ fn test_horizontal_win() {
     }
 
     // Test win detection from different positions
-    assert!(WinChecker::check_win_around(&board, 9, 5, 5));
-    assert!(WinChecker::check_win_around(&board, 9, 7, 5));
-    assert!(WinChecker::check_win_around(&board, 9, 9, 5));
+    assert!(WinChecker::check_win_around(&board, 9, 5, 5, &dir_tables));
+    assert!(WinChecker::check_win_around(&board, 9, 7, 5, &dir_tables));
+    assert!(WinChecker::check_win_around(&board, 9, 9, 5, &dir_tables));
 }
 
 #[test]
 fn test_vertical_win() {
     let mut board = Board::new(19);
+    let dir_tables = create_dir_tables(19);
 
     // Place 5 stones vertically
     for i in 0..5 {
@@ -26,14 +33,15 @@ fn test_vertical_win() {
     }
 
     // Test win detection
-    assert!(WinChecker::check_win_around(&board, 5, 9, 5));
-    assert!(WinChecker::check_win_around(&board, 7, 9, 5));
-    assert!(WinChecker::check_win_around(&board, 9, 9, 5));
+    assert!(WinChecker::check_win_around(&board, 5, 9, 5, &dir_tables));
+    assert!(WinChecker::check_win_around(&board, 7, 9, 5, &dir_tables));
+    assert!(WinChecker::check_win_around(&board, 9, 9, 5, &dir_tables));
 }
 
 #[test]
 fn test_diagonal_win() {
     let mut board = Board::new(19);
+    let dir_tables = create_dir_tables(19);
 
     // Place 5 stones diagonally
     for i in 0..5 {
@@ -41,14 +49,15 @@ fn test_diagonal_win() {
     }
 
     // Test win detection
-    assert!(WinChecker::check_win_around(&board, 5, 5, 5));
-    assert!(WinChecker::check_win_around(&board, 7, 7, 5));
-    assert!(WinChecker::check_win_around(&board, 9, 9, 5));
+    assert!(WinChecker::check_win_around(&board, 5, 5, 5, &dir_tables));
+    assert!(WinChecker::check_win_around(&board, 7, 7, 5, &dir_tables));
+    assert!(WinChecker::check_win_around(&board, 9, 9, 5, &dir_tables));
 }
 
 #[test]
 fn test_anti_diagonal_win() {
     let mut board = Board::new(19);
+    let dir_tables = create_dir_tables(19);
 
     // Place 5 stones anti-diagonally
     for i in 0..5 {
@@ -56,14 +65,15 @@ fn test_anti_diagonal_win() {
     }
 
     // Test win detection
-    assert!(WinChecker::check_win_around(&board, 5, 9, 5));
-    assert!(WinChecker::check_win_around(&board, 7, 7, 5));
-    assert!(WinChecker::check_win_around(&board, 9, 5, 5));
+    assert!(WinChecker::check_win_around(&board, 5, 9, 5, &dir_tables));
+    assert!(WinChecker::check_win_around(&board, 7, 7, 5, &dir_tables));
+    assert!(WinChecker::check_win_around(&board, 9, 5, 5, &dir_tables));
 }
 
 #[test]
 fn test_no_win_four_in_row() {
     let mut board = Board::new(19);
+    let dir_tables = create_dir_tables(19);
 
     // Place only 4 stones horizontally
     for i in 0..4 {
@@ -71,24 +81,24 @@ fn test_no_win_four_in_row() {
     }
 
     // Should not detect win
-    assert!(!WinChecker::check_win_around(&board, 9, 5, 5));
-    assert!(!WinChecker::check_win_around(&board, 9, 8, 5));
+    assert!(!WinChecker::check_win_around(&board, 9, 5, 5, &dir_tables));
+    assert!(!WinChecker::check_win_around(&board, 9, 8, 5, &dir_tables));
 }
 
 #[test]
 fn test_blocked_line_no_win() {
     let mut board = Board::new(19);
+    let dir_tables = create_dir_tables(19);
 
-    // Place 4 stones with opponent stone blocking
-    board.place_stone(9, 5, Player::Max);
-    board.place_stone(9, 6, Player::Max);
-    board.place_stone(9, 7, Player::Max);
-    board.place_stone(9, 8, Player::Max);
-    board.place_stone(9, 9, Player::Min); // Blocking stone
+    // Place 4 stones with one blocked
+    for i in 0..4 {
+        board.place_stone(9, 5 + i, Player::Max);
+    }
+    board.place_stone(9, 9, Player::Min); // Blocker
 
     // Should not detect win
-    assert!(!WinChecker::check_win_around(&board, 9, 5, 5));
-    assert!(!WinChecker::check_win_around(&board, 9, 8, 5));
+    assert!(!WinChecker::check_win_around(&board, 9, 5, 5, &dir_tables));
+    assert!(!WinChecker::check_win_around(&board, 9, 8, 5, &dir_tables));
 }
 
 #[test]
@@ -118,43 +128,42 @@ fn test_no_capture_win() {
 #[test]
 fn test_win_different_conditions() {
     let mut board = Board::new(19);
+    let dir_tables = create_dir_tables(19);
 
     // Test with 4-in-a-row win condition
     for i in 0..4 {
         board.place_stone(9, 5 + i, Player::Max);
     }
 
-    assert!(WinChecker::check_win_around(&board, 9, 5, 4));
-    assert!(!WinChecker::check_win_around(&board, 9, 5, 5));
+    assert!(WinChecker::check_win_around(&board, 9, 5, 4, &dir_tables));
+    assert!(!WinChecker::check_win_around(&board, 9, 5, 5, &dir_tables));
 
     // Test with 6-in-a-row win condition
     for i in 4..6 {
         board.place_stone(9, 5 + i, Player::Max);
     }
 
-    assert!(WinChecker::check_win_around(&board, 9, 5, 6));
-    assert!(WinChecker::check_win_around(&board, 9, 5, 5));
+    assert!(WinChecker::check_win_around(&board, 9, 5, 6, &dir_tables));
+    assert!(WinChecker::check_win_around(&board, 9, 5, 5, &dir_tables));
 }
 
 #[test]
-fn test_edge_case_wins() {
+fn test_edge_wins() {
     let mut board = Board::new(19);
+    let dir_tables = create_dir_tables(19);
 
-    // Test win at board edge
+    // Test horizontal win at top edge
     for i in 0..5 {
         board.place_stone(0, i, Player::Max);
     }
+    assert!(WinChecker::check_win_around(&board, 0, 0, 5, &dir_tables));
+    assert!(WinChecker::check_win_around(&board, 0, 4, 5, &dir_tables));
 
-    assert!(WinChecker::check_win_around(&board, 0, 0, 5));
-    assert!(WinChecker::check_win_around(&board, 0, 4, 5));
-
+    let mut board = Board::new(19);
+    // Test vertical win at left edge
     for i in 0..5 {
-        board.remove_stone(0, i);
+        board.place_stone(i, 0, Player::Max);
     }
-    for i in 0..5 {
-        board.place_stone(i, 0, Player::Min);
-    }
-
-    assert!(WinChecker::check_win_around(&board, 0, 0, 5));
-    assert!(WinChecker::check_win_around(&board, 4, 0, 5));
+    assert!(WinChecker::check_win_around(&board, 0, 0, 5, &dir_tables));
+    assert!(WinChecker::check_win_around(&board, 4, 0, 5, &dir_tables));
 }

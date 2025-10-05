@@ -4,6 +4,7 @@ pub mod ai {
     pub mod minimax;
     pub mod move_ordering;
     pub mod pattern_history;
+    pub mod precompute;
     pub mod transposition;
     pub mod zobrist;
 }

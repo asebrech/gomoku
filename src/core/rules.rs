@@ -1,9 +1,10 @@
+use crate::ai::precompute::DirectionTables;
 use crate::core::board::{Board, Player};
 
 pub struct WinChecker;
 
 impl WinChecker {
-    pub fn check_win_around(board: &Board, row: usize, col: usize, win_condition: usize) -> bool {
+    pub fn check_win_around(board: &Board, row: usize, col: usize, win_condition: usize, dir_tables: &DirectionTables) -> bool {
         if row >= board.size || col >= board.size {
             return false;
         }
@@ -19,49 +20,36 @@ impl WinChecker {
             &board.min_bits
         };
 
-        let directions = [(1, 0), (0, 1), (1, 1), (1, -1)];
-
-        for &(dx, dy) in directions.iter() {
-            let mut count = 1;
-
-            let mut step = 1;
-            loop {
-                let x = row as isize + dx as isize * step;
-                let y = col as isize + dy as isize * step;
-                if x < 0 || y < 0 || x >= board.size as isize || y >= board.size as isize {
-                    break;
-                }
-                let check_idx = board.index(x as usize, y as usize);
-                if Board::is_bit_set(player_bits, check_idx) {
+        // Check all 4 directions using precomputed rays
+        for direction in 0..4 {
+            let mut count = 1; // Count the current position
+            
+            // Count forward
+            let forward_ray = dir_tables.get_ray_forward(idx, direction);
+            for &ray_idx in forward_ray {
+                if Board::is_bit_set(player_bits, ray_idx) {
                     count += 1;
+                    if count >= win_condition {
+                        return true;
+                    }
                 } else {
                     break;
                 }
-                step += 1;
-                if count >= win_condition {
-                    return true;
-                }
             }
-
-            let mut step = 1;
-            loop {
-                let x = row as isize - dx as isize * step;
-                let y = col as isize - dy as isize * step;
-                if x < 0 || y < 0 || x >= board.size as isize || y >= board.size as isize {
-                    break;
-                }
-                let check_idx = board.index(x as usize, y as usize);
-                if Board::is_bit_set(player_bits, check_idx) {
+            
+            // Count backward
+            let backward_ray = dir_tables.get_ray_backward(idx, direction);
+            for &ray_idx in backward_ray {
+                if Board::is_bit_set(player_bits, ray_idx) {
                     count += 1;
+                    if count >= win_condition {
+                        return true;
+                    }
                 } else {
                     break;
                 }
-                step += 1;
-                if count >= win_condition {
-                    return true;
-                }
             }
-
+            
             if count >= win_condition {
                 return true;
             }
