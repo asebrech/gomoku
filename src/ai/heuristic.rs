@@ -20,7 +20,7 @@ const CAPTURE_BONUS_MULTIPLIER: i32 = 1_000;
 const DIRECTIONS: [(isize, isize); 4] = [(1, 0), (0, 1), (1, 1), (1, -1)];
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum PatternFreedom {
+pub enum PatternFreedom {
     Free,
     HalfFree,
     Flanked,
@@ -84,10 +84,12 @@ impl Heuristic {
         let (max_counts, min_counts) =
             Self::analyze_both_players(&state.board, state.win_condition);
 
-        if max_counts.five_in_row > 0 || max_counts.live_four > 1 {
+        // Check for winning positions: multiple live fours (can't be blocked)
+        // Note: Five-in-a-row is already checked by check_winner() above
+        if max_counts.live_four > 1 {
             return WINNING_SCORE + depth;
         }
-        if min_counts.five_in_row > 0 || min_counts.live_four > 1 {
+        if min_counts.live_four > 1 {
             return -WINNING_SCORE - depth;
         }
 
@@ -220,7 +222,7 @@ impl Heuristic {
         Some(PatternInfo { length, freedom })
     }
 
-    fn count_consecutive(
+    pub fn count_consecutive(
         board: &Board,
         row: usize,
         col: usize,
@@ -253,7 +255,7 @@ impl Heuristic {
         count
     }
 
-    fn find_pattern_start(
+    pub fn find_pattern_start(
         board: &Board,
         row: usize,
         col: usize,
@@ -292,7 +294,7 @@ impl Heuristic {
         (current_row as usize, current_col as usize)
     }
 
-    fn analyze_pattern_freedom(
+    pub fn analyze_pattern_freedom(
         board: &Board,
         start_row: usize,
         start_col: usize,
@@ -316,7 +318,7 @@ impl Heuristic {
     }
 
     #[inline(always)]
-    fn is_position_empty(board: &Board, row: isize, col: isize) -> bool {
+    pub fn is_position_empty(board: &Board, row: isize, col: isize) -> bool {
         if row < 0 || col < 0 || row >= board.size as isize || col >= board.size as isize {
             return false;
         }
@@ -324,7 +326,7 @@ impl Heuristic {
         !Board::is_bit_set(&board.occupied, idx)
     }
 
-    fn has_sufficient_space(
+    pub fn has_sufficient_space(
         board: &Board,
         start_row: usize,
         start_col: usize,
@@ -344,46 +346,55 @@ impl Heuristic {
         };
 
         // Count total available space in both directions from the pattern
-        let mut total_space = length; // Current pattern length
+        let mut total_space = length;
         
         // Count backwards from pattern start
-        let mut pos_row = start_row as isize - dx;
-        let mut pos_col = start_col as isize - dy;
-        let mut backward_space = 0;
-        
-        while pos_row >= 0 
-            && pos_row < board.size as isize 
-            && pos_col >= 0 
-            && pos_col < board.size as isize 
-            && backward_space < win_condition
-        {
-            let idx = board.index(pos_row as usize, pos_col as usize);
-            
-            // Stop if we hit an opponent stone
-            if Board::is_bit_set(opponent_bits, idx) {
-                break;
-            }
-            
-            // Count empty spaces and our own stones
-            if !Board::is_bit_set(&board.occupied, idx) || Board::is_bit_set(player_bits, idx) {
-                backward_space += 1;
-                pos_row -= dx;
-                pos_col -= dy;
-            } else {
-                break;
-            }
-        }
+        total_space += Self::count_available_space(
+            board,
+            start_row as isize - dx,
+            start_col as isize - dy,
+            -dx,
+            -dy,
+            player_bits,
+            opponent_bits,
+            win_condition,
+        );
         
         // Count forwards from pattern end
-        let mut pos_row = start_row as isize + (length as isize * dx);
-        let mut pos_col = start_col as isize + (length as isize * dy);
-        let mut forward_space = 0;
+        total_space += Self::count_available_space(
+            board,
+            start_row as isize + (length as isize * dx),
+            start_col as isize + (length as isize * dy),
+            dx,
+            dy,
+            player_bits,
+            opponent_bits,
+            win_condition,
+        );
+        
+        total_space >= win_condition
+    }
+
+    /// Helper to count available space in a direction until hitting opponent or board edge
+    fn count_available_space(
+        board: &Board,
+        start_row: isize,
+        start_col: isize,
+        dx: isize,
+        dy: isize,
+        player_bits: &[u64],
+        opponent_bits: &[u64],
+        max_count: usize,
+    ) -> usize {
+        let mut count = 0;
+        let mut pos_row = start_row;
+        let mut pos_col = start_col;
         
         while pos_row >= 0 
             && pos_row < board.size as isize 
             && pos_col >= 0 
             && pos_col < board.size as isize 
-            && forward_space < win_condition
+            && count < max_count
         {
             let idx = board.index(pos_row as usize, pos_col as usize);
             
@@ -394,7 +405,7 @@ impl Heuristic {
             
             // Count empty spaces and our own stones
             if !Board::is_bit_set(&board.occupied, idx) || Board::is_bit_set(player_bits, idx) {
-                forward_space += 1;
+                count += 1;
                 pos_row += dx;
                 pos_col += dy;
             } else {
@@ -402,8 +413,7 @@ impl Heuristic {
             }
         }
         
-        total_space += backward_space + forward_space;
-        total_space >= win_condition
+        count
     }
 
     fn mark_pattern_analyzed(
@@ -453,18 +463,22 @@ impl Heuristic {
             score += FIVE_IN_ROW_SCORE;
         }
 
-        score += match counts.live_four {
+        // Cap live_four at 2 since having more than 2 doesn't add strategic value
+        // (2 live fours is already a guaranteed win)
+        score += match counts.live_four.min(2) {
             1 => LIVE_FOUR_SINGLE_SCORE,
-            n if n > 1 => LIVE_FOUR_MULTIPLE_SCORE,
+            2 => LIVE_FOUR_MULTIPLE_SCORE,
             _ => 0,
         };
 
-        if counts.live_three >= 2
-            || counts.dead_four >= 2
-            || (counts.dead_four >= 1 && counts.live_three >= 1)
-            || (counts.half_free_four >= 1 && counts.live_three >= 1)
-            || (counts.half_free_four >= 2)
-        {
+        // Check for winning threats (multiple ways to create an unstoppable four)
+        let has_winning_threat = counts.live_three >= 2              // Two live threes
+            || counts.dead_four >= 2                                  // Two dead fours
+            || (counts.dead_four >= 1 && counts.live_three >= 1)      // Dead four + live three
+            || (counts.half_free_four >= 1 && counts.live_three >= 1) // Half-free four + live three
+            || counts.half_free_four >= 2;                            // Two half-free fours
+        
+        if has_winning_threat {
             score += WINNING_THREAT_SCORE;
         }
 

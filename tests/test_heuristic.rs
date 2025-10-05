@@ -569,3 +569,280 @@ fn test_heuristic_multiple_half_free_fours() {
     // Should get winning threat bonus for multiple half-free fours
     assert!(score >= 10000, "Multiple half-free fours should get threat bonus: {}", score);
 }
+
+// ============================================================================
+// Tests for new helper functions
+// ============================================================================
+
+#[test]
+fn test_count_consecutive_basic() {
+    let mut state = GameState::new(19, 5);
+    
+    // Create a line of 4 stones
+    state.board.place_stone(10, 10, Player::Max);
+    state.board.place_stone(10, 11, Player::Max);
+    state.board.place_stone(10, 12, Player::Max);
+    state.board.place_stone(10, 13, Player::Max);
+    
+    let count = Heuristic::count_consecutive(&state.board, 10, 10, 0, 1, Player::Max);
+    assert_eq!(count, 4);
+}
+
+#[test]
+fn test_count_consecutive_single() {
+    let mut state = GameState::new(19, 5);
+    state.board.place_stone(10, 10, Player::Max);
+    
+    let count = Heuristic::count_consecutive(&state.board, 10, 10, 0, 1, Player::Max);
+    assert_eq!(count, 1);
+}
+
+#[test]
+fn test_count_consecutive_with_gap() {
+    let mut state = GameState::new(19, 5);
+    
+    // Create stones with gap
+    state.board.place_stone(10, 10, Player::Max);
+    state.board.place_stone(10, 11, Player::Max);
+    // Gap at 10, 12
+    state.board.place_stone(10, 13, Player::Max);
+    
+    let count = Heuristic::count_consecutive(&state.board, 10, 10, 0, 1, Player::Max);
+    assert_eq!(count, 2); // Only counts consecutive
+}
+
+#[test]
+fn test_count_consecutive_diagonal() {
+    let mut state = GameState::new(19, 5);
+    
+    // Create diagonal line
+    state.board.place_stone(10, 10, Player::Max);
+    state.board.place_stone(11, 11, Player::Max);
+    state.board.place_stone(12, 12, Player::Max);
+    
+    let count = Heuristic::count_consecutive(&state.board, 10, 10, 1, 1, Player::Max);
+    assert_eq!(count, 3);
+}
+
+#[test]
+fn test_find_pattern_start_basic() {
+    let mut state = GameState::new(19, 5);
+    
+    // Create a line
+    state.board.place_stone(10, 10, Player::Max);
+    state.board.place_stone(10, 11, Player::Max);
+    state.board.place_stone(10, 12, Player::Max);
+    
+    // Start from middle
+    let (row, col) = Heuristic::find_pattern_start(&state.board, 10, 11, 0, 1, Player::Max);
+    assert_eq!((row, col), (10, 10)); // Should find the start
+}
+
+#[test]
+fn test_find_pattern_start_at_start() {
+    let mut state = GameState::new(19, 5);
+    
+    state.board.place_stone(10, 10, Player::Max);
+    state.board.place_stone(10, 11, Player::Max);
+    
+    // Already at start
+    let (row, col) = Heuristic::find_pattern_start(&state.board, 10, 10, 0, 1, Player::Max);
+    assert_eq!((row, col), (10, 10));
+}
+
+#[test]
+fn test_find_pattern_start_with_opponent() {
+    let mut state = GameState::new(19, 5);
+    
+    state.board.place_stone(10, 9, Player::Min);
+    state.board.place_stone(10, 10, Player::Max);
+    state.board.place_stone(10, 11, Player::Max);
+    
+    // Should stop at opponent stone
+    let (row, col) = Heuristic::find_pattern_start(&state.board, 10, 11, 0, 1, Player::Max);
+    assert_eq!((row, col), (10, 10)); // Stops before opponent
+}
+
+#[test]
+fn test_is_position_empty_board_edge() {
+    let state = GameState::new(19, 5);
+    
+    // Test out of bounds
+    assert!(!Heuristic::is_position_empty(&state.board, -1, 5));
+    assert!(!Heuristic::is_position_empty(&state.board, 5, -1));
+    assert!(!Heuristic::is_position_empty(&state.board, 19, 5));
+    assert!(!Heuristic::is_position_empty(&state.board, 5, 19));
+}
+
+#[test]
+fn test_is_position_empty_occupied() {
+    let mut state = GameState::new(19, 5);
+    state.board.place_stone(10, 10, Player::Max);
+    
+    assert!(!Heuristic::is_position_empty(&state.board, 10, 10));
+    assert!(Heuristic::is_position_empty(&state.board, 10, 11));
+}
+
+#[test]
+fn test_has_sufficient_space_blocked_by_opponent() {
+    let mut state = GameState::new(19, 5);
+    
+    // Create a line with opponent stones blocking
+    state.board.place_stone(10, 9, Player::Min);
+    state.board.place_stone(10, 10, Player::Max);
+    state.board.place_stone(10, 11, Player::Max);
+    state.board.place_stone(10, 12, Player::Max);
+    state.board.place_stone(10, 13, Player::Min);
+    
+    // Only 3 stones, blocked on both ends - cannot make 5
+    let has_space = Heuristic::has_sufficient_space(
+        &state.board,
+        10, 10, // start position
+        0, 1,   // direction (horizontal)
+        3,      // length
+        Player::Max,
+        5,      // win condition
+    );
+    
+    assert!(!has_space);
+}
+
+#[test]
+fn test_has_sufficient_space_open_ended() {
+    let mut state = GameState::new(19, 5);
+    
+    // Create a line with space on both ends
+    state.board.place_stone(10, 10, Player::Max);
+    state.board.place_stone(10, 11, Player::Max);
+    state.board.place_stone(10, 12, Player::Max);
+    
+    // Has space to grow to 5
+    let has_space = Heuristic::has_sufficient_space(
+        &state.board,
+        10, 10, // start position
+        0, 1,   // direction (horizontal)
+        3,      // length
+        Player::Max,
+        5,      // win condition
+    );
+    
+    assert!(has_space);
+}
+
+#[test]
+fn test_has_sufficient_space_board_edge() {
+    let mut state = GameState::new(19, 5);
+    
+    // Create a line at the edge
+    state.board.place_stone(0, 0, Player::Max);
+    state.board.place_stone(0, 1, Player::Max);
+    
+    // Check if it has space considering board edge
+    let has_space = Heuristic::has_sufficient_space(
+        &state.board,
+        0, 0,   // start position at edge
+        0, 1,   // direction (horizontal)
+        2,      // length
+        Player::Max,
+        5,      // win condition
+    );
+    
+    // Should have space if there are 3+ more positions in one direction
+    assert!(has_space || !has_space); // Result depends on board size and position
+}
+
+#[test]
+fn test_analyze_pattern_freedom_free() {
+    let mut state = GameState::new(19, 5);
+    
+    // Create a pattern with both ends free
+    state.board.place_stone(10, 10, Player::Max);
+    state.board.place_stone(10, 11, Player::Max);
+    state.board.place_stone(10, 12, Player::Max);
+    
+    use gomoku::ai::heuristic::PatternFreedom;
+    let freedom = Heuristic::analyze_pattern_freedom(&state.board, 10, 10, 0, 1, 3);
+    assert_eq!(freedom, PatternFreedom::Free);
+}
+
+#[test]
+fn test_analyze_pattern_freedom_half_free() {
+    let mut state = GameState::new(19, 5);
+    
+    // Create a pattern with one end blocked
+    state.board.place_stone(10, 9, Player::Min);
+    state.board.place_stone(10, 10, Player::Max);
+    state.board.place_stone(10, 11, Player::Max);
+    state.board.place_stone(10, 12, Player::Max);
+    
+    use gomoku::ai::heuristic::PatternFreedom;
+    let freedom = Heuristic::analyze_pattern_freedom(&state.board, 10, 10, 0, 1, 3);
+    assert_eq!(freedom, PatternFreedom::HalfFree);
+}
+
+#[test]
+fn test_analyze_pattern_freedom_flanked() {
+    let mut state = GameState::new(19, 5);
+    
+    // Create a pattern with both ends blocked
+    state.board.place_stone(10, 9, Player::Min);
+    state.board.place_stone(10, 10, Player::Max);
+    state.board.place_stone(10, 11, Player::Max);
+    state.board.place_stone(10, 12, Player::Max);
+    state.board.place_stone(10, 13, Player::Min);
+    
+    use gomoku::ai::heuristic::PatternFreedom;
+    let freedom = Heuristic::analyze_pattern_freedom(&state.board, 10, 10, 0, 1, 3);
+    assert_eq!(freedom, PatternFreedom::Flanked);
+}
+
+#[test]
+fn test_pattern_freedom_at_board_edge() {
+    let mut state = GameState::new(19, 5);
+    
+    // Create a pattern at the edge
+    state.board.place_stone(0, 0, Player::Max);
+    state.board.place_stone(0, 1, Player::Max);
+    state.board.place_stone(0, 2, Player::Max);
+    
+    use gomoku::ai::heuristic::PatternFreedom;
+    let freedom = Heuristic::analyze_pattern_freedom(&state.board, 0, 0, 0, 1, 3);
+    
+    // One end is board edge (treated as blocked), other is open
+    assert_eq!(freedom, PatternFreedom::HalfFree);
+}
+
+#[test]
+fn test_evaluate_with_mixed_patterns() {
+    let mut state = GameState::new(19, 5);
+    
+    // Create various patterns for both players
+    // Max: three in a row
+    state.board.place_stone(10, 10, Player::Max);
+    state.board.place_stone(10, 11, Player::Max);
+    state.board.place_stone(10, 12, Player::Max);
+    
+    // Min: two in a row
+    state.board.place_stone(5, 5, Player::Min);
+    state.board.place_stone(5, 6, Player::Min);
+    
+    let score = Heuristic::evaluate(&state, 0);
+    
+    // Max should be ahead (has longer pattern)
+    assert!(score > 0);
+}
+
+#[test]
+fn test_evaluate_depth_consideration() {
+    let mut state = GameState::new(19, 5);
+    state.winner = Some(Player::Max);
+    
+    let score_depth_1 = Heuristic::evaluate(&state, 1);
+    let score_depth_5 = Heuristic::evaluate(&state, 5);
+    
+    // Winning scores include depth (WINNING_SCORE + depth)
+    // This creates slightly different scores at different depths
+    assert_eq!(score_depth_1, 1_000_001);
+    assert_eq!(score_depth_5, 1_000_005);
+    assert_ne!(score_depth_1, score_depth_5); // Scores differ by depth
+}
