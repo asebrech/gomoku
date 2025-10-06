@@ -30,7 +30,7 @@ pub struct GameSettings {
 	pub ai_depth: i32, //default to 2
 	pub alpha_beta_enabled: bool, //wether deep checking is enabled or not
 	pub versus_ai: bool, //if the user is against an AI or multiplayer
-	pub time_limit: Option<usize> // time limit in milliseconds, optional
+	pub time_limit: Option<usize>, // time limit in milliseconds, optional
 }
 
 impl GameSettings {
@@ -42,7 +42,7 @@ impl GameSettings {
 			ai_depth: 10, // Increased since iterative deepening can handle higher depths
 			alpha_beta_enabled: true,
 			versus_ai: true,
-			time_limit: Some(500) // 1000ms (1 second) time limit for AI by default
+			time_limit: Some(500), // 500ms time limit for AI by default
 		}
 	}
 }

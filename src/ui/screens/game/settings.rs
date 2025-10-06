@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::ui::{app::GameSettings, config::GameConfig, screens::{game::game::AITimeText}};
+use crate::ui::{app::GameSettings, config::GameConfig, screens::game::game::{AITimeText, AIDepthText}};
 
 #[derive(Component)]
 pub struct GameSettingsPanel;
@@ -61,6 +61,7 @@ pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &
                 spawn_setting_row(builder, "Alpha-Beta", alpha_beta);
 
 				spawn_timer_row(builder, "AI Time", "");
+				spawn_depth_row(builder, "Max Depth", "");
             }
 
             // Time Limit
@@ -111,7 +112,7 @@ fn spawn_setting_row(builder: &mut ChildSpawnerCommands, label: &str, value: &st
         });
 }
 
-fn spawn_timer_row(builder: &mut ChildSpawnerCommands, label: &str, value: &str) {
+fn spawn_timer_row(builder: &mut ChildSpawnerCommands, label: &str, _value: &str) {
     builder
         .spawn((
             Node {
@@ -149,6 +150,47 @@ fn spawn_timer_row(builder: &mut ChildSpawnerCommands, label: &str, value: &str)
                         ..default()
                     },
                 ));
+        });
+}
+
+fn spawn_depth_row(builder: &mut ChildSpawnerCommands, label: &str, _value: &str) {
+    builder
+        .spawn((
+            Node {
+                display: Display::Flex,
+                flex_direction: FlexDirection::Row,
+                justify_content: JustifyContent::SpaceBetween,
+                align_items: AlignItems::Center,
+                width: Val::Percent(100.0),
+                padding: UiRect::all(Val::Px(8.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.08, 0.08, 0.08)),
+            BorderRadius::all(Val::Px(4.0)),
+        ))
+        .with_children(|builder| {
+            builder.spawn((
+                Text::new(label),
+                TextFont {
+                    font_size: 16.0,
+                    ..default()
+                },
+                TextColor(Color::srgb(0.8, 0.8, 0.8)),
+            ));
+
+            builder.spawn((
+                Text::new("depth 0"),
+                TextFont {
+                    font_size: 16.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+                AIDepthText,
+                Node {
+                    margin: UiRect::top(Val::Px(8.0)),
+                    ..default()
+                },
+            ));
         });
 }
 

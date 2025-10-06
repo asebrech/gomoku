@@ -10,7 +10,6 @@ pub enum EntryType {
 
 #[derive(Debug, Clone)]
 pub struct TranspositionEntry {
-    pub key: u64,
     pub value: i32,
     pub depth: i32,
     pub entry_type: EntryType,
@@ -25,7 +24,6 @@ pub struct TranspositionTable {
     max_size: usize,
     hits: u64,
     misses: u64,
-    collisions: u64,
 }
 
 impl TranspositionTable {
@@ -36,12 +34,7 @@ impl TranspositionTable {
             max_size,
             hits: 0,
             misses: 0,
-            collisions: 0,
         }
-    }
-    
-    pub fn new_default() -> Self {
-        Self::new(1_000_000)
     }
     
     pub fn store(&mut self, key: u64, value: i32, depth: i32, entry_type: EntryType, best_move: Option<(usize, usize)>) {
@@ -51,7 +44,6 @@ impl TranspositionTable {
         
         let current_age = self.current_age;
         let new_entry = TranspositionEntry {
-            key,
             value,
             depth,
             entry_type,
@@ -61,10 +53,6 @@ impl TranspositionTable {
         
         match self.table.get(&key) {
             Some(existing) => {
-                if existing.key != key {
-                    self.collisions += 1;
-                }
-                
                 if depth > existing.depth || (depth == existing.depth && current_age >= existing.age) {
                     self.table.insert(key, new_entry);
                 }
@@ -77,12 +65,6 @@ impl TranspositionTable {
     
     pub fn probe(&mut self, key: u64, depth: i32, alpha: i32, beta: i32) -> TTResult {
         if let Some(entry) = self.table.get(&key) {
-            if entry.key != key {
-                self.collisions += 1;
-                self.misses += 1;
-                return TTResult::miss();
-            }
-            
             self.hits += 1;
             
             if entry.depth >= depth {
@@ -111,13 +93,7 @@ impl TranspositionTable {
     }
     
     pub fn get_best_move(&self, key: u64) -> Option<(usize, usize)> {
-        self.table.get(&key).and_then(|entry| {
-            if entry.key == key {
-                entry.best_move
-            } else {
-                None
-            }
-        })
+        self.table.get(&key).and_then(|entry| entry.best_move)
     }
     
     pub fn clear(&mut self) {
@@ -125,7 +101,6 @@ impl TranspositionTable {
         self.current_age = 0;
         self.hits = 0;
         self.misses = 0;
-        self.collisions = 0;
     }
     
     pub fn advance_age(&mut self) {
@@ -147,11 +122,10 @@ impl TranspositionTable {
         self.table.len()
     }
     
-    pub fn get_stats(&self) -> (u64, u64, u64) {
+    pub fn get_stats(&self) -> (u64, u64) {
         (
             self.hits,
             self.misses,
-            self.collisions,
         )
     }
     
@@ -162,7 +136,6 @@ impl TranspositionTable {
         }
         
         let cutoff_age = current_age - 5;
-        let original_size = self.table.len();
         
         self.table.retain(|_, entry| {
             entry.age >= cutoff_age || entry.depth > 10
@@ -174,17 +147,12 @@ impl TranspositionTable {
                 entry.age >= cutoff_age && entry.depth > 5
             });
         }
-        
-        let cleaned = original_size - self.table.len();
-        if cleaned > 0 {
-            println!("Cleaned {} old entries from transposition table", cleaned);
-        }
     }
 }
 
 impl Default for TranspositionTable {
     fn default() -> Self {
-        Self::new_default()
+        Self::new(1_000_000)
     }
 }
 
@@ -196,10 +164,6 @@ pub struct TTResult {
 }
 
 impl TTResult {
-    pub fn new(value: Option<i32>, best_move: Option<(usize, usize)>, cutoff: bool) -> Self {
-        Self { value, best_move, cutoff }
-    }
-    
     pub fn miss() -> Self {
         Self { value: None, best_move: None, cutoff: false }
     }

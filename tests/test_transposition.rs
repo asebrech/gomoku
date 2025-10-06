@@ -2,7 +2,7 @@ use gomoku::ai::transposition::{TranspositionTable, EntryType};
 
 #[test]
 fn test_transposition_table_creation() {
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Should create empty table
     let result1 = tt.probe(0, 1, i32::MIN, i32::MAX);
@@ -13,7 +13,7 @@ fn test_transposition_table_creation() {
 
 #[test]
 fn test_store_and_lookup() {
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Store a value
     tt.store(12345, 100, 1, EntryType::Exact, None);
@@ -26,7 +26,7 @@ fn test_store_and_lookup() {
 
 #[test]
 fn test_multiple_entries() {
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Store multiple values
     tt.store(111, 10, 1, EntryType::Exact, None);
@@ -44,7 +44,7 @@ fn test_multiple_entries() {
 
 #[test]
 fn test_overwrite_entry() {
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Store initial value
     tt.store(123, 100, 1, EntryType::Exact, None);
@@ -59,7 +59,7 @@ fn test_overwrite_entry() {
 
 #[test]
 fn test_lookup_nonexistent() {
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Should return None for non-existent keys
     let result1 = tt.probe(999, 1, i32::MIN, i32::MAX);
@@ -72,7 +72,7 @@ fn test_lookup_nonexistent() {
 
 #[test]
 fn test_negative_values() {
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Store negative values
     tt.store(111, -100, 1, EntryType::Exact, None);
@@ -90,7 +90,7 @@ fn test_negative_values() {
 
 #[test]
 fn test_extreme_values() {
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Store extreme values
     tt.store(111, i32::MAX, 1, EntryType::Exact, None);
@@ -108,7 +108,7 @@ fn test_extreme_values() {
 
 #[test]
 fn test_large_keys() {
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Store values with large keys
     tt.store(u64::MAX, 100, 1, EntryType::Exact, None);
@@ -126,7 +126,7 @@ fn test_large_keys() {
 
 #[test]
 fn test_zero_key() {
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Store value with zero key
     tt.store(0, 42, 1, EntryType::Exact, None);
@@ -138,7 +138,7 @@ fn test_zero_key() {
 
 #[test]
 fn test_collision_behavior() {
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Store two different values with same key (simulating collision)
     tt.store(123, 100, 1, EntryType::Exact, None);
@@ -151,7 +151,7 @@ fn test_collision_behavior() {
 
 #[test]
 fn test_many_entries() {
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Store many entries
     for i in 0..1000 {
@@ -167,14 +167,14 @@ fn test_many_entries() {
 
 #[test]
 fn test_clear_and_reuse() {
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Store some values
     tt.store(111, 100, 1, EntryType::Exact, None);
     tt.store(222, 200, 1, EntryType::Exact, None);
     
     // Create new table (effectively clearing)
-    tt = TranspositionTable::new_default();
+    tt = TranspositionTable::default();
     
     // Should be empty again
     let result1 = tt.probe(111, 1, i32::MIN, i32::MAX);
@@ -190,7 +190,7 @@ fn test_clear_and_reuse() {
 
 #[test]
 fn test_realistic_game_hashes() {
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Simulate realistic game state hashes
     let game_hashes = vec![
@@ -217,7 +217,7 @@ fn test_realistic_game_hashes() {
 
 #[test]
 fn test_performance_many_lookups() {
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Store initial values
     for i in 0..100 {
@@ -235,7 +235,7 @@ fn test_performance_many_lookups() {
 
 #[test]
 fn test_mixed_operations() {
-    let mut tt = TranspositionTable::new_default();
+    let mut tt = TranspositionTable::default();
     
     // Mix store and lookup operations
     tt.store(1, 10, 1, EntryType::Exact, None);
@@ -260,5 +260,78 @@ fn test_mixed_operations() {
     tt.store(3, 30, 1, EntryType::Exact, None);
     let result3b = tt.probe(3, 1, i32::MIN, i32::MAX);
     assert!(result3b.cutoff && result3b.value == Some(30));
+}
+
+#[test]
+fn test_hash_collision_resistance() {
+    let mut tt = TranspositionTable::default();
+    let mut successful_stores = 0;
+    let total_attempts = 500;
+    
+    // Try to force collisions by using keys that might collide
+    for i in 0..total_attempts {
+        let base_key = i as u64;
+        let collision_key = base_key ^ 0x8000000000000000_u64; // Flip top bit
+        
+        tt.store(base_key, i as i32, 1, EntryType::Exact, None);
+        tt.store(collision_key, (i + 1000) as i32, 1, EntryType::Exact, None);
+        
+        // Check if we can retrieve the correct values
+        let result1 = tt.probe(base_key, 1, i32::MIN, i32::MAX);
+        let result2 = tt.probe(collision_key, 1, i32::MIN, i32::MAX);
+        
+        if result1.cutoff && result2.cutoff {
+            if result1.value == Some(i as i32) && result2.value == Some((i + 1000) as i32) {
+                successful_stores += 1;
+            }
+        }
+    }
+    
+    let success_rate = successful_stores as f64 / total_attempts as f64;
+    
+    // Should handle most entries correctly even with potential collisions
+    assert!(success_rate > 0.90, "Success rate too low: {:.2}%", success_rate * 100.0);
+}
+
+#[test]
+fn test_aging_mechanism() {
+    let mut tt = TranspositionTable::default();
+    
+    // Store entry with current age
+    tt.store(12345, 500, 10, EntryType::Exact, None);
+    let initial_probe = tt.probe(12345, 10, i32::MIN, i32::MAX);
+    assert!(initial_probe.cutoff && initial_probe.value == Some(500));
+    
+    // Advance age and add more entries
+    tt.advance_age();
+    tt.store(67890, 300, 8, EntryType::Exact, None);
+    
+    // Old entry should still be there initially
+    assert!(tt.probe(12345, 10, i32::MIN, i32::MAX).cutoff);
+    
+    // Advance age multiple times
+    for _ in 0..10 {
+        tt.advance_age();
+    }
+    
+    // Table should still function after aging
+    tt.store(11111, 700, 12, EntryType::Exact, None);
+    assert!(tt.probe(11111, 12, i32::MIN, i32::MAX).cutoff);
+}
+
+#[test] 
+fn test_table_capacity_management() {
+    let mut tt = TranspositionTable::new(50); // Smaller for testing
+    
+    // Fill beyond capacity with varied keys
+    for i in 0..200 {
+        let key = (i as u64).wrapping_mul(0x9e3779b97f4a7c15); // Better distribution
+        tt.store(key, i as i32 * 10, 8, EntryType::Exact, None);
+    }
+    
+    // Recent entries should still be accessible  
+    let last_key = (199_u64).wrapping_mul(0x9e3779b97f4a7c15);
+    let result = tt.probe(last_key, 8, i32::MIN, i32::MAX);
+    assert!(result.cutoff && result.value == Some(1990));
 }
 

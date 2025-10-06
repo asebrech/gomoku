@@ -1,10 +1,9 @@
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use bevy::prelude::*;
 use crate::{
-    ai::transposition::TranspositionTable, 
+    ai::lazy_smp::lazy_smp_search,
     core::{board::Player, state::GameState}, 
-    interface::utils::{find_best_move, find_best_move_timed}, 
     ui::{
         app::{AppState, GameSettings}, 
         config::GameConfig,
@@ -56,10 +55,12 @@ pub struct GridCell {
 pub fn game_plugin(app: &mut App) {
     app.init_resource::<GameStatus>()
         .init_resource::<AITimeTaken>()
+        .init_resource::<AIDepthReached>()
         .add_event::<GameEnded>()
         .add_event::<StonePlacement>()
         .add_event::<MovePlayed>()
         .add_event::<UpdateAITimeDisplay>()
+        .add_event::<UpdateAIDepthDisplay>()
         .add_systems(OnEnter(AppState::Game), (update_game_settings_from_config, setup_game_ui, update_available_placement).chain())
         .add_systems(
             Update,
@@ -70,6 +71,7 @@ pub fn game_plugin(app: &mut App) {
                 update_available_placement.run_if(on_event::<MovePlayed>),
                 toggle_pause,
                 update_ai_time_display.run_if(on_event::<UpdateAITimeDisplay>),
+                update_ai_depth_display.run_if(on_event::<UpdateAIDepthDisplay>),
                 handle_game_volume_control,
                 update_game_volume_display,
             ).run_if(in_state(AppState::Game)),
@@ -262,8 +264,9 @@ pub fn process_next_round(
     mut game_state: ResMut<GameState>,
     mut game_status: ResMut<GameStatus>,
     mut ai_time: ResMut<AITimeTaken>,
+    mut ai_depth: ResMut<AIDepthReached>,
     mut update_ai_time: EventWriter<UpdateAITimeDisplay>,
-    mut tt: ResMut<TranspositionTable>,
+    mut update_ai_depth: EventWriter<UpdateAIDepthDisplay>,
 ) {
     for _ in move_played.read() {
         // Check for game end first
@@ -285,25 +288,22 @@ pub fn process_next_round(
             *game_status = GameStatus::AwaitingUserInput;
         } else if settings.versus_ai {
             // AI's turn
-            let start_time = Instant::now();
             
-            // Only call find_best_move if game is not terminal
             if !game_state.is_terminal() {
                 let placement = if let Some(time_limit_ms) = settings.time_limit {
-                    // Use time-based iterative deepening
                     let time_limit = Duration::from_millis(time_limit_ms as u64);
-                    info!("AI using time-based search with {}ms limit", time_limit_ms);
-                    find_best_move_timed(&mut game_state, settings.ai_depth, time_limit, &mut tt)
+                    info!("AI using Lazy SMP search with {}ms limit", time_limit_ms);
+                    lazy_smp_search(&mut game_state, settings.ai_depth, Some(time_limit), None)
                 } else {
-                    // Use depth-based iterative deepening
-                    info!("AI using depth-based search to depth {}", settings.ai_depth);
-                    find_best_move(&mut game_state, settings.ai_depth, &mut tt)
+                    info!("AI using Lazy SMP search to depth {}", settings.ai_depth);
+                    lazy_smp_search(&mut game_state, settings.ai_depth, None, None)
                 };
-                let elapsed_time = start_time.elapsed().as_millis();
-                ai_time.millis = elapsed_time;
+                ai_time.micros = placement.time_elapsed.as_micros();
+                ai_depth.depth = placement.depth_reached;
                 update_ai_time.write(UpdateAITimeDisplay);
+                update_ai_depth.write(UpdateAIDepthDisplay);
 
-                if let Some((x, y)) = placement {
+                if let Some((x, y)) = placement.best_move {
                     stone_placement.write(StonePlacement { x, y });
                     *game_status = GameStatus::AwaitingUserInput;
                 } else {
@@ -324,9 +324,23 @@ pub fn update_ai_time_display(
     mut events: EventReader<UpdateAITimeDisplay>,
 ) {
     for _ in events.read() {
-        info!("Updating AI time display: {:.0}ms", ai_time.millis);
+        let time_ms = ai_time.micros as f64 / 1000.0;
+        info!("Updating AI time display: {:.1}ms", time_ms);
         for mut text in query.iter_mut() {
-			text.0 = format!("{:.0}ms", ai_time.millis);
+			text.0 = format!("{:.1}ms", time_ms);
+        }
+    }
+}
+
+pub fn update_ai_depth_display(
+    mut query: Query<&mut Text, With<AIDepthText>>,
+    ai_depth: Res<AIDepthReached>,
+    mut events: EventReader<UpdateAIDepthDisplay>,
+) {
+    for _ in events.read() {
+        info!("Updating AI depth display: depth {}", ai_depth.depth);
+        for mut text in query.iter_mut() {
+			text.0 = format!("depth {}", ai_depth.depth);
         }
     }
 }
@@ -334,15 +348,24 @@ pub fn update_ai_time_display(
 #[derive(Component)]
 pub struct AITimeText;
 
-// Resource to store AI computation time
 #[derive(Resource, Default)]
 pub struct AITimeTaken {
-    pub millis: u128,
+    pub micros: u128,
 }
 
-// Event to trigger AI time display update
 #[derive(Event)]
 pub struct UpdateAITimeDisplay;
+
+#[derive(Component)]
+pub struct AIDepthText;
+
+#[derive(Resource, Default)]
+pub struct AIDepthReached {
+    pub depth: i32,
+}
+
+#[derive(Event)]
+pub struct UpdateAIDepthDisplay;
 
 
 pub fn toggle_pause(

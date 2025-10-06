@@ -1,4 +1,4 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
+use std::hash::Hash;
 
 use bevy::prelude::*;
 
@@ -30,7 +30,7 @@ pub struct Board {
 impl Board {
     pub fn new(size: usize) -> Self {
         let total_cells = size * size;
-        let u64_count = ((total_cells + 63) / 64) as usize;
+        let u64_count = (total_cells + 63) / 64;
         Board {
             max_bits: vec![0u64; u64_count],
             min_bits: vec![0u64; u64_count],
@@ -45,26 +45,47 @@ impl Board {
         row * self.size + col
     }
 
-    pub fn set_bit(bits: &mut Vec<u64>, idx: usize) {
+    pub fn set_bit(bits: &mut [u64], idx: usize) {
         let array_idx = idx / 64;
+        if array_idx >= bits.len() {
+            return;
+        }
         let bit_idx = (idx % 64) as u32;
         bits[array_idx] |= 1u64 << bit_idx;
     }
 
-    pub fn clear_bit(bits: &mut Vec<u64>, idx: usize) {
+    pub fn clear_bit(bits: &mut [u64], idx: usize) {
         let array_idx = idx / 64;
+        if array_idx >= bits.len() {
+            return;
+        }
         let bit_idx = (idx % 64) as u32;
         bits[array_idx] &= !(1u64 << bit_idx);
     }
 
-    pub fn is_bit_set(bits: &Vec<u64>, idx: usize) -> bool {
+    pub fn is_bit_set(bits: &[u64], idx: usize) -> bool {
         let array_idx = idx / 64;
+        if array_idx >= bits.len() {
+            return false;
+        }
         let bit_idx = (idx % 64) as u32;
         (bits[array_idx] & (1u64 << bit_idx)) != 0
     }
 
     pub fn is_empty(&self) -> bool {
         self.occupied.iter().all(|&b| b == 0)
+    }
+
+    pub fn count_stones(&self) -> usize {
+        self.occupied.iter().map(|&bits| bits.count_ones() as usize).sum()
+    }
+
+    pub fn count_player_stones(&self, player: Player) -> usize {
+        let bits = match player {
+            Player::Max => &self.max_bits,
+            Player::Min => &self.min_bits,
+        };
+        bits.iter().map(|&b| b.count_ones() as usize).sum()
     }
 
     pub fn center(&self) -> (usize, usize) {
@@ -119,7 +140,7 @@ impl Board {
         if row >= self.size || col >= self.size {
             return false;
         }
-        let mut neighbor_mask = vec![0u64; self.u64_count];
+        
         let directions = [-1isize, 0, 1];
         for &dr in &directions {
             for &dc in &directions {
@@ -130,13 +151,10 @@ impl Board {
                 let nc = col as isize + dc;
                 if nr >= 0 && nc >= 0 && nr < self.size as isize && nc < self.size as isize {
                     let idx = self.index(nr as usize, nc as usize);
-                    Self::set_bit(&mut neighbor_mask, idx);
+                    if Self::is_bit_set(&self.occupied, idx) {
+                        return true;
+                    }
                 }
-            }
-        }
-        for (&o, &m) in self.occupied.iter().zip(&neighbor_mask) {
-            if (o & m) != 0 {
-                return true;
             }
         }
         false
@@ -160,17 +178,6 @@ impl Board {
         }
 
         total_set_bits == self.total_cells
-    }
-
-    pub fn hash(&self) -> u64 {
-        let mut hasher = DefaultHasher::new();
-        for &b in &self.max_bits {
-            b.hash(&mut hasher);
-        }
-        for &b in &self.min_bits {
-            b.hash(&mut hasher);
-        }
-        hasher.finish()
     }
 
     pub fn count_in_line(
@@ -233,5 +240,30 @@ impl Board {
             }
         }
         empties
+    }
+
+    pub fn get_occupied_positions(&self) -> Vec<((usize, usize), Player)> {
+        let mut positions = Vec::new();
+        for array_idx in 0..self.u64_count {
+            let mut occupied_bits = self.occupied[array_idx];
+            let max_bits = self.max_bits[array_idx];
+            
+            while occupied_bits != 0 {
+                let bit_pos = occupied_bits.trailing_zeros() as usize;
+                let global_idx = array_idx * 64 + bit_pos;
+                if global_idx < self.total_cells {
+                    let row = global_idx / self.size;
+                    let col = global_idx % self.size;
+                    let player = if (max_bits & (1u64 << bit_pos)) != 0 {
+                        Player::Max
+                    } else {
+                        Player::Min
+                    };
+                    positions.push(((row, col), player));
+                }
+                occupied_bits &= occupied_bits - 1;
+            }
+        }
+        positions
     }
 }

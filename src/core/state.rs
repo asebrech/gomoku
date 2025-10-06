@@ -1,4 +1,5 @@
 use crate::ai::zobrist::ZobristHash;
+use crate::ai::pattern_history::PatternHistoryAnalyzer;
 use crate::core::board::{Board, Player};
 use crate::core::captures::CaptureHandler;
 use crate::core::moves::MoveHandler;
@@ -16,6 +17,8 @@ pub struct GameState {
     pub max_captures: usize,
     pub min_captures: usize,
     pub capture_history: Vec<Vec<(usize, usize)>>,
+    pub move_history: Vec<(usize, usize)>,
+    pub pattern_analyzer: PatternHistoryAnalyzer,
     pub zobrist_hash: ZobristHash,
     pub current_hash: u64,
 }
@@ -34,10 +37,11 @@ impl GameState {
             max_captures: 0,
             min_captures: 0,
             capture_history: Vec::new(),
+            move_history: Vec::new(),
+            pattern_analyzer: PatternHistoryAnalyzer::new(),
             zobrist_hash: zobrist_hash.clone(),
             current_hash: 0,
         };
-        // Compute the initial hash
         state.current_hash = zobrist_hash.compute_hash(&state);
         state
     }
@@ -69,9 +73,25 @@ impl GameState {
         }
         
         self.execute_captures(captures);
-
+        self.move_history.push(mv);
         self.check_for_wins(mv);
         self.switch_player();
+        self.update_pattern_analysis(mv);
+    }
+
+    fn update_pattern_analysis(&mut self, last_move: (usize, usize)) {
+        let current_player = self.current_player;
+        let capture_history_len = self.capture_history.len();
+        let last_captures = if capture_history_len > 0 {
+            self.capture_history[capture_history_len - 1].clone()
+        } else {
+            Vec::new()
+        };
+        
+        let move_player = current_player.opponent();
+        let captures_made = last_captures.len() / 2;
+        
+        self.pattern_analyzer.analyze_move_simple(last_move, move_player, captures_made);
     }
 
     pub fn undo_move(&mut self, move_: (usize, usize)) {
@@ -98,6 +118,13 @@ impl GameState {
 
         self.current_player = move_player;
         self.winner = None;
+
+        if let Some(last_move) = self.move_history.last() {
+            if *last_move == move_ {
+                self.move_history.pop();
+                self.pattern_analyzer.undo_last_move();
+            }
+        }
 
         self.restore_captured_stones();
     }
