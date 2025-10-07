@@ -98,13 +98,13 @@
   "ui": {
     "loading_messages": {
       "100": "Complete!",
-      "11-25": "Loading songs...",
-      "41-60": "Using Minimax Algorithm...",
       "81-95": "Renaming variables...",
-      "0-10": "Initializing...",
-      "61-80": "Importing neo-cat...",
+      "26-40": "Cloning heuristic...",
       "96-99": "Changing headers names...",
-      "26-40": "Cloning heuristic..."
+      "41-60": "Using Minimax Algorithm...",
+      "61-80": "Importing neo-cat...",
+      "0-10": "Initializing...",
+      "11-25": "Loading songs..."
     },
     "font_sizes": {
       "title": 32.0,
@@ -116,7 +116,7 @@
   },
   "game": {
     "board_size": 19,
-    "win_condition": 5,
+    "win_condition": 4,
     "ai_max_depth": null,
     "ai_time_limit": 500,
     "pair_captures_to_win": 5
