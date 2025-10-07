@@ -96,16 +96,10 @@ impl GomokuApp {
 		// Load game settings from config
 		let config = GameConfig::load_from_file("config/config.json")
 			.unwrap_or_else(|_| GameConfig::default());
-		let (board_size, win_condition, ai_difficulty, pair_captures_to_win) = config.get_game_settings();
-		
-		// Map AI difficulty to actual values
-		let (ai_depth, time_limit) = match ai_difficulty.to_lowercase().as_str() {
-			"easy" => (2, Some(300)),     // Depth 2, 300ms
-			"medium" => (4, Some(800)),   // Depth 4, 800ms  
-			"hard" => (6, Some(1500)),    // Depth 6, 1500ms
-			_ => (4, Some(800)),          // Default to medium
-		};
-		
+		let (board_size, win_condition, ai_max_depth, ai_time_limit, pair_captures_to_win) = config.get_game_settings();
+		// Use the configured values directly
+		let ai_depth = ai_max_depth.unwrap_or(6) as i32; // Default to 6 if unlimited
+		let time_limit = ai_time_limit.map(|t| t as usize); // Convert u64 to usize
 		let settings = GameSettings {
 			board_size: board_size as usize,
 			total_capture_to_win: pair_captures_to_win as usize,

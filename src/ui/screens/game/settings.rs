@@ -14,6 +14,12 @@ pub struct VolumeDown;
 #[derive(Component)]
 pub struct VolumeDisplay;
 
+#[derive(Component)]
+pub struct ResetBoardButton;
+
+#[derive(Component)]
+pub struct BackToMenuButton;
+
 pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &GameSettings) {
     builder
         .spawn((
@@ -73,6 +79,9 @@ pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &
 
             // Volume Control Section
             spawn_volume_control(builder);
+
+            // Game Control Buttons
+            spawn_game_control_buttons(builder);
         });
 }
 
@@ -315,4 +324,73 @@ fn spawn_volume_control(builder: &mut ChildSpawnerCommands) {
                 });
             });
         });
+}
+
+fn spawn_game_control_buttons(builder: &mut ChildSpawnerCommands) {
+    // Game control section header
+    builder.spawn((
+        Text::new("Game Controls"),
+        TextFont {
+            font_size: 20.0,
+            ..default()
+        },
+        TextColor(Color::WHITE),
+        Node {
+            margin: UiRect::vertical(Val::Px(10.0)),
+            ..default()
+        },
+    ));
+
+    // Reset Board button
+    builder.spawn((
+        Button,
+        Node {
+            width: Val::Percent(100.0),
+            height: Val::Px(40.0),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            border: UiRect::all(Val::Px(2.0)),
+            margin: UiRect::bottom(Val::Px(8.0)),
+            ..default()
+        },
+        BackgroundColor(Color::srgb(0.3, 0.5, 0.3)),
+        BorderColor(Color::srgb(0.4, 0.6, 0.4)),
+        BorderRadius::all(Val::Px(4.0)),
+        ResetBoardButton,
+    )).with_children(|builder| {
+        builder.spawn((
+            Text::new("🔄 RESET BOARD"),
+            TextFont {
+                font_size: 16.0,
+                ..default()
+            },
+            TextColor(Color::WHITE),
+        ));
+    });
+
+    // Back to Menu button
+    builder.spawn((
+        Button,
+        Node {
+            width: Val::Percent(100.0),
+            height: Val::Px(40.0),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            border: UiRect::all(Val::Px(2.0)),
+            ..default()
+        },
+        BackgroundColor(Color::srgb(0.5, 0.3, 0.3)),
+        BorderColor(Color::srgb(0.6, 0.4, 0.4)),
+        BorderRadius::all(Val::Px(4.0)),
+        BackToMenuButton,
+    )).with_children(|builder| {
+        builder.spawn((
+            Text::new("⬅️ BACK TO MENU"),
+            TextFont {
+                font_size: 16.0,
+                ..default()
+            },
+            TextColor(Color::WHITE),
+        ));
+    });
 }

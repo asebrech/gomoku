@@ -108,7 +108,8 @@ pub struct FontSizes {
 pub struct GameSettings {
     pub board_size: u32,
     pub win_condition: u32,
-    pub ai_difficulty: String,
+    pub ai_max_depth: Option<u32>,  // None = unlimited depth
+    pub ai_time_limit: Option<u64>, // Time limit in milliseconds, None = no time limit
     pub pair_captures_to_win: u32,
 }
 
@@ -212,17 +213,21 @@ impl GameConfig {
     }
 
     // Save game settings
-    pub fn save_game_settings(&mut self, board_size: u32, win_condition: u32, ai_difficulty: String, pair_captures_to_win: u32) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn save_game_settings(&mut self, board_size: u32, win_condition: u32, ai_max_depth: Option<u32>, ai_time_limit: Option<u64>, pair_captures_to_win: u32) -> Result<(), Box<dyn std::error::Error>> {
         self.game.board_size = board_size;
         self.game.win_condition = win_condition;
-        self.game.ai_difficulty = ai_difficulty;
+        self.game.ai_max_depth = ai_max_depth;
+        self.game.ai_time_limit = ai_time_limit;
         self.game.pair_captures_to_win = pair_captures_to_win;
-        self.save_to_file("config/config.json")
+        
+        let result = self.save_to_file("config/config.json");
+
+        result
     }
 
     // Get game settings
-    pub fn get_game_settings(&self) -> (u32, u32, String, u32) {
-        (self.game.board_size, self.game.win_condition, self.game.ai_difficulty.clone(), self.game.pair_captures_to_win)
+    pub fn get_game_settings(&self) -> (u32, u32, Option<u32>, Option<u64>, u32) {
+        (self.game.board_size, self.game.win_condition, self.game.ai_max_depth, self.game.ai_time_limit, self.game.pair_captures_to_win)
     }
 
     pub fn default() -> Self {
@@ -297,7 +302,8 @@ impl GameConfig {
             game: GameSettings {
                 board_size: 15,
                 win_condition: 5,
-                ai_difficulty: "medium".to_string(),
+                ai_max_depth: Some(4),      // Default depth of 4
+                ai_time_limit: Some(1000),  // Default 1 second time limit
                 pair_captures_to_win: 10,
             },
             settings: UserSettings {

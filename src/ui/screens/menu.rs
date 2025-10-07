@@ -111,10 +111,14 @@
 
     #[derive(Component, Clone, Debug)]
     enum SettingControl {
-        BoardSize,
-        WinCondition,
-        AIDifficulty,
-        PairCaptures,
+        BoardSizeInc,
+        BoardSizeDec,
+        WinConditionInc,
+        WinConditionDec,
+        AIMaxDepth,
+        AITimeLimit,
+        PairCapturesInc,
+        PairCapturesDec,
         Fullscreen,
         Vsync,
         VolumeControl,
@@ -134,7 +138,8 @@
         FullscreenToggle,
         VsyncToggle,
         MutedToggle,
-        AIDifficultyButton(String), // Store the difficulty level this button represents
+        AIMaxDepthValue,
+        AITimeLimitValue,
     }
 
     pub fn menu_plugin(app: &mut App) {
@@ -292,23 +297,6 @@
                             SettingControl::AudioMute => {
                                 let (_, muted) = config.get_audio_settings();
                                 if muted { colors.button_pressed.clone() } else { colors.button_normal.clone() }
-                            },
-                            SettingControl::AIDifficulty => {
-                                // Check if this specific difficulty button should be highlighted
-                                if let Some(setting_display) = setting_display {
-                                    if let SettingDisplayType::AIDifficultyButton(difficulty_level) = &setting_display.setting_type {
-                                        let (_, _, ai_difficulty, _) = config.get_game_settings();
-                                        if ai_difficulty.to_lowercase() == difficulty_level.to_lowercase() {
-                                            colors.accent.clone()
-                                        } else {
-                                            colors.button_normal.clone()
-                                        }
-                                    } else {
-                                        colors.button_normal.clone()
-                                    }
-                                } else {
-                                    colors.button_normal.clone()
-                                }
                             },
                             _ => colors.button_normal.clone(),
                         };
@@ -528,7 +516,7 @@
         loading_progress.total_assets = total_count;
         commands.insert_resource(tracked_assets);
         
-        println!("🚀 Priority loading: Splash background loading first, {} total assets to follow", total_count);
+        println!("[LOADING] Priority loading: Splash background loading first, {} total assets to follow", total_count);
     }
 
     fn loading_progress_system(
@@ -647,7 +635,7 @@
                 
                 // When fade out completes, transition to main menu
                 if fade.timer.just_finished() {
-                    println!("✨ Perfectly smooth fade complete! Transitioning to main menu...");
+                    println!("[TRANSITION] Perfectly smooth fade complete! Transitioning to main menu...");
                     menu_state.set(MenuState::Main);
                     commands.entity(entity).despawn();
                 }
@@ -957,9 +945,8 @@ fn main_menu_setup(
                             },
                         ))
                         .with_children(|parent| {
-                            // New Game button (primary) with play icon
-                            let play_icon = asset_server.load(&config.assets.icons.synthwave.play);
-                            create_menu_button_with_icon(
+                            // New Game button (primary)
+                            create_menu_button(
                                 parent,
                                 "NEW GAME",
                                 MenuButtonAction::Play,
@@ -967,7 +954,6 @@ fn main_menu_setup(
                                 button_text_font.clone(),
                                 colors,
                                 true, // is_primary
-                                Some(play_icon),
                             );
 
                             // How to Play button
@@ -1018,7 +1004,7 @@ fn main_menu_setup(
                         ))
                         .with_children(|parent| {
                             parent.spawn((
-                                Text::new("Press ESC to quit • Made with ❤️ and Rust"),
+                                Text::new("Press ESC to quit - Made with Rust"),
                                 TextFont {
                                     font_size: 14.0,
                                     ..default()
@@ -1118,7 +1104,7 @@ fn settings_menu_setup(
                 .with_children(|parent| {
                     // Title
                     parent.spawn((
-                        Text::new("⚙️ SETTINGS"),
+                        Text::new("SETTINGS"),
                         TextFont {
                             font_size: config.ui.font_sizes.title,
                             ..default()
@@ -1147,7 +1133,7 @@ fn settings_menu_setup(
                             // Audio Settings Column
                             create_settings_column(
                                 parent,
-                                "🔊 AUDIO",
+                                "AUDIO",
                                 &[
                                     ("Volume", SettingType::VolumeSlider),
                                     ("Muted", SettingType::AudioMute),
@@ -1158,12 +1144,13 @@ fn settings_menu_setup(
                             // Game Settings Column
                             create_settings_column(
                                 parent,
-                                "🎮 GAME",
+                                "GAME",
                                 &[
                                     ("Board Size", SettingType::BoardSize),
                                     ("Win Condition", SettingType::WinCondition),
                                     ("Pair Captures", SettingType::PairCaptures),
-                                    ("AI Difficulty", SettingType::AIDifficulty),
+                                    ("AI Depth Limit", SettingType::AIMaxDepth),
+                                    ("AI Time Limit", SettingType::AITimeLimit),
                                 ],
                                 &config,
                             );
@@ -1171,7 +1158,7 @@ fn settings_menu_setup(
                             // Display Settings Column
                             create_settings_column(
                                 parent,
-                                "🖥️ DISPLAY",
+                                "DISPLAY",
                                 &[
                                     ("Fullscreen", SettingType::Fullscreen),
                                     ("VSync", SettingType::VSync),
@@ -1212,7 +1199,7 @@ fn settings_menu_setup(
                                 ))
                                 .with_children(|parent| {
                                     parent.spawn((
-                                        Text::new("← BACK TO MENU"),
+                                        Text::new("BACK TO MENU"),
                                         TextFont {
                                             font_size: config.ui.font_sizes.button,
                                             ..default()
@@ -1231,7 +1218,8 @@ enum SettingType {
     AudioMute,
     BoardSize,
     WinCondition,
-    AIDifficulty,
+    AIMaxDepth,
+    AITimeLimit,
     PairCaptures,
     Fullscreen,
     VSync,
@@ -1325,19 +1313,23 @@ fn create_setting_item(
                     create_toggle_control(parent, muted, "Muted", colors);
                 }
                 SettingType::BoardSize => {
-                    let (board_size, _, _, _) = config.get_game_settings();
+                    let (board_size, _, _, _, _) = config.get_game_settings();
                     create_number_selector(parent, board_size, 15, 19, "BoardSize", colors);
                 }
                 SettingType::WinCondition => {
-                    let (_, win_condition, _, _) = config.get_game_settings();
+                    let (_, win_condition, _, _, _) = config.get_game_settings();
                     create_number_selector(parent, win_condition, 4, 6, "WinCondition", colors);
                 }
-                SettingType::AIDifficulty => {
-                    let (_, _, ai_difficulty, _) = config.get_game_settings();
-                    create_difficulty_selector(parent, &ai_difficulty, colors);
+                SettingType::AIMaxDepth => {
+                    let (_, _, ai_max_depth, _, _) = config.get_game_settings();
+                    create_ai_depth_selector(parent, ai_max_depth, colors);
+                }
+                SettingType::AITimeLimit => {
+                    let (_, _, _, ai_time_limit, _) = config.get_game_settings();
+                    create_ai_time_limit_selector(parent, ai_time_limit, colors);
                 }
                 SettingType::PairCaptures => {
-                    let (_, _, _, pair_captures) = config.get_game_settings();
+                    let (_, _, _, _, pair_captures) = config.get_game_settings();
                     create_number_selector(parent, pair_captures, 5, 20, "PairCaptures", colors);
                 }
                 SettingType::Fullscreen => {
@@ -1684,8 +1676,6 @@ fn create_menu_button_with_icon(
 
     fn handle_settings_controls(
         settings_query: Query<(&Interaction, &SettingControl), (Changed<Interaction>, With<Button>)>,
-        ai_difficulty_query: Query<(&Interaction, &Children, &SettingControl), (Changed<Interaction>, With<Button>)>,
-        text_query: Query<&Text>,
         mut config: ResMut<GameConfig>,
         mut audio_sink_query: Query<&mut AudioSink>,
         game_audio: Option<Res<GameAudio>>,
@@ -1694,31 +1684,90 @@ fn create_menu_button_with_icon(
         for (interaction, setting_control) in settings_query.iter() {
             if *interaction == Interaction::Pressed {
                 match setting_control {
-                    SettingControl::BoardSize => {
-                        let (current_board_size, win_condition, ai_difficulty, pair_captures) = config.get_game_settings();
-                        let new_board_size = if current_board_size < 19 { current_board_size + 1 } else { 15 };
-                        if let Err(e) = config.save_game_settings(new_board_size, win_condition, ai_difficulty, pair_captures) {
+                    SettingControl::BoardSizeInc => {
+                        let (current_board_size, win_condition, ai_max_depth, ai_time_limit, pair_captures) = config.get_game_settings();
+                        let new_board_size = if current_board_size < 19 { current_board_size + 1 } else { 19 };
+                        if let Err(e) = config.save_game_settings(new_board_size, win_condition, ai_max_depth, ai_time_limit, pair_captures) {
                             println!("Failed to save board size: {}", e);
                         } else {
                             println!("Board size changed to: {}", new_board_size);
                         }
                     }
-                    SettingControl::WinCondition => {
-                        let (board_size, current_win_condition, ai_difficulty, pair_captures) = config.get_game_settings();
-                        let new_win_condition = if current_win_condition < 6 { current_win_condition + 1 } else { 4 };
-                        if let Err(e) = config.save_game_settings(board_size, new_win_condition, ai_difficulty, pair_captures) {
+                    SettingControl::BoardSizeDec => {
+                        let (current_board_size, win_condition, ai_max_depth, ai_time_limit, pair_captures) = config.get_game_settings();
+                        let new_board_size = if current_board_size > 15 { current_board_size - 1 } else { 15 };
+                        if let Err(e) = config.save_game_settings(new_board_size, win_condition, ai_max_depth, ai_time_limit, pair_captures) {
+                            println!("Failed to save board size: {}", e);
+                        } else {
+                            println!("Board size changed to: {}", new_board_size);
+                        }
+                    }
+                    SettingControl::WinConditionInc => {
+                        let (board_size, current_win_condition, ai_max_depth, ai_time_limit, pair_captures) = config.get_game_settings();
+                        let new_win_condition = if current_win_condition < 6 { current_win_condition + 1 } else { 6 };
+                        if let Err(e) = config.save_game_settings(board_size, new_win_condition, ai_max_depth, ai_time_limit, pair_captures) {
                             println!("Failed to save win condition: {}", e);
                         } else {
                             println!("Win condition changed to: {}", new_win_condition);
                         }
                     }
-                    SettingControl::PairCaptures => {
-                        let (board_size, win_condition, ai_difficulty, current_pair_captures) = config.get_game_settings();
-                        let new_pair_captures = if current_pair_captures < 20 { current_pair_captures + 1 } else { 5 };
-                        if let Err(e) = config.save_game_settings(board_size, win_condition, ai_difficulty, new_pair_captures) {
+                    SettingControl::WinConditionDec => {
+                        let (board_size, current_win_condition, ai_max_depth, ai_time_limit, pair_captures) = config.get_game_settings();
+                        let new_win_condition = if current_win_condition > 4 { current_win_condition - 1 } else { 4 };
+                        if let Err(e) = config.save_game_settings(board_size, new_win_condition, ai_max_depth, ai_time_limit, pair_captures) {
+                            println!("Failed to save win condition: {}", e);
+                        } else {
+                            println!("Win condition changed to: {}", new_win_condition);
+                        }
+                    }
+                    SettingControl::PairCapturesInc => {
+                        let (board_size, win_condition, ai_max_depth, ai_time_limit, current_pair_captures) = config.get_game_settings();
+                        let new_pair_captures = if current_pair_captures < 20 { current_pair_captures + 1 } else { 20 };
+                        if let Err(e) = config.save_game_settings(board_size, win_condition, ai_max_depth, ai_time_limit, new_pair_captures) {
                             println!("Failed to save pair captures: {}", e);
                         } else {
                             println!("Pair captures to win changed to: {}", new_pair_captures);
+                        }
+                    }
+                    SettingControl::PairCapturesDec => {
+                        let (board_size, win_condition, ai_max_depth, ai_time_limit, current_pair_captures) = config.get_game_settings();
+                        let new_pair_captures = if current_pair_captures > 5 { current_pair_captures - 1 } else { 5 };
+                        if let Err(e) = config.save_game_settings(board_size, win_condition, ai_max_depth, ai_time_limit, new_pair_captures) {
+                            println!("Failed to save pair captures: {}", e);
+                        } else {
+                            println!("Pair captures to win changed to: {}", new_pair_captures);
+                        }
+                    }
+                    SettingControl::AIMaxDepth => {
+                        let (board_size, win_condition, current_ai_max_depth, ai_time_limit, pair_captures) = config.get_game_settings();
+                        // Cycle: 1 -> 2 -> ... -> 10 -> None (Unlimited) -> 1
+                        let new_ai_max_depth = match current_ai_max_depth {
+                            Some(depth) if depth < 10 => Some(depth + 1),
+                            Some(_) => None, // 10 -> Unlimited
+                            None => Some(1), // Unlimited -> 1
+                        };
+                        if let Err(e) = config.save_game_settings(board_size, win_condition, new_ai_max_depth, ai_time_limit, pair_captures) {
+                            println!("Failed to save AI max depth: {}", e);
+                        } else {
+                            println!("AI max depth changed to: {:?}", new_ai_max_depth);
+                        }
+                    }
+                    SettingControl::AITimeLimit => {
+                        let (board_size, win_condition, ai_max_depth, current_ai_time_limit, pair_captures) = config.get_game_settings();
+                        // Cycle: 100ms -> 300ms -> 500ms -> 1s -> 2s -> 5s -> None (Unlimited) -> 100ms
+                        let new_ai_time_limit = match current_ai_time_limit {
+                            Some(100) => Some(300),
+                            Some(300) => Some(500),
+                            Some(500) => Some(1000),
+                            Some(1000) => Some(2000),
+                            Some(2000) => Some(5000),
+                            Some(_) => None, // 5s or other -> Unlimited
+                            None => Some(100), // Unlimited -> 100ms
+                        };
+                        if let Err(e) = config.save_game_settings(board_size, win_condition, ai_max_depth, new_ai_time_limit, pair_captures) {
+                            println!("Failed to save AI time limit: {}", e);
+                        } else {
+                            println!("AI time limit changed to: {:?}", new_ai_time_limit);
                         }
                     }
                     SettingControl::Fullscreen => {
@@ -1763,23 +1812,6 @@ fn create_menu_button_with_icon(
                 }
             }
         }
-
-        // Handle AI difficulty selection (special case with text content)
-        for (interaction, children, setting_control) in ai_difficulty_query.iter() {
-            if *interaction == Interaction::Pressed && matches!(setting_control, SettingControl::AIDifficulty) {
-                if let Some(child) = children.first() {
-                    if let Ok(text) = text_query.get(*child) {
-                        let (board_size, win_condition, _, pair_captures) = config.get_game_settings();
-                        let new_difficulty = text.0.to_lowercase();
-                        if let Err(e) = config.save_game_settings(board_size, win_condition, new_difficulty.clone(), pair_captures) {
-                            println!("Failed to save AI difficulty: {}", e);
-                        } else {
-                            println!("AI difficulty changed to: {}", new_difficulty);
-                        }
-                    }
-                }
-            }
-        }
     }
 
     fn update_settings_display(
@@ -1815,7 +1847,7 @@ fn create_menu_button_with_icon(
             Query<&mut Text>,
         )>,
     ) {
-            let (board_size, win_condition, ai_difficulty, pair_captures) = config.get_game_settings();
+            let (board_size, win_condition, ai_max_depth, ai_time_limit, pair_captures) = config.get_game_settings();
             let (fullscreen, vsync) = config.get_display_settings();
             let (_, muted) = config.get_audio_settings();
             let colors = &config.colors;
@@ -1831,6 +1863,24 @@ fn create_menu_button_with_icon(
                     }
                     SettingDisplayType::PairCapturesValue => {
                         text.0 = pair_captures.to_string();
+                    }
+                    SettingDisplayType::AIMaxDepthValue => {
+                        text.0 = match ai_max_depth {
+                            Some(depth) => depth.to_string(),
+                            None => "Unlimited".to_string(),
+                        };
+                    }
+                    SettingDisplayType::AITimeLimitValue => {
+                        text.0 = match ai_time_limit {
+                            Some(100) => "100ms".to_string(),
+                            Some(300) => "300ms".to_string(),
+                            Some(500) => "500ms".to_string(),
+                            Some(1000) => "1s".to_string(),
+                            Some(2000) => "2s".to_string(),
+                            Some(5000) => "5s".to_string(),
+                            Some(ms) => format!("{}ms", ms),
+                            None => "Unlimited".to_string(),
+                        };
                     }
                     _ => {}
                 }
@@ -1859,14 +1909,6 @@ fn create_menu_button_with_icon(
                     SettingDisplayType::MutedToggle => {
                         button_updates.push((children[0], if muted { "ON" } else { "OFF" }));
                         *bg_color = BackgroundColor(if muted { 
-                            colors.accent.clone() 
-                        } else { 
-                            colors.button_normal.clone() 
-                        }.into());
-                    }
-                    SettingDisplayType::AIDifficultyButton(difficulty_level) => {
-                        let is_selected = ai_difficulty.to_lowercase() == difficulty_level.to_lowercase();
-                        *bg_color = BackgroundColor(if is_selected { 
                             colors.accent.clone() 
                         } else { 
                             colors.button_normal.clone() 
@@ -2041,10 +2083,10 @@ fn create_menu_button_with_icon(
                     BackgroundColor(colors.button_normal.clone().into()),
                     BorderColor(colors.secondary.clone().into()),
                     match setting_name {
-                        "BoardSize" => SettingControl::BoardSize,
-                        "WinCondition" => SettingControl::WinCondition,
-                        "PairCaptures" => SettingControl::PairCaptures,
-                        _ => SettingControl::BoardSize,
+                        "BoardSize" => SettingControl::BoardSizeDec,
+                        "WinCondition" => SettingControl::WinConditionDec,
+                        "PairCaptures" => SettingControl::PairCapturesDec,
+                        _ => SettingControl::BoardSizeDec,
                     },
                 )).with_children(|parent| {
                     parent.spawn((
@@ -2089,10 +2131,10 @@ fn create_menu_button_with_icon(
                     BackgroundColor(colors.button_normal.clone().into()),
                     BorderColor(colors.secondary.clone().into()),
                     match setting_name {
-                        "BoardSize" => SettingControl::BoardSize,
-                        "WinCondition" => SettingControl::WinCondition,
-                        "PairCaptures" => SettingControl::PairCaptures,
-                        _ => SettingControl::BoardSize,
+                        "BoardSize" => SettingControl::BoardSizeInc,
+                        "WinCondition" => SettingControl::WinConditionInc,
+                        "PairCaptures" => SettingControl::PairCapturesInc,
+                        _ => SettingControl::BoardSizeInc,
                     },
                 )).with_children(|parent| {
                     parent.spawn((
@@ -2104,50 +2146,119 @@ fn create_menu_button_with_icon(
             });
     }
 
-    fn create_difficulty_selector(
+    fn create_ai_depth_selector(
         parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
-        current_difficulty: &str,
+        current_depth: Option<u32>,
         colors: &crate::ui::config::ColorConfig,
     ) {
-        let difficulties = ["Easy", "Medium", "Hard"];
-        
         parent
             .spawn((
                 Node {
                     width: Val::Percent(100.0),
-                    height: Val::Auto,
-                    flex_direction: FlexDirection::Column,
-                    row_gap: Val::Px(5.0),
+                    height: Val::Px(30.0),
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    justify_content: JustifyContent::SpaceBetween,
                     ..default()
                 },
             ))
             .with_children(|parent| {
-                for difficulty in difficulties {
-                    let is_selected = current_difficulty.to_lowercase() == difficulty.to_lowercase();
+                // Cycle button
+                parent.spawn((
+                    Button,
+                    Node {
+                        width: Val::Px(100.0),
+                        height: Val::Px(25.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        border: UiRect::all(Val::Px(1.0)),
+                        ..default()
+                    },
+                    BackgroundColor(colors.button_normal.clone().into()),
+                    BorderColor(colors.secondary.clone().into()),
+                    SettingControl::AIMaxDepth,
+                )).with_children(|parent| {
                     parent.spawn((
-                        Button,
-                        Node {
-                            width: Val::Percent(100.0),
-                            height: Val::Px(25.0),
-                            justify_content: JustifyContent::Center,
-                            align_items: AlignItems::Center,
-                            border: UiRect::all(Val::Px(1.0)),
-                            ..default()
-                        },
-                        BackgroundColor(if is_selected { colors.accent.clone() } else { colors.button_normal.clone() }.into()),
-                        BorderColor(colors.secondary.clone().into()),
-                        SettingControl::AIDifficulty,
-                        SettingDisplay {
-                            setting_type: SettingDisplayType::AIDifficultyButton(difficulty.to_string()),
-                        },
-                    )).with_children(|parent| {
-                        parent.spawn((
-                            Text::new(difficulty.to_string()),
-                            TextFont { font_size: 12.0, ..default() },
-                            TextColor(colors.text_primary.clone().into()),
-                        ));
-                    });
-                }
+                        Text::new("CYCLE"),
+                        TextFont { font_size: 12.0, ..default() },
+                        TextColor(colors.text_primary.clone().into()),
+                    ));
+                });
+
+                // Value display
+                let value_text = match current_depth {
+                    Some(depth) => depth.to_string(),
+                    None => "Unlimited".to_string(),
+                };
+                parent.spawn((
+                    Text::new(value_text),
+                    TextFont { font_size: 14.0, ..default() },
+                    TextColor(colors.text_primary.clone().into()),
+                    SettingDisplay {
+                        setting_type: SettingDisplayType::AIMaxDepthValue,
+                    },
+                ));
+            });
+    }
+
+    fn create_ai_time_limit_selector(
+        parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
+        current_time_limit: Option<u64>,
+        colors: &crate::ui::config::ColorConfig,
+    ) {
+        parent
+            .spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    height: Val::Px(30.0),
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    justify_content: JustifyContent::SpaceBetween,
+                    ..default()
+                },
+            ))
+            .with_children(|parent| {
+                // Cycle button
+                parent.spawn((
+                    Button,
+                    Node {
+                        width: Val::Px(100.0),
+                        height: Val::Px(25.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        border: UiRect::all(Val::Px(1.0)),
+                        ..default()
+                    },
+                    BackgroundColor(colors.button_normal.clone().into()),
+                    BorderColor(colors.secondary.clone().into()),
+                    SettingControl::AITimeLimit,
+                )).with_children(|parent| {
+                    parent.spawn((
+                        Text::new("CYCLE"),
+                        TextFont { font_size: 12.0, ..default() },
+                        TextColor(colors.text_primary.clone().into()),
+                    ));
+                });
+
+                // Value display
+                let value_text = match current_time_limit {
+                    Some(100) => "100ms".to_string(),
+                    Some(300) => "300ms".to_string(),
+                    Some(500) => "500ms".to_string(),
+                    Some(1000) => "1s".to_string(),
+                    Some(2000) => "2s".to_string(),
+                    Some(5000) => "5s".to_string(),
+                    Some(ms) => format!("{}ms", ms),
+                    None => "Unlimited".to_string(),
+                };
+                parent.spawn((
+                    Text::new(value_text),
+                    TextFont { font_size: 14.0, ..default() },
+                    TextColor(colors.text_primary.clone().into()),
+                    SettingDisplay {
+                        setting_type: SettingDisplayType::AITimeLimitValue,
+                    },
+                ));
             });
     }
 

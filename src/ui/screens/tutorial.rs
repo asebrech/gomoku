@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use crate::{
     ui::{
         app::AppState,
+        config::GameConfig,
         screens::{
             utils::despawn_screen,
             splash::PreloadedStones,
@@ -26,6 +27,7 @@ pub fn tutorial_plugin(app: &mut App) {
         .add_systems(
             Update,
             (
+                tutorial_button_system,
                 handle_tutorial_navigation,
                 update_tutorial_content,
             ).run_if(in_state(AppState::HowToPlay)),
@@ -38,7 +40,9 @@ fn reset_tutorial_state(mut tutorial_state: ResMut<NextState<TutorialState>>) {
     tutorial_state.set(TutorialState::WinExample);
 }
 
-fn setup_tutorial(mut commands: Commands) {
+fn setup_tutorial(mut commands: Commands, config: Res<GameConfig>, preloaded_stones: Res<PreloadedStones>) {
+    let colors = &config.colors;
+    
     commands
         .spawn((
             Node {
@@ -51,7 +55,7 @@ fn setup_tutorial(mut commands: Commands) {
                 row_gap: Val::Px(20.0),
                 ..default()
             },
-            BackgroundColor(Color::srgb(0.1, 0.1, 0.1)),
+            BackgroundColor(colors.background.clone().into()),
             OnTutorialScreen,
         ))
         .with_children(|builder| {
@@ -59,13 +63,13 @@ fn setup_tutorial(mut commands: Commands) {
             builder.spawn((
                 Text::new("How to Play Gomoku"),
                 TextFont {
-                    font_size: 48.0,
+                    font_size: config.ui.font_sizes.title,
                     ..default()
                 },
-                TextColor(Color::srgb(1.0, 1.0, 1.0)),
+                TextColor(colors.accent.clone().into()),
             ));
 
-            // Tutorial content container
+            // Tutorial content container - spawn with initial content
             builder.spawn((
                 Node {
                     display: Display::Flex,
@@ -77,7 +81,10 @@ fn setup_tutorial(mut commands: Commands) {
                     ..default()
                 },
                 TutorialContent,
-            ));
+            )).with_children(|builder| {
+                // Spawn initial content (Win Example)
+                spawn_win_example(builder, &preloaded_stones, colors);
+            });
 
             // Navigation buttons
             builder.spawn((
@@ -91,13 +98,13 @@ fn setup_tutorial(mut commands: Commands) {
                 },
             )).with_children(|builder| {
                 // Win Example Button
-                spawn_tutorial_button(builder, "Win Example", TutorialButton::WinExample);
+                spawn_tutorial_button(builder, "Win Example", TutorialButton::WinExample, colors);
                 
                 // Capture Example Button
-                spawn_tutorial_button(builder, "Capture Example", TutorialButton::CaptureExample);
+                spawn_tutorial_button(builder, "Capture Example", TutorialButton::CaptureExample, colors);
                 
                 // Back Button
-                spawn_tutorial_button(builder, "Back to Menu", TutorialButton::BackToMenu);
+                spawn_tutorial_button(builder, "Back to Menu", TutorialButton::BackToMenu, colors);
             });
         });
 }
@@ -112,29 +119,63 @@ enum TutorialButton {
     BackToMenu,
 }
 
-fn spawn_tutorial_button(builder: &mut ChildSpawnerCommands, text: &str, action: TutorialButton) {
+fn spawn_tutorial_button(
+    builder: &mut ChildSpawnerCommands, 
+    text: &str, 
+    action: TutorialButton,
+    colors: &crate::ui::config::ColorConfig,
+) {
     builder.spawn((
         Button,
         Node {
-            width: Val::Px(150.0),
-            height: Val::Px(50.0),
+            width: Val::Px(280.0),
+            height: Val::Px(60.0),
+            margin: UiRect::all(Val::Px(12.0)),
             justify_content: JustifyContent::Center,
             align_items: AlignItems::Center,
+            border: UiRect::all(Val::Px(2.0)),
             ..default()
         },
-        BackgroundColor(Color::srgb(0.2, 0.2, 0.8)),
-        BorderRadius::all(Val::Px(5.0)),
+        BackgroundColor(colors.button_normal.clone().into()),
+        BorderColor(colors.secondary.clone().into()),
         action,
     )).with_children(|builder| {
         builder.spawn((
             Text::new(text),
             TextFont {
-                font_size: 16.0,
+                font_size: 18.0,
                 ..default()
             },
-            TextColor(Color::WHITE),
+            TextColor(colors.text_primary.clone().into()),
         ));
     });
+}
+
+fn tutorial_button_system(
+    mut interaction_query: Query<
+        (&Interaction, &mut BackgroundColor, &mut BorderColor),
+        (Changed<Interaction>, With<Button>, With<TutorialButton>),
+    >,
+    config: Res<GameConfig>,
+) {
+    let colors = &config.colors;
+    
+    for (interaction, mut background_color, mut border_color) in &mut interaction_query {
+        match *interaction {
+            Interaction::Pressed => {
+                *background_color = BackgroundColor(colors.accent.clone().into());
+                *border_color = BorderColor(colors.accent.clone().into());
+            },
+            Interaction::Hovered => {
+                *background_color = BackgroundColor(colors.button_hovered.clone().into());
+                *border_color = BorderColor(colors.secondary.clone().into());
+            },
+            Interaction::None => {
+                *background_color = BackgroundColor(colors.button_normal.clone().into());
+                *border_color = BorderColor(colors.secondary.clone().into());
+            },
+        }
+    }
 }
 
 fn handle_tutorial_navigation(
@@ -159,8 +200,11 @@ fn update_tutorial_content(
     content_query: Query<Entity, With<TutorialContent>>,
     children_query: Query<&Children>,
     preloaded_stones: Res<PreloadedStones>,
+    config: Res<GameConfig>,
 ) {
     if tutorial_state.is_changed() {
+        let colors = &config.colors;
+        
         // Clear existing content
         if let Ok(content_entity) = content_query.single() {
             // Manually despawn all children
@@ -173,15 +217,19 @@ fn update_tutorial_content(
             // Add new content based on state
             commands.entity(content_entity).with_children(|builder| {
                 match tutorial_state.get() {
-                    TutorialState::WinExample => spawn_win_example(builder, &preloaded_stones),
-                    TutorialState::CaptureExample => spawn_capture_example(builder, &preloaded_stones),
+                    TutorialState::WinExample => spawn_win_example(builder, &preloaded_stones, colors),
+                    TutorialState::CaptureExample => spawn_capture_example(builder, &preloaded_stones, colors),
                 }
             });
         }
     }
 }
 
-fn spawn_win_example(builder: &mut ChildSpawnerCommands, preloaded_stones: &PreloadedStones) {
+fn spawn_win_example(
+    builder: &mut ChildSpawnerCommands, 
+    preloaded_stones: &PreloadedStones,
+    colors: &crate::ui::config::ColorConfig,
+) {
     // Left side: explanation
     builder.spawn((
         Node {
@@ -195,7 +243,8 @@ fn spawn_win_example(builder: &mut ChildSpawnerCommands, preloaded_stones: &Prel
             padding: UiRect::all(Val::Px(20.0)),
             ..default()
         },
-        BackgroundColor(Color::srgba(0.2, 0.2, 0.2, 0.8)),
+        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.7)),
+        BorderColor(colors.secondary.clone().into()),
         BorderRadius::all(Val::Px(10.0)),
     )).with_children(|builder| {
         builder.spawn((
@@ -204,7 +253,7 @@ fn spawn_win_example(builder: &mut ChildSpawnerCommands, preloaded_stones: &Prel
                 font_size: 32.0,
                 ..default()
             },
-            TextColor(Color::srgb(0.9, 0.9, 0.9)),
+            TextColor(colors.accent.clone().into()),
         ));
         
         builder.spawn((
@@ -213,7 +262,7 @@ fn spawn_win_example(builder: &mut ChildSpawnerCommands, preloaded_stones: &Prel
                 font_size: 18.0,
                 ..default()
             },
-            TextColor(Color::srgb(0.8, 0.8, 0.8)),
+            TextColor(colors.text_primary.clone().into()),
         ));
     });
 
@@ -233,7 +282,11 @@ fn spawn_win_example(builder: &mut ChildSpawnerCommands, preloaded_stones: &Prel
     });
 }
 
-fn spawn_capture_example(builder: &mut ChildSpawnerCommands, preloaded_stones: &PreloadedStones) {
+fn spawn_capture_example(
+    builder: &mut ChildSpawnerCommands, 
+    preloaded_stones: &PreloadedStones,
+    colors: &crate::ui::config::ColorConfig,
+) {
     // Left side: explanation
     builder.spawn((
         Node {
@@ -247,7 +300,8 @@ fn spawn_capture_example(builder: &mut ChildSpawnerCommands, preloaded_stones: &
             padding: UiRect::all(Val::Px(20.0)),
             ..default()
         },
-        BackgroundColor(Color::srgba(0.2, 0.2, 0.2, 0.8)),
+        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.7)),
+        BorderColor(colors.secondary.clone().into()),
         BorderRadius::all(Val::Px(10.0)),
     )).with_children(|builder| {
         builder.spawn((
@@ -256,7 +310,7 @@ fn spawn_capture_example(builder: &mut ChildSpawnerCommands, preloaded_stones: &
                 font_size: 32.0,
                 ..default()
             },
-            TextColor(Color::srgb(0.9, 0.9, 0.9)),
+            TextColor(colors.accent.clone().into()),
         ));
         
         builder.spawn((
@@ -265,7 +319,7 @@ fn spawn_capture_example(builder: &mut ChildSpawnerCommands, preloaded_stones: &
                 font_size: 18.0,
                 ..default()
             },
-            TextColor(Color::srgb(0.8, 0.8, 0.8)),
+            TextColor(colors.text_primary.clone().into()),
         ));
     });
 
@@ -289,6 +343,7 @@ fn spawn_demo_board(builder: &mut ChildSpawnerCommands, preloaded_stones: &Prelo
     let board_size = 9; // Smaller demo board
     let cell_size = 40.0;
     let total_size = (board_size as f32) * cell_size;
+    let line_thickness = 2.0;
 
     builder.spawn((
         Node {
@@ -301,67 +356,51 @@ fn spawn_demo_board(builder: &mut ChildSpawnerCommands, preloaded_stones: &Prelo
         BackgroundColor(Color::srgba(0.02, 0.0, 0.08, 0.9)),
         BorderRadius::all(Val::Px(8.0)),
     )).with_children(|builder| {
-        // Draw grid lines
+        // Draw vertical lines at cell centers (creating intersections)
         for i in 0..board_size {
-            for j in 0..board_size {
-                builder.spawn((
-                    Node {
-                        position_type: PositionType::Absolute,
-                        left: Val::Px(j as f32 * cell_size),
-                        top: Val::Px(i as f32 * cell_size),
-                        width: Val::Px(cell_size),
-                        height: Val::Px(cell_size),
-                        justify_content: JustifyContent::Center,
-                        align_items: AlignItems::Center,
-                        ..default()
-                    },
-                    BackgroundColor(Color::NONE),
-                )).with_children(|builder| {
-                    // Grid lines
-                    if i < board_size - 1 {
-                        builder.spawn((
-                            Node {
-                                position_type: PositionType::Absolute,
-                                bottom: Val::Px(0.0),
-                                left: Val::Px(0.0),
-                                width: Val::Percent(100.0),
-                                height: Val::Px(1.0),
-                                ..default()
-                            },
-                            BackgroundColor(Color::srgba(0.8, 0.4, 1.0, 0.3)),
-                        ));
-                    }
-                    if j < board_size - 1 {
-                        builder.spawn((
-                            Node {
-                                position_type: PositionType::Absolute,
-                                top: Val::Px(0.0),
-                                right: Val::Px(0.0),
-                                width: Val::Px(1.0),
-                                height: Val::Percent(100.0),
-                                ..default()
-                            },
-                            BackgroundColor(Color::srgba(0.8, 0.4, 1.0, 0.3)),
-                        ));
-                    }
-                });
-            }
+            builder.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Px(i as f32 * cell_size + cell_size / 2.0 - line_thickness / 2.0),
+                    top: Val::Px(0.0),
+                    width: Val::Px(line_thickness),
+                    height: Val::Px(cell_size * board_size as f32),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.8, 0.4, 1.0, 0.4)),
+            ));
         }
 
-        // Add stones according to pattern
+        // Draw horizontal lines at cell centers (creating intersections)
+        for i in 0..board_size {
+            builder.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Px(0.0),
+                    top: Val::Px(i as f32 * cell_size + cell_size / 2.0 - line_thickness / 2.0),
+                    width: Val::Px(cell_size * board_size as f32),
+                    height: Val::Px(line_thickness),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.8, 0.4, 1.0, 0.4)),
+            ));
+        }
+
+        // Add stones according to pattern - now at intersections (cell centers)
         for (x, y, stone_type) in pattern {
             let stone_handle = match stone_type {
                 StoneType::Pink => preloaded_stones.pink_stone.clone(),
                 StoneType::Blue => preloaded_stones.blue_stone.clone(),
             };
 
+            let stone_size = 30.0;
             builder.spawn((
                 Node {
                     position_type: PositionType::Absolute,
-                    left: Val::Px(x as f32 * cell_size + (cell_size - 30.0) / 2.0),
-                    top: Val::Px(y as f32 * cell_size + (cell_size - 30.0) / 2.0),
-                    width: Val::Px(30.0),
-                    height: Val::Px(30.0),
+                    left: Val::Px(x as f32 * cell_size + cell_size / 2.0 - stone_size / 2.0),
+                    top: Val::Px(y as f32 * cell_size + cell_size / 2.0 - stone_size / 2.0),
+                    width: Val::Px(stone_size),
+                    height: Val::Px(stone_size),
                     ..default()
                 },
                 ImageNode::new(stone_handle),

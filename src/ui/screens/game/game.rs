@@ -3,20 +3,16 @@ use std::time::Duration;
 use bevy::prelude::*;
 use crate::{
     ai::lazy_smp::lazy_smp_search,
-    core::{board::Player, state::GameState}, 
+    core::{board::Player, moves::RuleValidator, state::GameState}, 
     ui::{
         app::{AppState, GameSettings}, 
         config::GameConfig,
         screens::{
             game::{
                 board::{BoardRoot, BoardUtils, PreviewDot}, 
-                settings::{spawn_settings_panel, VolumeUp, VolumeDown, VolumeDisplay}
-            }, 
-            utils::despawn_screen,
-            menu::{GameAudio},
-            splash::PreloadedStones,
+                settings::{spawn_settings_panel, BackToMenuButton, ResetBoardButton, VolumeDisplay, VolumeDown, VolumeUp}
+            }, menu::GameAudio, splash::PreloadedStones, utils::despawn_screen
         },
-        theme::ThemeManager,
     }
 };
 
@@ -46,6 +42,19 @@ pub struct MovePlayed;
 pub struct GameEnded {
     winner: Option<Player>,
 }
+
+#[derive(Event)]
+pub struct ResetBoard;
+
+#[derive(Component)]
+pub struct GameOverOverlay;
+
+#[derive(Component)]
+pub enum GameOverAction {
+    RestartGame,
+    BackToMenu,
+}
+
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct GridCell {
     pub x: usize,
@@ -61,6 +70,7 @@ pub fn game_plugin(app: &mut App) {
         .add_event::<MovePlayed>()
         .add_event::<UpdateAITimeDisplay>()
         .add_event::<UpdateAIDepthDisplay>()
+        .add_event::<ResetBoard>()
         .add_systems(OnEnter(AppState::Game), (update_game_settings_from_config, setup_game_ui, update_available_placement).chain())
         .add_systems(
             Update,
@@ -69,11 +79,16 @@ pub fn game_plugin(app: &mut App) {
                 place_stone.run_if(on_event::<StonePlacement>),
                 process_next_round.run_if(on_event::<MovePlayed>),
                 update_available_placement.run_if(on_event::<MovePlayed>),
+                reset_board.run_if(on_event::<ResetBoard>),
                 toggle_pause,
                 update_ai_time_display.run_if(on_event::<UpdateAITimeDisplay>),
                 update_ai_depth_display.run_if(on_event::<UpdateAIDepthDisplay>),
                 handle_game_volume_control,
                 update_game_volume_display,
+                handle_reset_board_button,
+                handle_back_to_menu_button,
+                show_game_over_screen.run_if(on_event::<GameEnded>),
+                handle_game_over_actions,
             ).run_if(in_state(AppState::Game)),
         )
         .add_systems(OnExit(AppState::Game), despawn_screen::<OnGameScreen>);
@@ -85,15 +100,27 @@ fn update_game_settings_from_config(
     mut game_state: ResMut<GameState>,
 ) {
     // Get current settings from config
-    let (board_size, win_condition, ai_difficulty, pair_captures_to_win) = config.get_game_settings();
+    let (board_size, win_condition, ai_max_depth, ai_time_limit, pair_captures_to_win) = config.get_game_settings();
     
-    // Map AI difficulty to actual values
-    let (ai_depth, time_limit) = match ai_difficulty.to_lowercase().as_str() {
-        "easy" => (2, Some(300)),     // Depth 2, 300ms
-        "medium" => (4, Some(800)),   // Depth 4, 800ms  
-        "hard" => (6, Some(1500)),    // Depth 6, 1500ms
-        _ => (4, Some(800)),          // Default to medium
+    println!("📋 update_game_settings_from_config:");
+    println!("  board_size: {}", board_size);
+    println!("  win_condition: {}", win_condition);
+    println!("  ai_max_depth: {:?}", ai_max_depth);
+    println!("  ai_time_limit: {:?}", ai_time_limit);
+    println!("  pair_captures_to_win: {}", pair_captures_to_win);
+    
+    // Convert AI parameters
+    // If ai_max_depth is None (unlimited), default to depth 6 for reasonable performance
+    let ai_depth = match ai_max_depth {
+        Some(depth) => depth as i32,
+        None => 6, // Unlimited depth defaults to 6 for safety
     };
+    
+    // Convert time_limit from Option<u64> to Option<usize>
+    let time_limit = ai_time_limit.map(|ms| ms as usize);
+    
+    println!("  Converted ai_depth: {}", ai_depth);
+    println!("  Converted time_limit: {:?}", time_limit);
     
     // Update GameSettings resource
     *game_settings = GameSettings {
@@ -109,14 +136,13 @@ fn update_game_settings_from_config(
     // Create a new GameState with updated settings
     *game_state = GameState::new(game_settings.board_size, game_settings.minimum_chain_to_win, game_settings.total_capture_to_win);
     
-    info!("Updated game settings from config: Board {}x{}, Win Condition: {}, AI Difficulty: {} (depth: {}), Pair Captures: {}", 
-          board_size, board_size, win_condition, ai_difficulty, ai_depth, pair_captures_to_win);
+    info!("Updated game settings from config: Board {}x{}, Win Condition: {}, AI Max Depth: {:?} (using depth: {}), AI Time Limit: {:?}, Pair Captures: {}", 
+          board_size, board_size, win_condition, ai_max_depth, ai_depth, ai_time_limit, pair_captures_to_win);
 }
 
 fn setup_game_ui(
     mut commands: Commands, 
     game_settings: Res<GameSettings>,
-    theme_manager: Res<ThemeManager>,
 ) {
     commands
         .spawn((
@@ -159,10 +185,13 @@ pub fn update_available_placement(
     // Consume events
     for _ in ev_board_update.read() {}
 
-    let possible_moves = game_state.get_possible_moves();
     info!("Updating stone preview...");
     for (entity, children, cell) in parents.iter() {
-        if possible_moves.contains(&(cell.x, cell.y)) {
+        // Check if position is empty and doesn't create double-three
+        let is_valid = game_state.board.is_empty_position(cell.x, cell.y)
+            && !RuleValidator::creates_double_three(&game_state.board, cell.x, cell.y, game_state.current_player);
+        
+        if is_valid {
             for &child in children {
                 if let Ok((mut bg, mut visibility)) = dots.get_mut(child) {
                     *bg = BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.4));
@@ -482,6 +511,320 @@ pub fn update_game_volume_display(
             } else {
                 text.0 = format!("{}%", (volume * 100.0) as u32);
             }
+        }
+    }
+}
+fn handle_reset_board_button(
+    button_query: Query<&Interaction, (Changed<Interaction>, With<ResetBoardButton>)>,
+    mut reset_event: EventWriter<ResetBoard>,
+) {
+    for interaction in button_query.iter() {
+        if *interaction == Interaction::Pressed {
+            println!("🔘 Reset Board button clicked - sending reset event...");
+            reset_event.write(ResetBoard);
+        }
+    }
+}
+
+fn reset_board(
+    mut commands: Commands,
+    mut game_state: ResMut<GameState>,
+    game_settings: Res<GameSettings>,
+    mut game_status: ResMut<GameStatus>,
+    mut ai_time_taken: ResMut<AITimeTaken>,
+    mut ai_depth_reached: ResMut<AIDepthReached>,
+    stone_query: Query<Entity, With<Stone>>,
+    mut move_played: EventWriter<MovePlayed>,
+) {
+    println!("======================================");
+    println!("       RESETTING GAME BOARD");
+    println!("======================================");
+    
+    // Print state BEFORE reset
+    println!("\n[STATE BEFORE RESET]");
+    println!("  Current Player: {:?}", game_state.current_player);
+    println!("  Moves Played: {}", game_state.move_history.len());
+    println!("  Game Status: {}", match *game_status {
+        GameStatus::AwaitingUserInput => "AwaitingUserInput",
+        GameStatus::Paused => "Paused",
+        GameStatus::GameOver => "GameOver",
+    });
+    println!("  Max Player Captures: {}", game_state.max_captures);
+    println!("  Min Player Captures: {}", game_state.min_captures);
+    println!("  AI Time Taken: {:.3}s", ai_time_taken.micros as f64 / 1_000_000.0);
+    println!("  AI Depth Reached: {}", ai_depth_reached.depth);
+    
+    // Count stones to despawn
+    let stone_count = stone_query.iter().count();
+    println!("\n[DESPAWNING] Despawning {} stones...", stone_count);
+    
+    // Despawn all stones
+    for entity in stone_query.iter() {
+        commands.entity(entity).despawn();
+    }
+    
+    println!("\n🔧 Creating fresh GameState...");
+    // Reset the game state
+    *game_state = GameState::new(
+        game_settings.board_size,
+        game_settings.minimum_chain_to_win,
+        game_settings.total_capture_to_win,
+    );
+    
+    // Reset game status
+    *game_status = GameStatus::AwaitingUserInput;
+    
+    // Reset AI tracking
+    ai_time_taken.micros = 0;
+    ai_depth_reached.depth = 0;
+    
+    // Print state AFTER reset
+    println!("\n[STATE AFTER RESET]");
+    println!("  Current Player: {:?}", game_state.current_player);
+    println!("  Moves Played: {}", game_state.move_history.len());
+    println!("  Game Status: {}", match *game_status {
+        GameStatus::AwaitingUserInput => "AwaitingUserInput",
+        GameStatus::Paused => "Paused",
+        GameStatus::GameOver => "GameOver",
+    });
+    println!("  Max Player Captures: {}", game_state.max_captures);
+    println!("  Min Player Captures: {}", game_state.min_captures);
+    println!("  Board Size: {}x{}", game_settings.board_size, game_settings.board_size);
+    println!("  Win Condition: {}", game_settings.minimum_chain_to_win);
+    println!("  Captures to Win: {}", game_settings.total_capture_to_win);
+    
+    // Trigger update_available_placement by sending MovePlayed event
+    println!("\n[TRIGGERING] Sending MovePlayed event to update available placements...");
+    move_played.write(MovePlayed);
+    
+    println!("\n[RESET COMPLETE] Game board reset complete!");
+    println!("======================================\n");
+}
+
+fn handle_back_to_menu_button(
+    button_query: Query<&Interaction, (Changed<Interaction>, With<BackToMenuButton>)>,
+    mut app_state: ResMut<NextState<AppState>>,
+) {
+    for interaction in button_query.iter() {
+        if *interaction == Interaction::Pressed {
+            info!("Back to Menu button pressed!");
+            app_state.set(AppState::Menu);
+        }
+    }
+}
+
+fn show_game_over_screen(
+    mut commands: Commands,
+    mut game_ended_events: EventReader<GameEnded>,
+    config: Res<GameConfig>,
+    game_settings: Res<GameSettings>,
+) {
+    for event in game_ended_events.read() {
+        info!("Game Over! Winner: {:?}", event.winner);
+        
+        let colors = &config.colors;
+        
+        // Determine the title and message based on winner
+        let (title, message, title_color) = match event.winner {
+            Some(Player::Max) => (
+                "VICTORY!",
+                if game_settings.versus_ai {
+                    "You defeated the AI!"
+                } else {
+                    "Player 1 (Blue) Wins!"
+                },
+                colors.accent.clone(), // Victory color
+            ),
+            Some(Player::Min) => (
+                if game_settings.versus_ai { "DEFEAT" } else { "VICTORY!" },
+                if game_settings.versus_ai {
+                    "The AI has won..."
+                } else {
+                    "Player 2 (Pink) Wins!"
+                },
+                if game_settings.versus_ai {
+                    crate::ui::config::ColorData { r: 0.8, g: 0.2, b: 0.3, a: 1.0 } // Red for defeat
+                } else {
+                    crate::ui::config::ColorData { r: 1.0, g: 0.2, b: 0.8, a: 1.0 } // Pink for player 2 victory
+                },
+            ),
+            None => (
+                "DRAW",
+                "The game ended in a draw",
+                colors.text_secondary.clone(),
+            ),
+        };
+        
+        // Spawn game over overlay
+        commands
+            .spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    top: Val::Px(0.0),
+                    left: Val::Px(0.0),
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(100.0),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.8)), // Dark overlay
+                ZIndex(100),
+                GameOverOverlay,
+                OnGameScreen,
+            ))
+            .with_children(|parent| {
+                // Game over panel
+                parent
+                    .spawn((
+                        Node {
+                            width: Val::Px(600.0),
+                            height: Val::Auto,
+                            flex_direction: FlexDirection::Column,
+                            align_items: AlignItems::Center,
+                            justify_content: JustifyContent::Center,
+                            padding: UiRect::all(Val::Px(50.0)),
+                            border: UiRect::all(Val::Px(3.0)),
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgba(0.05, 0.0, 0.15, 0.95)),
+                        BorderColor(title_color.clone().into()),
+                        BorderRadius::all(Val::Px(15.0)),
+                    ))
+                    .with_children(|parent| {
+                        // Title
+                        parent.spawn((
+                            Text::new(title),
+                            TextFont {
+                                font_size: 64.0,
+                                ..default()
+                            },
+                            TextColor(title_color.into()),
+                            Node {
+                                margin: UiRect::bottom(Val::Px(20.0)),
+                                ..default()
+                            },
+                        ));
+                        
+                        // Message
+                        parent.spawn((
+                            Text::new(message),
+                            TextFont {
+                                font_size: 24.0,
+                                ..default()
+                            },
+                            TextColor(colors.text_primary.clone().into()),
+                            Node {
+                                margin: UiRect::bottom(Val::Px(40.0)),
+                                ..default()
+                            },
+                        ));
+                        
+                        // Buttons container
+                        parent
+                            .spawn((
+                                Node {
+                                    width: Val::Percent(100.0),
+                                    flex_direction: FlexDirection::Column,
+                                    align_items: AlignItems::Center,
+                                    row_gap: Val::Px(15.0),
+                                    ..default()
+                                },
+                            ))
+                            .with_children(|parent| {
+                                // Restart Game button
+                                parent
+                                    .spawn((
+                                        Button,
+                                        Node {
+                                            width: Val::Px(300.0),
+                                            height: Val::Px(60.0),
+                                            justify_content: JustifyContent::Center,
+                                            align_items: AlignItems::Center,
+                                            border: UiRect::all(Val::Px(2.0)),
+                                            ..default()
+                                        },
+                                        BackgroundColor(colors.accent.clone().into()),
+                                        BorderColor(colors.accent.clone().into()),
+                                        GameOverAction::RestartGame,
+                                    ))
+                                    .with_children(|parent| {
+                                        parent.spawn((
+                                            Text::new("RESTART GAME"),
+                                            TextFont {
+                                                font_size: 20.0,
+                                                ..default()
+                                            },
+                                            TextColor(colors.text_primary.clone().into()),
+                                        ));
+                                    });
+                                
+                                // Back to Menu button
+                                parent
+                                    .spawn((
+                                        Button,
+                                        Node {
+                                            width: Val::Px(300.0),
+                                            height: Val::Px(60.0),
+                                            justify_content: JustifyContent::Center,
+                                            align_items: AlignItems::Center,
+                                            border: UiRect::all(Val::Px(2.0)),
+                                            ..default()
+                                        },
+                                        BackgroundColor(colors.button_normal.clone().into()),
+                                        BorderColor(colors.secondary.clone().into()),
+                                        GameOverAction::BackToMenu,
+                                    ))
+                                    .with_children(|parent| {
+                                        parent.spawn((
+                                            Text::new("BACK TO MENU"),
+                                            TextFont {
+                                                font_size: 20.0,
+                                                ..default()
+                                            },
+                                            TextColor(colors.text_primary.clone().into()),
+                                        ));
+                                    });
+                            });
+                    });
+            });
+    }
+}
+
+fn handle_game_over_actions(
+    mut commands: Commands,
+    button_query: Query<(&Interaction, &GameOverAction), (Changed<Interaction>, With<Button>)>,
+    overlay_query: Query<Entity, With<GameOverOverlay>>,
+    mut app_state: ResMut<NextState<AppState>>,
+    mut reset_board: EventWriter<ResetBoard>,
+    config: Res<GameConfig>,
+) {
+    let colors = &config.colors;
+    
+    for (interaction, action) in button_query.iter() {
+        if *interaction == Interaction::Pressed {
+            match action {
+                GameOverAction::RestartGame => {
+                    info!("Restart Game button pressed!");
+                    
+                    // Despawn game over overlay
+                    for entity in overlay_query.iter() {
+                        commands.entity(entity).despawn_recursive();
+                    }
+                    
+                    // Reset the board
+                    reset_board.write(ResetBoard);
+                }
+                GameOverAction::BackToMenu => {
+                    info!("Back to Menu button pressed from game over screen!");
+                    app_state.set(AppState::Menu);
+                }
+            }
+        }
+        
+        // Add hover effects
+        if *interaction == Interaction::Hovered {
+            // Handled by existing button_system if we want
         }
     }
 }
