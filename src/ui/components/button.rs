@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use crate::ui::config::ColorConfig;
+use crate::audio::PlayClickSound;
 
 /// Button style variants
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -146,6 +147,7 @@ impl ButtonBuilder {
                 BackgroundColor(bg_color.into()),
                 BorderColor(border_color.into()),
                 BorderRadius::all(Val::Px(self.border_radius)),
+                PlayClickSound,
                 marker,
             ))
             .with_children(|parent| {

@@ -3,6 +3,7 @@ use bevy::window::{PresentMode, WindowTheme, WindowMode, MonitorSelection};
 
 use crate::core::state::GameState;
 use crate::ai::transposition::TranspositionTable;
+use crate::audio::audio_plugin;
 use crate::ui::display::display::make_visible;
 use crate::ui::screens::game::game::game_plugin;
 use crate::ui::screens::menu::menu_plugin;
@@ -139,7 +140,7 @@ impl GomokuApp {
                 make_visible,
             ),
         )
-        .add_plugins((splash_plugin, menu_plugin, game_plugin, tutorial_plugin, config_plugin));
+        .add_plugins((splash_plugin, menu_plugin, game_plugin, tutorial_plugin, config_plugin, audio_plugin));
 	}
 
 	pub fn start(&mut self) {

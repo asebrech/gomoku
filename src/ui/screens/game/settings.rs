@@ -1,9 +1,12 @@
 use bevy::prelude::*;
 
-use crate::ui::{
-    app::GameSettings,
-    config::GameConfig,
-    screens::game::game::{AITimeText, AIDepthText}
+use crate::{
+    audio::PlayClickSound,
+    ui::{
+        app::GameSettings,
+        config::GameConfig,
+        screens::game::game::{AITimeText, AIDepthText}
+    }
 };
 
 #[derive(Component)]
@@ -288,6 +291,7 @@ fn spawn_volume_control(builder: &mut ChildSpawnerCommands, config: &GameConfig)
                 // Volume down button - using button component pattern
                 builder.spawn((
                     Button,
+                    PlayClickSound,
                     Node {
                         width: Val::Px(25.0),
                         height: Val::Px(25.0),
@@ -331,6 +335,7 @@ fn spawn_volume_control(builder: &mut ChildSpawnerCommands, config: &GameConfig)
                 // Volume up button
                 builder.spawn((
                     Button,
+                    PlayClickSound,
                     Node {
                         width: Val::Px(25.0),
                         height: Val::Px(25.0),
@@ -375,6 +380,7 @@ fn spawn_reset_button(builder: &mut ChildSpawnerCommands) {
     // Reset Board button
     builder.spawn((
         Button,
+        PlayClickSound,
         Node {
             width: Val::Percent(100.0),
             height: Val::Px(40.0),
@@ -403,6 +409,7 @@ fn spawn_back_to_menu_button(builder: &mut ChildSpawnerCommands) {
     // Back to Menu button - in its own container, not constrained by column
     builder.spawn((
         Button,
+        PlayClickSound,
         Node {
             width: Val::Px(350.0),
             height: Val::Px(50.0),

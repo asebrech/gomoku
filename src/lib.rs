@@ -8,6 +8,8 @@ pub mod ai {
     pub mod zobrist;
 }
 
+pub mod audio;
+
 pub mod core {
     pub mod board;
     pub mod captures;

@@ -7,10 +7,13 @@
         window::{WindowMode, MonitorSelection},
     };
 
-    use crate::ui::{
-        app::{AppState, GameSettings}, 
-        screens::utils::despawn_screen,
-        config::GameConfig
+    use crate::{
+        audio::PlayClickSound,
+        ui::{
+            app::{AppState, GameSettings}, 
+            screens::utils::despawn_screen,
+            config::GameConfig
+        }
     };
 
     #[derive(Component)]
@@ -779,6 +782,7 @@ fn main_menu_setup(
                 // Volume down button
                 parent.spawn((
                     Button,
+                    PlayClickSound,
                     Node {
                         width: Val::Px(30.0),
                         height: Val::Px(30.0),
@@ -827,6 +831,7 @@ fn main_menu_setup(
                 // Volume up button
                 parent.spawn((
                     Button,
+                    PlayClickSound,
                     Node {
                         width: Val::Px(30.0),
                         height: Val::Px(30.0),
@@ -852,6 +857,7 @@ fn main_menu_setup(
                 // Mute/unmute button
                 parent.spawn((
                     Button,
+                    PlayClickSound,
                     Node {
                         width: Val::Px(35.0),
                         height: Val::Px(30.0),
@@ -1188,6 +1194,7 @@ fn settings_menu_setup(
                             parent
                                 .spawn((
                                     Button,
+                                    PlayClickSound,
                                     Node {
                                         width: Val::Px(250.0),
                                         height: Val::Px(50.0),
@@ -1383,6 +1390,7 @@ fn create_menu_button_with_icon(
     parent
         .spawn((
             Button,
+            PlayClickSound,
             button_node,
             BackgroundColor(bg_color.into()),
             BorderColor(border_color.into()),
@@ -1996,6 +2004,7 @@ fn create_menu_button_with_icon(
                 // Volume down button
                 parent.spawn((
                     Button,
+                    PlayClickSound,
                     Node {
                         width: Val::Px(25.0),
                         height: Val::Px(25.0),
@@ -2037,6 +2046,7 @@ fn create_menu_button_with_icon(
                 // Volume up button
                 parent.spawn((
                     Button,
+                    PlayClickSound,
                     Node {
                         width: Val::Px(25.0),
                         height: Val::Px(25.0),
@@ -2066,6 +2076,7 @@ fn create_menu_button_with_icon(
     ) {
         parent.spawn((
             Button,
+            PlayClickSound,
             Node {
                 width: Val::Percent(100.0),
                 height: Val::Px(30.0),
@@ -2121,6 +2132,7 @@ fn create_menu_button_with_icon(
                 // Decrease button
                 parent.spawn((
                     Button,
+                    PlayClickSound,
                     Node {
                         width: Val::Px(25.0),
                         height: Val::Px(25.0),
@@ -2173,6 +2185,7 @@ fn create_menu_button_with_icon(
                 // Increase button
                 parent.spawn((
                     Button,
+                    PlayClickSound,
                     Node {
                         width: Val::Px(25.0),
                         height: Val::Px(25.0),
@@ -2219,6 +2232,7 @@ fn create_menu_button_with_icon(
                 // Decrease button
                 parent.spawn((
                     Button,
+                    PlayClickSound,
                     Node {
                         width: Val::Px(25.0),
                         height: Val::Px(25.0),
@@ -2265,6 +2279,7 @@ fn create_menu_button_with_icon(
                 // Increase button
                 parent.spawn((
                     Button,
+                    PlayClickSound,
                     Node {
                         width: Val::Px(25.0),
                         height: Val::Px(25.0),
@@ -2306,6 +2321,7 @@ fn create_menu_button_with_icon(
                 // Decrease button
                 parent.spawn((
                     Button,
+                    PlayClickSound,
                     Node {
                         width: Val::Px(25.0),
                         height: Val::Px(25.0),
@@ -2358,6 +2374,7 @@ fn create_menu_button_with_icon(
                 // Increase button
                 parent.spawn((
                     Button,
+                    PlayClickSound,
                     Node {
                         width: Val::Px(25.0),
                         height: Val::Px(25.0),

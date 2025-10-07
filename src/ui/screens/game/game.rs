@@ -3,6 +3,7 @@ use std::time::Duration;
 use bevy::prelude::*;
 use crate::{
     ai::lazy_smp::lazy_smp_search,
+    audio::{PlayStonePlacementSound, PlayWinSound, PlayLoseSound},
     core::{board::Player, moves::RuleValidator, state::GameState}, 
     ui::{
         app::{AppState, GameSettings}, 
@@ -383,10 +384,14 @@ pub fn place_stone(
     mut game_state: ResMut<GameState>,
     mut ev_stone_placement: EventReader<StonePlacement>,
     mut move_played: EventWriter<MovePlayed>,
+    mut stone_sound: EventWriter<PlayStonePlacementSound>,
     stones: Query<(Entity, &GridCell, &Stone)>,
 ) {
     for ev in ev_stone_placement.read() {
         info!("Stone placed at x: {}, y: {}", ev.x, ev.y);
+        
+        // Play stone placement sound (randomized)
+        stone_sound.send(PlayStonePlacementSound);
         
         // Get the player BEFORE making the move (they're the one placing the stone)
         let player = game_state.current_player;
@@ -462,6 +467,8 @@ pub fn process_next_round(
     settings: Res<GameSettings>,
     game_state: Res<GameState>,
     mut game_status: ResMut<GameStatus>,
+    mut win_sound: EventWriter<PlayWinSound>,
+    mut lose_sound: EventWriter<PlayLoseSound>,
     mut player_text_query: Query<&mut Text, With<CurrentPlayerText>>,
 ) {
     for _ in move_played.read() {
@@ -472,8 +479,26 @@ pub fn process_next_round(
             *game_status = GameStatus::GameOver;
             
             match winner {
-                Some(player) => println!("Game Over! Winner: {:?}", player),
-                None => println!("Game Over! It's a draw."),
+                Some(player) => {
+                    println!("Game Over! Winner: {:?}", player);
+                    if settings.versus_ai {
+                        // In vs AI mode, check if human won or lost
+                        if player == Player::Max {
+                            // Human won (Player::Max)
+                            win_sound.send(PlayWinSound);
+                        } else {
+                            // AI won (Player::Min)
+                            lose_sound.send(PlayLoseSound);
+                        }
+                    } else {
+                        // In multiplayer mode, always play win sound
+                        win_sound.send(PlayWinSound);
+                    }
+                }
+                None => {
+                    println!("Game Over! It's a draw.");
+                    // Could add a draw sound here if you want
+                }
             }
             return;
         }
