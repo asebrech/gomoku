@@ -20,6 +20,9 @@ pub mod ui {
     pub mod app;
     pub mod config;
     pub mod theme;
+    pub mod components {
+        pub mod button;
+    }
     pub mod display {
         pub mod display;
     }

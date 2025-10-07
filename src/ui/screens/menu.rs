@@ -4,6 +4,7 @@
         audio::{PlaybackSettings, Volume, AudioSink},
         ecs::relationship::RelatedSpawnerCommands,
         prelude::*,
+        window::{WindowMode, MonitorSelection},
     };
 
     use crate::ui::{
@@ -115,8 +116,10 @@
         BoardSizeDec,
         WinConditionInc,
         WinConditionDec,
-        AIMaxDepth,
-        AITimeLimit,
+        AIMaxDepthInc,
+        AIMaxDepthDec,
+        AITimeLimitInc,
+        AITimeLimitDec,
         PairCapturesInc,
         PairCapturesDec,
         Fullscreen,
@@ -1186,11 +1189,12 @@ fn settings_menu_setup(
                                 .spawn((
                                     Button,
                                     Node {
-                                        width: Val::Px(200.0),
+                                        width: Val::Px(250.0),
                                         height: Val::Px(50.0),
                                         justify_content: JustifyContent::Center,
                                         align_items: AlignItems::Center,
                                         border: UiRect::all(Val::Px(2.0)),
+                                        padding: UiRect::all(Val::Px(10.0)),
                                         ..default()
                                     },
                                     BackgroundColor(colors.button_normal.clone().into()),
@@ -1205,6 +1209,10 @@ fn settings_menu_setup(
                                             ..default()
                                         },
                                         TextColor(colors.text_primary.clone().into()),
+                                        TextLayout {
+                                            justify: JustifyText::Center,
+                                            linebreak: LineBreak::NoWrap,
+                                        },
                                     ));
                                 });
                         });
@@ -1679,6 +1687,7 @@ fn create_menu_button_with_icon(
         mut config: ResMut<GameConfig>,
         mut audio_sink_query: Query<&mut AudioSink>,
         game_audio: Option<Res<GameAudio>>,
+        mut windows: Query<&mut bevy::window::Window>,
     ) {
         // Handle all settings controls
         for (interaction, setting_control) in settings_query.iter() {
@@ -1738,13 +1747,13 @@ fn create_menu_button_with_icon(
                             println!("Pair captures to win changed to: {}", new_pair_captures);
                         }
                     }
-                    SettingControl::AIMaxDepth => {
+                    SettingControl::AIMaxDepthInc => {
                         let (board_size, win_condition, current_ai_max_depth, ai_time_limit, pair_captures) = config.get_game_settings();
-                        // Cycle: 1 -> 2 -> ... -> 10 -> None (Unlimited) -> 1
+                        // Increment: 1 -> 2 -> ... -> 10 -> Unlimited (None)
                         let new_ai_max_depth = match current_ai_max_depth {
                             Some(depth) if depth < 10 => Some(depth + 1),
                             Some(_) => None, // 10 -> Unlimited
-                            None => Some(1), // Unlimited -> 1
+                            None => None, // Already at Unlimited, stay there
                         };
                         if let Err(e) = config.save_game_settings(board_size, win_condition, new_ai_max_depth, ai_time_limit, pair_captures) {
                             println!("Failed to save AI max depth: {}", e);
@@ -1752,9 +1761,23 @@ fn create_menu_button_with_icon(
                             println!("AI max depth changed to: {:?}", new_ai_max_depth);
                         }
                     }
-                    SettingControl::AITimeLimit => {
+                    SettingControl::AIMaxDepthDec => {
+                        let (board_size, win_condition, current_ai_max_depth, ai_time_limit, pair_captures) = config.get_game_settings();
+                        // Decrement: Unlimited (None) -> 10 -> 9 -> ... -> 1
+                        let new_ai_max_depth = match current_ai_max_depth {
+                            None => Some(10), // Unlimited -> 10
+                            Some(depth) if depth > 1 => Some(depth - 1),
+                            Some(_) => Some(1), // Already at 1, stay there
+                        };
+                        if let Err(e) = config.save_game_settings(board_size, win_condition, new_ai_max_depth, ai_time_limit, pair_captures) {
+                            println!("Failed to save AI max depth: {}", e);
+                        } else {
+                            println!("AI max depth changed to: {:?}", new_ai_max_depth);
+                        }
+                    }
+                    SettingControl::AITimeLimitInc => {
                         let (board_size, win_condition, ai_max_depth, current_ai_time_limit, pair_captures) = config.get_game_settings();
-                        // Cycle: 100ms -> 300ms -> 500ms -> 1s -> 2s -> 5s -> None (Unlimited) -> 100ms
+                        // Increment: 100ms -> 300ms -> 500ms -> 1s -> 2s -> 5s -> Unlimited (None)
                         let new_ai_time_limit = match current_ai_time_limit {
                             Some(100) => Some(300),
                             Some(300) => Some(500),
@@ -1762,7 +1785,25 @@ fn create_menu_button_with_icon(
                             Some(1000) => Some(2000),
                             Some(2000) => Some(5000),
                             Some(_) => None, // 5s or other -> Unlimited
-                            None => Some(100), // Unlimited -> 100ms
+                            None => None, // Already Unlimited, stay there
+                        };
+                        if let Err(e) = config.save_game_settings(board_size, win_condition, ai_max_depth, new_ai_time_limit, pair_captures) {
+                            println!("Failed to save AI time limit: {}", e);
+                        } else {
+                            println!("AI time limit changed to: {:?}", new_ai_time_limit);
+                        }
+                    }
+                    SettingControl::AITimeLimitDec => {
+                        let (board_size, win_condition, ai_max_depth, current_ai_time_limit, pair_captures) = config.get_game_settings();
+                        // Decrement: Unlimited (None) -> 5s -> 2s -> 1s -> 500ms -> 300ms -> 100ms
+                        let new_ai_time_limit = match current_ai_time_limit {
+                            None => Some(5000), // Unlimited -> 5s
+                            Some(5000) => Some(2000),
+                            Some(2000) => Some(1000),
+                            Some(1000) => Some(500),
+                            Some(500) => Some(300),
+                            Some(300) => Some(100),
+                            Some(_) => Some(100), // 100ms or other -> stay at 100ms
                         };
                         if let Err(e) = config.save_game_settings(board_size, win_condition, ai_max_depth, new_ai_time_limit, pair_captures) {
                             println!("Failed to save AI time limit: {}", e);
@@ -1777,6 +1818,14 @@ fn create_menu_button_with_icon(
                             println!("Failed to save fullscreen setting: {}", e);
                         } else {
                             println!("Fullscreen changed to: {}", new_fullscreen);
+                            // Apply the window mode immediately
+                            if let Ok(mut window) = windows.single_mut() {
+                                window.mode = if new_fullscreen {
+                                    WindowMode::BorderlessFullscreen(MonitorSelection::Current)
+                                } else {
+                                    WindowMode::Windowed
+                                };
+                            }
                         }
                     }
                     SettingControl::Vsync => {
@@ -2101,6 +2150,10 @@ fn create_menu_button_with_icon(
                     Text::new(current_value.to_string()),
                     TextFont { font_size: 14.0, ..default() },
                     TextColor(colors.text_secondary.clone().into()),
+                    TextLayout {
+                        justify: JustifyText::Center,
+                        ..default()
+                    },
                     Node {
                         width: Val::Px(40.0),
                         justify_content: JustifyContent::Center,
@@ -2163,11 +2216,11 @@ fn create_menu_button_with_icon(
                 },
             ))
             .with_children(|parent| {
-                // Cycle button
+                // Decrease button
                 parent.spawn((
                     Button,
                     Node {
-                        width: Val::Px(100.0),
+                        width: Val::Px(25.0),
                         height: Val::Px(25.0),
                         justify_content: JustifyContent::Center,
                         align_items: AlignItems::Center,
@@ -2176,11 +2229,11 @@ fn create_menu_button_with_icon(
                     },
                     BackgroundColor(colors.button_normal.clone().into()),
                     BorderColor(colors.secondary.clone().into()),
-                    SettingControl::AIMaxDepth,
+                    SettingControl::AIMaxDepthDec,
                 )).with_children(|parent| {
                     parent.spawn((
-                        Text::new("CYCLE"),
-                        TextFont { font_size: 12.0, ..default() },
+                        Text::new("-"),
+                        TextFont { font_size: 14.0, ..default() },
                         TextColor(colors.text_primary.clone().into()),
                     ));
                 });
@@ -2193,11 +2246,43 @@ fn create_menu_button_with_icon(
                 parent.spawn((
                     Text::new(value_text),
                     TextFont { font_size: 14.0, ..default() },
-                    TextColor(colors.text_primary.clone().into()),
+                    TextColor(colors.text_secondary.clone().into()),
+                    TextLayout {
+                        justify: JustifyText::Center,
+                        ..default()
+                    },
+                    Node {
+                        width: Val::Px(80.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
                     SettingDisplay {
                         setting_type: SettingDisplayType::AIMaxDepthValue,
                     },
                 ));
+
+                // Increase button
+                parent.spawn((
+                    Button,
+                    Node {
+                        width: Val::Px(25.0),
+                        height: Val::Px(25.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        border: UiRect::all(Val::Px(1.0)),
+                        ..default()
+                    },
+                    BackgroundColor(colors.button_normal.clone().into()),
+                    BorderColor(colors.secondary.clone().into()),
+                    SettingControl::AIMaxDepthInc,
+                )).with_children(|parent| {
+                    parent.spawn((
+                        Text::new("+"),
+                        TextFont { font_size: 14.0, ..default() },
+                        TextColor(colors.text_primary.clone().into()),
+                    ));
+                });
             });
     }
 
@@ -2218,11 +2303,11 @@ fn create_menu_button_with_icon(
                 },
             ))
             .with_children(|parent| {
-                // Cycle button
+                // Decrease button
                 parent.spawn((
                     Button,
                     Node {
-                        width: Val::Px(100.0),
+                        width: Val::Px(25.0),
                         height: Val::Px(25.0),
                         justify_content: JustifyContent::Center,
                         align_items: AlignItems::Center,
@@ -2231,11 +2316,11 @@ fn create_menu_button_with_icon(
                     },
                     BackgroundColor(colors.button_normal.clone().into()),
                     BorderColor(colors.secondary.clone().into()),
-                    SettingControl::AITimeLimit,
+                    SettingControl::AITimeLimitDec,
                 )).with_children(|parent| {
                     parent.spawn((
-                        Text::new("CYCLE"),
-                        TextFont { font_size: 12.0, ..default() },
+                        Text::new("-"),
+                        TextFont { font_size: 14.0, ..default() },
                         TextColor(colors.text_primary.clone().into()),
                     ));
                 });
@@ -2254,11 +2339,43 @@ fn create_menu_button_with_icon(
                 parent.spawn((
                     Text::new(value_text),
                     TextFont { font_size: 14.0, ..default() },
-                    TextColor(colors.text_primary.clone().into()),
+                    TextColor(colors.text_secondary.clone().into()),
+                    TextLayout {
+                        justify: JustifyText::Center,
+                        ..default()
+                    },
+                    Node {
+                        width: Val::Px(80.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
                     SettingDisplay {
                         setting_type: SettingDisplayType::AITimeLimitValue,
                     },
                 ));
+
+                // Increase button
+                parent.spawn((
+                    Button,
+                    Node {
+                        width: Val::Px(25.0),
+                        height: Val::Px(25.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        border: UiRect::all(Val::Px(1.0)),
+                        ..default()
+                    },
+                    BackgroundColor(colors.button_normal.clone().into()),
+                    BorderColor(colors.secondary.clone().into()),
+                    SettingControl::AITimeLimitInc,
+                )).with_children(|parent| {
+                    parent.spawn((
+                        Text::new("+"),
+                        TextFont { font_size: 14.0, ..default() },
+                        TextColor(colors.text_primary.clone().into()),
+                    ));
+                });
             });
     }
 

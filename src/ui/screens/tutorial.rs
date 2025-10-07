@@ -3,6 +3,7 @@ use crate::{
     ui::{
         app::AppState,
         config::GameConfig,
+        components::button::{ButtonBuilder, ButtonStyle, ButtonSize, button_interaction_system},
         screens::{
             utils::despawn_screen,
             splash::PreloadedStones,
@@ -27,7 +28,7 @@ pub fn tutorial_plugin(app: &mut App) {
         .add_systems(
             Update,
             (
-                tutorial_button_system,
+                button_interaction_system,
                 handle_tutorial_navigation,
                 update_tutorial_content,
             ).run_if(in_state(AppState::HowToPlay)),
@@ -98,13 +99,25 @@ fn setup_tutorial(mut commands: Commands, config: Res<GameConfig>, preloaded_sto
                 },
             )).with_children(|builder| {
                 // Win Example Button
-                spawn_tutorial_button(builder, "Win Example", TutorialButton::WinExample, colors);
+                ButtonBuilder::new("Win Example")
+                    .with_style(ButtonStyle::Secondary)
+                    .with_size(ButtonSize::Large)
+                    .with_margin(UiRect::all(Val::Px(12.0)))
+                    .spawn(builder, TutorialButton::WinExample, colors);
                 
                 // Capture Example Button
-                spawn_tutorial_button(builder, "Capture Example", TutorialButton::CaptureExample, colors);
+                ButtonBuilder::new("Capture Example")
+                    .with_style(ButtonStyle::Secondary)
+                    .with_size(ButtonSize::Large)
+                    .with_margin(UiRect::all(Val::Px(12.0)))
+                    .spawn(builder, TutorialButton::CaptureExample, colors);
                 
                 // Back Button
-                spawn_tutorial_button(builder, "Back to Menu", TutorialButton::BackToMenu, colors);
+                ButtonBuilder::new("Back to Menu")
+                    .with_style(ButtonStyle::Secondary)
+                    .with_size(ButtonSize::Large)
+                    .with_margin(UiRect::all(Val::Px(12.0)))
+                    .spawn(builder, TutorialButton::BackToMenu, colors);
             });
         });
 }
@@ -117,65 +130,6 @@ enum TutorialButton {
     WinExample,
     CaptureExample,
     BackToMenu,
-}
-
-fn spawn_tutorial_button(
-    builder: &mut ChildSpawnerCommands, 
-    text: &str, 
-    action: TutorialButton,
-    colors: &crate::ui::config::ColorConfig,
-) {
-    builder.spawn((
-        Button,
-        Node {
-            width: Val::Px(280.0),
-            height: Val::Px(60.0),
-            margin: UiRect::all(Val::Px(12.0)),
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            border: UiRect::all(Val::Px(2.0)),
-            ..default()
-        },
-        BackgroundColor(colors.button_normal.clone().into()),
-        BorderColor(colors.secondary.clone().into()),
-        action,
-    )).with_children(|builder| {
-        builder.spawn((
-            Text::new(text),
-            TextFont {
-                font_size: 18.0,
-                ..default()
-            },
-            TextColor(colors.text_primary.clone().into()),
-        ));
-    });
-}
-
-fn tutorial_button_system(
-    mut interaction_query: Query<
-        (&Interaction, &mut BackgroundColor, &mut BorderColor),
-        (Changed<Interaction>, With<Button>, With<TutorialButton>),
-    >,
-    config: Res<GameConfig>,
-) {
-    let colors = &config.colors;
-    
-    for (interaction, mut background_color, mut border_color) in &mut interaction_query {
-        match *interaction {
-            Interaction::Pressed => {
-                *background_color = BackgroundColor(colors.accent.clone().into());
-                *border_color = BorderColor(colors.accent.clone().into());
-            },
-            Interaction::Hovered => {
-                *background_color = BackgroundColor(colors.button_hovered.clone().into());
-                *border_color = BorderColor(colors.secondary.clone().into());
-            },
-            Interaction::None => {
-                *background_color = BackgroundColor(colors.button_normal.clone().into());
-                *border_color = BorderColor(colors.secondary.clone().into());
-            },
-        }
-    }
 }
 
 fn handle_tutorial_navigation(
@@ -257,7 +211,7 @@ fn spawn_win_example(
         ));
         
         builder.spawn((
-            Text::new("Connect 5 stones in a row to win!\n\nYou can connect:\n• Horizontally\n• Vertically\n• Diagonally\n\nThe example shows a winning horizontal line."),
+            Text::new("Connect 5 stones in a row to win!\n\nYou can connect:\n- Horizontally\n- Vertically\n- Diagonally\n\nThe example shows a winning horizontal line."),
             TextFont {
                 font_size: 18.0,
                 ..default()

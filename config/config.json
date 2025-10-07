@@ -97,14 +97,14 @@
 	},
 	"ui": {
 		"loading_messages": {
+			"81-95": "Renaming variables...",
+			"41-60": "Using Minimax Algorithm...",
 			"61-80": "Importing neo-cat...",
 			"100": "Complete!",
-			"0-10": "Initializing...",
-			"26-40": "Cloning heuristic...",
 			"96-99": "Changing headers names...",
 			"11-25": "Loading songs...",
-			"41-60": "Using Minimax Algorithm...",
-			"81-95": "Renaming variables..."
+			"0-10": "Initializing...",
+			"26-40": "Cloning heuristic..."
 		},
 		"font_sizes": {
 			"title": 32.0,
@@ -116,15 +116,15 @@
 	},
 	"game": {
 		"board_size": 19,
-		"win_condition": 4,
+		"win_condition": 5,
 		"ai_max_depth": null,
-		"ai_time_limit": 100,
+		"ai_time_limit": 500,
 		"pair_captures_to_win": 5
 	},
 	"settings": {
 		"audio": {
-			"volume": 0.0,
-			"muted": true
+			"volume": 0.1,
+			"muted": false
 		},
 		"display": {
 			"fullscreen": false,

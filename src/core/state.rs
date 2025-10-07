@@ -7,6 +7,12 @@ use crate::core::rules::WinChecker;
 use bevy::prelude::*;
 use std::hash::Hash;
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Copy)]
+pub enum WinReason {
+    Alignment,  // Won by placing N stones in a row
+    Captures,   // Won by capturing required pairs
+}
+
 #[derive(Resource, Component, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct GameState {
     pub board: Board,
@@ -14,6 +20,7 @@ pub struct GameState {
     pub win_condition: usize,
     pub capture_to_win: usize,
     pub winner: Option<Player>,
+    pub win_reason: Option<WinReason>,
     pub max_captures: usize,
     pub min_captures: usize,
     pub capture_history: Vec<Vec<(usize, usize)>>,
@@ -34,6 +41,7 @@ impl GameState {
             win_condition,
             capture_to_win,
             winner: None,
+            win_reason: None,
             max_captures: 0,
             min_captures: 0,
             capture_history: Vec::new(),
@@ -148,11 +156,13 @@ impl GameState {
     fn check_for_wins(&mut self, mv: (usize, usize)) -> bool {
         if let Some(winner) = self.check_capture_win() {
             self.winner = Some(winner);
+            self.win_reason = Some(WinReason::Captures);
             return true;
         }
 
         if self.check_win_around(mv) {
             self.winner = Some(self.current_player);
+            self.win_reason = Some(WinReason::Alignment);
             return true;
         }
 

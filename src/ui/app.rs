@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use bevy::window::{PresentMode, WindowTheme};
+use bevy::window::{PresentMode, WindowTheme, WindowMode, MonitorSelection};
 
 use crate::core::state::GameState;
 use crate::ai::transposition::TranspositionTable;
@@ -70,6 +70,11 @@ impl GomokuApp {
 	}
 
 	fn init_window(&mut self) {
+		// Load display settings from config
+		let config = GameConfig::load_from_file("config/config.json")
+			.unwrap_or_else(|_| GameConfig::default());
+		let (fullscreen, _vsync) = config.get_display_settings();
+		
 		self.app.add_plugins((
             DefaultPlugins.set(WindowPlugin {
                 primary_window: Some(Window {
@@ -85,6 +90,11 @@ impl GomokuApp {
                         ..Default::default()
                     },
                     visible: false,
+                    mode: if fullscreen {
+                        WindowMode::BorderlessFullscreen(MonitorSelection::Current)
+                    } else {
+                        WindowMode::Windowed
+                    },
                     ..default()
                 }),
                 ..default()
