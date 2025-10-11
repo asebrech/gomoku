@@ -92,7 +92,9 @@ impl Heuristic {
     }
 
     fn calculate_historical_bonus(state: &GameState) -> i32 {
-        state.pattern_analyzer.calculate_historical_bonus(state)
+        let max_bonus = state.pattern_analyzer.calculate_historical_bonus(Player::Max);
+        let min_bonus = state.pattern_analyzer.calculate_historical_bonus(Player::Min);
+        max_bonus - min_bonus
     }
 
     fn analyze_both_players(board: &Board, win_condition: usize) -> (PatternCounts, PatternCounts) {

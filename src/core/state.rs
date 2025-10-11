@@ -74,10 +74,10 @@ impl GameState {
         self.move_history.push(mv);
         self.check_for_wins(mv);
         self.switch_player();
-        self.update_pattern_analysis(mv);
+        self.update_pattern_analysis();
     }
 
-    fn update_pattern_analysis(&mut self, last_move: (usize, usize)) {
+    fn update_pattern_analysis(&mut self) {
         let current_player = self.current_player;
         let capture_history_len = self.capture_history.len();
         let last_captures = if capture_history_len > 0 {
@@ -89,7 +89,7 @@ impl GameState {
         let move_player = current_player.opponent();
         let captures_made = last_captures.len() / 2;
         
-        self.pattern_analyzer.analyze_move_simple(last_move, move_player, captures_made);
+        self.pattern_analyzer.analyze_move(move_player, captures_made);
     }
 
     pub fn undo_move(&mut self, move_: (usize, usize)) {
@@ -120,7 +120,6 @@ impl GameState {
         if let Some(last_move) = self.move_history.last() {
             if *last_move == move_ {
                 self.move_history.pop();
-                self.pattern_analyzer.undo_last_move();
             }
         }
 

@@ -1,6 +1,6 @@
 use gomoku::ai::heuristic::Heuristic;
 use gomoku::ai::minimax::mtdf;
-use gomoku::ai::pattern_history::{MoveType, PatternHistoryAnalyzer};
+use gomoku::ai::pattern_history::PatternHistoryAnalyzer;
 use gomoku::ai::transposition::TranspositionTable;
 use gomoku::core::board::Player;
 use gomoku::core::state::GameState;
@@ -18,7 +18,7 @@ fn test_dynamic_heuristic_basic_functionality() {
 
     // Verify that pattern analyzer has tracked the moves
     assert_eq!(state.move_history.len(), 4);
-    assert_eq!(state.pattern_analyzer.get_recent_patterns().len(), 4);
+    assert_eq!(state.pattern_analyzer.move_count(), 4);
 
     // Test that heuristic evaluation includes historical bonus
     let eval_with_history = Heuristic::evaluate(&state, 0);
@@ -50,9 +50,7 @@ fn test_capture_momentum_bonus() {
     assert!(eval_after > eval_before);
     
     // Verify capture was recorded in move history
-    let recent_patterns = state.pattern_analyzer.get_recent_patterns();
-    let last_move = recent_patterns.first().unwrap();
-    assert_eq!(last_move.move_type, MoveType::Capture);
+    let last_move = state.pattern_analyzer.latest_move().unwrap();
     assert!(last_move.captures_made > 0);
 }
 
@@ -69,10 +67,10 @@ fn test_tempo_and_initiative_tracking() {
     state.make_move((10, 12)); // Min
     
     // Check that pattern analyzer recognizes the tempo
-    let recent_patterns = state.pattern_analyzer.get_recent_patterns();
+    let pattern_count = state.pattern_analyzer.move_count();
     
     // Verify moves are being tracked
-    assert!(recent_patterns.len() >= 4);
+    assert!(pattern_count >= 4);
     
     // Evaluate position - Max should get bonus for maintaining initiative
     let evaluation = Heuristic::evaluate(&state, 0);
@@ -88,15 +86,15 @@ fn test_pattern_history_analyzer_reset() {
     
     // Simulate some moves
     state.make_move((9, 9));
-    analyzer.analyze_move_simple((9, 9), Player::Max, 0);
+    analyzer.analyze_move(Player::Max, 0);
     
-    assert!(!analyzer.get_recent_patterns().is_empty());
+    assert!(analyzer.move_count() > 0);
     
     // Reset analyzer
     analyzer.reset();
     
     // Should be empty after reset
-    assert!(analyzer.get_recent_patterns().is_empty());
+    assert_eq!(analyzer.move_count(), 0);
 }
 
 #[test]
@@ -125,7 +123,7 @@ fn test_historical_bonus_calculation() {
     let state = GameState::new(19, 5);
     
     // Test that historical bonus calculation doesn't crash
-    let bonus = state.pattern_analyzer.calculate_historical_bonus(&state);
+    let bonus = state.pattern_analyzer.calculate_historical_bonus(state.current_player);
     
     // Should return a reasonable value (could be 0 for empty game)
     assert!(bonus.abs() < 10_000);
@@ -138,13 +136,11 @@ fn test_move_type_classification() {
     // Test basic move classification
     state.make_move((9, 9));   // Max - first move
     
-    let recent_patterns = state.pattern_analyzer.get_recent_patterns();
-    let last_move = recent_patterns.first().unwrap();
+    let last_move = state.pattern_analyzer.latest_move().unwrap();
     
-    // First move should be classified as positional
-    assert_eq!(last_move.move_type, MoveType::Positional);
+    // First move should be classified as normal (not capture)
+    assert_eq!(last_move.captures_made, 0);
     assert_eq!(last_move.player, Player::Max);
-    assert_eq!(last_move.position, (9, 9));
 }
 
 #[test]
@@ -161,7 +157,7 @@ fn test_minimax_with_dynamic_heuristic() {
     
     // Store initial state
     let initial_move_history_len = state.move_history.len();
-    let initial_pattern_count = state.pattern_analyzer.get_recent_patterns().len();
+    let initial_pattern_count = state.pattern_analyzer.move_count();
     let initial_hash = state.hash();
     let initial_player = state.current_player;
     
@@ -177,14 +173,12 @@ fn test_minimax_with_dynamic_heuristic() {
     
     // Verify state is restored correctly after minimax
     assert_eq!(state.move_history.len(), initial_move_history_len);
-    assert_eq!(state.pattern_analyzer.get_recent_patterns().len(), initial_pattern_count);
+    assert_eq!(state.pattern_analyzer.move_count(), initial_pattern_count);
     assert_eq!(state.hash(), initial_hash);
     assert_eq!(state.current_player, initial_player);
     
     // Evaluation should be reasonable (not a winning score)
     assert!(evaluation.abs() < 100_000);
-    
-    println!("Minimax evaluation with dynamic heuristic: {}", evaluation);
 }
 
 #[test]
@@ -200,7 +194,7 @@ fn test_minimax_state_consistency_with_patterns() {
     state.make_move((9, 11));  // Min
     state.make_move((9, 12));  // Max - potential capture setup
     
-    let pre_search_patterns = state.pattern_analyzer.get_recent_patterns().len();
+    let pre_search_patterns = state.pattern_analyzer.move_count();
     let pre_search_moves = state.move_history.len();
     
     // Run deeper mtdf
@@ -214,7 +208,7 @@ fn test_minimax_state_consistency_with_patterns() {
     );
     
     // State should be unchanged
-    assert_eq!(state.pattern_analyzer.get_recent_patterns().len(), pre_search_patterns);
+    assert_eq!(state.pattern_analyzer.move_count(), pre_search_patterns);
     assert_eq!(state.move_history.len(), pre_search_moves);
     
     // Run again - should get same result
