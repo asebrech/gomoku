@@ -159,7 +159,7 @@ impl Heuristic {
         bit_mask: u8,
     ) -> Option<PatternInfo> {
         let (pattern_start_row, pattern_start_col) =
-            PatternAnalyzer::find_pattern_start(board, start_row, start_col, dx, dy, player);
+            Self::find_pattern_start(board, start_row, start_col, dx, dy, player);
 
         if analyzed[pattern_start_row][pattern_start_col] & bit_mask != 0 {
             return None;
@@ -190,7 +190,7 @@ impl Heuristic {
         }
         
         let freedom =
-            PatternAnalyzer::analyze_pattern_freedom(board, pattern_start_row, pattern_start_col, dx, dy, length);
+            Self::analyze_pattern_freedom(board, pattern_start_row, pattern_start_col, dx, dy, length);
 
         Self::mark_pattern_analyzed(
             pattern_start_row,
@@ -336,5 +336,65 @@ impl Heuristic {
         };
         
         max_bonus - min_bonus
+    }
+
+    fn find_pattern_start(
+        board: &Board,
+        row: usize,
+        col: usize,
+        dx: isize,
+        dy: isize,
+        player: Player,
+    ) -> (usize, usize) {
+        let player_bits = board.get_player_bits(player);
+        
+        let mut current_row = row as isize;
+        let mut current_col = col as isize;
+
+        loop {
+            let prev_row = current_row - dx;
+            let prev_col = current_col - dy;
+
+            if prev_row >= 0
+                && prev_row < board.size as isize
+                && prev_col >= 0
+                && prev_col < board.size as isize
+            {
+                let idx = board.index(prev_row as usize, prev_col as usize);
+                if Board::is_bit_set(player_bits, idx) {
+                    current_row = prev_row;
+                    current_col = prev_col;
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+
+        (current_row as usize, current_col as usize)
+    }
+
+    fn analyze_pattern_freedom(
+        board: &Board,
+        start_row: usize,
+        start_col: usize,
+        dx: isize,
+        dy: isize,
+        length: usize,
+    ) -> PatternFreedom {
+        let before_row = start_row as isize - dx;
+        let before_col = start_col as isize - dy;
+        let start_open = PatternAnalyzer::is_valid_empty(board, before_row, before_col);
+
+        let end_row = start_row as isize + (length as isize * dx);
+        let end_col = start_col as isize + (length as isize * dy);
+        let end_open = PatternAnalyzer::is_valid_empty(board, end_row, end_col);
+
+        match (start_open, end_open) {
+            (true, true) => PatternFreedom::Free,
+            (true, false) | (false, true) => PatternFreedom::HalfFree,
+            (false, false) => PatternFreedom::Flanked,
+        }
     }
 }

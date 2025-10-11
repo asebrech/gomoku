@@ -82,7 +82,7 @@ impl MoveGenerator {
     fn creates_five_in_row(board: &Board, pos: (usize, usize), player: Player) -> bool {
         for &(dx, dy) in &DIRECTIONS {
 
-            let total = PatternAnalyzer::count_consecutive_bidirectional(board, pos.0, pos.1, dx, dy, player);
+            let total = Self::count_consecutive_bidirectional(board, pos.0, pos.1, dx, dy, player);
             if total >= 5 {
                 return true;
             }
@@ -205,7 +205,7 @@ impl MoveGenerator {
         }
 
         let center = board.size / 2;
-        let distance = PatternAnalyzer::manhattan_distance(row, col, center, center) as i32;
+        let distance = Self::manhattan_distance(row, col, center, center) as i32;
         priority += 10 - distance.min(10);
 
         priority
@@ -262,5 +262,24 @@ impl MoveGenerator {
             .into_iter()
             .filter(|&(row, col)| !GameRules::creates_double_three(board, row, col, player))
             .collect()
+    }
+
+    #[inline]
+    pub fn count_consecutive_bidirectional(
+        board: &Board,
+        row: usize,
+        col: usize,
+        dx: isize,
+        dy: isize,
+        player: Player,
+    ) -> usize {
+        let backward = PatternAnalyzer::count_consecutive(board, row, col, -dx, -dy, player);
+        let forward = PatternAnalyzer::count_consecutive(board, row, col, dx, dy, player);
+        backward + forward + 1
+    }
+
+    #[inline]
+    pub fn manhattan_distance(row1: usize, col1: usize, row2: usize, col2: usize) -> usize {
+        ((row1 as isize - row2 as isize).abs() + (col1 as isize - col2 as isize).abs()) as usize
     }
 }
