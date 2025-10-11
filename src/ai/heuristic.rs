@@ -233,11 +233,7 @@ impl Heuristic {
         
         let mut current_row = start_row as isize - dx;
         let mut current_col = start_col as isize - dy;
-        while current_row >= 0
-            && current_row < board.size as isize
-            && current_col >= 0
-            && current_col < board.size as isize
-        {
+        while PatternAnalyzer::is_in_bounds(board, current_row, current_col) {
             let idx = board.index(current_row as usize, current_col as usize);
             if !Board::is_bit_set(&board.occupied, idx) {
                 space += 1;
@@ -252,11 +248,7 @@ impl Heuristic {
         let end_col = start_col as isize + (pattern_length - 1) as isize * dy;
         current_row = end_row + dx;
         current_col = end_col + dy;
-        while current_row >= 0
-            && current_row < board.size as isize
-            && current_col >= 0
-            && current_col < board.size as isize
-        {
+        while PatternAnalyzer::is_in_bounds(board, current_row, current_col) {
             let idx = board.index(current_row as usize, current_col as usize);
             if !Board::is_bit_set(&board.occupied, idx) {
                 space += 1;

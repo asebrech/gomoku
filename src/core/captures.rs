@@ -1,5 +1,5 @@
 use crate::core::board::{Board, Player};
-use crate::core::patterns::DIRECTIONS;
+use crate::core::patterns::{DIRECTIONS, PatternAnalyzer};
 
 pub struct CaptureHandler;
 
@@ -22,11 +22,7 @@ impl CaptureHandler {
 
                 let pos1_x = row as isize + actual_dx;
                 let pos1_y = col as isize + actual_dy;
-                if pos1_x < 0
-                    || pos1_y < 0
-                    || pos1_x >= board.size as isize
-                    || pos1_y >= board.size as isize
-                {
+                if !PatternAnalyzer::is_in_bounds(board, pos1_x, pos1_y) {
                     continue;
                 }
                 let idx1 = board.index(pos1_x as usize, pos1_y as usize);
@@ -36,11 +32,7 @@ impl CaptureHandler {
 
                 let pos2_x = pos1_x + actual_dx;
                 let pos2_y = pos1_y + actual_dy;
-                if pos2_x < 0
-                    || pos2_y < 0
-                    || pos2_x >= board.size as isize
-                    || pos2_y >= board.size as isize
-                {
+                if !PatternAnalyzer::is_in_bounds(board, pos2_x, pos2_y) {
                     continue;
                 }
                 let idx2 = board.index(pos2_x as usize, pos2_y as usize);
@@ -50,11 +42,7 @@ impl CaptureHandler {
 
                 let pos3_x = pos2_x + actual_dx;
                 let pos3_y = pos2_y + actual_dy;
-                if pos3_x < 0
-                    || pos3_y < 0
-                    || pos3_x >= board.size as isize
-                    || pos3_y >= board.size as isize
-                {
+                if !PatternAnalyzer::is_in_bounds(board, pos3_x, pos3_y) {
                     continue;
                 }
                 let idx3 = board.index(pos3_x as usize, pos3_y as usize);

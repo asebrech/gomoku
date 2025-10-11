@@ -185,18 +185,11 @@ impl GameState {
         if let Some(last_captures) = self.capture_history.pop() {
             if !last_captures.is_empty() {
                 let opponent = self.current_player.opponent();
-                let size = self.board.size;
-
-                let opponent_bits = match opponent {
-                    Player::Max => &mut self.board.max_bits,
-                    Player::Min => &mut self.board.min_bits,
-                };
 
                 for &(row, col) in &last_captures {
-                    if row < size && col < size {
-                        let idx = row * size + col;
-                        Board::set_bit(opponent_bits, idx);
-                        Board::set_bit(&mut self.board.occupied, idx);
+                    if row < self.board.size && col < self.board.size {
+                        // Use the board's place_stone method which handles bit manipulation
+                        self.board.place_stone(row, col, opponent);
                     }
                 }
 

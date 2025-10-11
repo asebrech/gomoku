@@ -95,6 +95,15 @@ impl Board {
         }
     }
 
+    /// Get mutable bit array for a specific player
+    #[inline]
+    pub fn get_player_bits_mut(&mut self, player: Player) -> &mut Vec<u64> {
+        match player {
+            Player::Max => &mut self.max_bits,
+            Player::Min => &mut self.min_bits,
+        }
+    }
+
     pub fn center(&self) -> (usize, usize) {
         (self.size / 2, self.size / 2)
     }
