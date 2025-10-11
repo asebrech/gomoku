@@ -231,27 +231,32 @@ impl Heuristic {
     ) -> usize {
         let mut space = pattern_length;
         
-        let mut current_row = start_row as isize - dx;
-        let mut current_col = start_col as isize - dy;
-        while PatternAnalyzer::is_in_bounds(board, current_row, current_col) {
-            let idx = board.index(current_row as usize, current_col as usize);
-            if !Board::is_bit_set(&board.occupied, idx) {
-                space += 1;
-                current_row -= dx;
-                current_col -= dy;
-            } else {
-                break;
-            }
-        }
+        // Count space in backward direction
+        space += Self::count_empty_in_direction(board, start_row as isize - dx, start_col as isize - dy, -dx, -dy);
         
+        // Count space in forward direction
         let end_row = start_row as isize + (pattern_length - 1) as isize * dx;
         let end_col = start_col as isize + (pattern_length - 1) as isize * dy;
-        current_row = end_row + dx;
-        current_col = end_col + dy;
+        space += Self::count_empty_in_direction(board, end_row + dx, end_col + dy, dx, dy);
+        
+        space
+    }
+
+    fn count_empty_in_direction(
+        board: &Board,
+        start_row: isize,
+        start_col: isize,
+        dx: isize,
+        dy: isize,
+    ) -> usize {
+        let mut count = 0;
+        let mut current_row = start_row;
+        let mut current_col = start_col;
+        
         while PatternAnalyzer::is_in_bounds(board, current_row, current_col) {
             let idx = board.index(current_row as usize, current_col as usize);
             if !Board::is_bit_set(&board.occupied, idx) {
-                space += 1;
+                count += 1;
                 current_row += dx;
                 current_col += dy;
             } else {
@@ -259,7 +264,7 @@ impl Heuristic {
             }
         }
         
-        space
+        count
     }
 
     fn update_counts(counts: &mut PatternCounts, pattern: PatternInfo) {
