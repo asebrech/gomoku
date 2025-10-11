@@ -1,3 +1,27 @@
+//! Heuristic evaluation functions and utilities.
+//!
+//! This module contains the board pattern analysis and a heuristic evaluator
+//! used by search routines to estimate a GameState's value when a terminal
+//! state or full search depth hasn't been reached.
+//!
+//! The evaluator looks for common Gomoku patterns (five-in-a-row, live four,
+//! half-free four, live three, etc.) and combines pattern counts with
+//! capture information and a lightweight historical bonus to produce a single
+//! score for the current position.
+//!
+//! Relevant concepts and further reading:
+//! - Pattern-based heuristics: <https://en.wikipedia.org/wiki/Gomoku>
+//! - Common pattern types and their evaluation in board games: <https://www.chessprogramming.org/Threats>
+//!
+//! Notes on scoring:
+//! - Scores are chosen to (a) prefer immediate wins over long-term potential,
+//!   (b) make captures meaningful, and (c) keep values within i32 range.
+//! - Values are ordinal (relative) rather than absolute probabilities.
+//!
+//! The rest of the file contains helpers to scan and classify line patterns on
+//! the board. These helpers are intentionally small and focused to make the
+//! heuristic fast and easy to test.
+
 use crate::core::board::{Board, Player};
 use crate::core::state::GameState;
 use crate::core::patterns::{PatternAnalyzer, PatternFreedom, DIRECTIONS};
@@ -54,6 +78,19 @@ struct PatternInfo {
 }
 
 impl Heuristic {
+    /// Evaluate a GameState and return an integer score.
+    ///
+    /// Positive values favour Player::Max, negative values favour
+    /// Player::Min. The `depth` parameter is used to prefer faster
+    /// wins/losses (a common technique: WIN_SCORE +/- depth).
+    ///
+    /// The evaluator combines:
+    /// - Terminal checks (wins/losses/draws)
+    /// - Pattern counts (five, live four, live three, ...)
+    /// - Capture-based bonuses
+    /// - A small historical bias from `PatternHistoryAnalyzer`.
+    ///
+    /// See also: pattern-based heuristics and Gomoku evaluation notes.
     pub fn evaluate(state: &GameState, depth: i32) -> i32 {
         if let Some(winner) = state.check_winner() {
             return match winner {

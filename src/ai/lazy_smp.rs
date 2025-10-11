@@ -1,3 +1,24 @@
+//! Parallel search orchestration using a Lazy-SMP like approach.
+//!
+//! This file implements a simple parallel search driver inspired by the
+//! Lazy-SMP technique. Each worker runs an independent MTDF search with its
+//! own transposition table and occasional cooperation through an atomic
+//! shared state. The goal is to diversify search attempts (different depth
+//! offsets and aspiration windows) while sharing best-move/score results so
+//! workers can benefit from each other's discoveries.
+//!
+//! References:
+//! - Lazy SMP: "Lazy SMP - Parallelizing Alpha-Beta Search" (conceptual)
+//! - MTDF: As described in Sean E. Anderson's notes and other AI resources.
+//! - Rayon: data-parallel execution used here to run workers in parallel
+//!   (<https://docs.rs/rayon>).
+//!
+//! Design notes:
+//! - Each worker keeps a local transposition table to avoid synchronization
+//!   costs. Shared state only contains the current best move/score and
+//!   statistics. This mirrors the common Lazy-SMP trade-off of slightly
+//!   redundant work for simpler concurrency.
+
 use crate::core::state::GameState;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering};
@@ -147,6 +168,14 @@ fn lazy_smp_worker(
     (best_score, best_move, depth_reached, total_nodes)
 }
 
+/// Run a parallel Lazy-SMP style search.
+///
+/// - `time_limit_ms` limits the search wall-clock time.
+/// - `max_depth` limits per-worker depth.
+/// - `num_threads` optionally overrides the number of workers.
+///
+/// Returns a `SearchResult` with the best move and statistics gathered
+/// by the workers.
 pub fn lazy_smp_search(
     state: &mut GameState,
     time_limit_ms: u64,

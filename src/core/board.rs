@@ -1,3 +1,14 @@
+//! Bitboard-backed board representation and utilities.
+//!
+//! The board is represented by three bitboards stored as `Vec<u64>`:
+//! - `max_bits`: positions occupied by Player::Max
+//! - `min_bits`: positions occupied by Player::Min
+//! - `occupied`: union of both players' stones
+//!
+//! Using bitboards allows fast iteration and compact storage for larger
+//! boards. The helpers in this module provide routines to set/clear bits,
+//! iterate set bits, and common board queries used throughout the engine.
+
 use std::hash::Hash;
 
 use bevy::prelude::*;

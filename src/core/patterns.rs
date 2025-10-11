@@ -1,3 +1,10 @@
+//! Pattern detection helpers used by the heuristic and move generator.
+//!
+//! This module exposes small utilities to count consecutive stones, check
+//! in-bounds coordinates and determine whether an empty square is valid for
+//! move consideration. These functions are intentionally generic and used in
+//! several higher-level heuristics and rule checks.
+
 use crate::core::board::{Board, Player};
 
 pub const DIRECTIONS: [(isize, isize); 4] = [(1, 0), (0, 1), (1, 1), (1, -1)];

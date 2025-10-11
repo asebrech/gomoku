@@ -1,3 +1,9 @@
+//! Game rules and validation utilities.
+//!
+//! Contains functions to detect wins around a move, capture-win conditions
+//! and forbidden patterns such as double-three. The implementation focuses
+//! on correctness and readability.
+//!
 use crate::core::board::{Board, Player};
 use crate::core::patterns::{PatternAnalyzer, DIRECTIONS};
 

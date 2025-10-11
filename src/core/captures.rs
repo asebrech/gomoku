@@ -1,3 +1,11 @@
+//! Capture detection and execution utilities.
+//!
+//! Gomoku variants often include capture rules (take two opponent stones when
+//! they are flanked). This module provides functions to detect captures that
+//! result from a newly placed stone and to remove captured stones from the
+//! board. The implementation follows a simple directional scan for the common
+//! "2 in a row flanked" capture pattern.
+
 use crate::core::board::{Board, Player};
 use crate::core::patterns::{DIRECTIONS, PatternAnalyzer};
 

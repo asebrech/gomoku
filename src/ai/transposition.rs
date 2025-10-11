@@ -1,3 +1,14 @@
+//! Transposition table (TT) implementation.
+//!
+//! A transposition table caches previously evaluated positions keyed by a
+//! Zobrist hash to avoid repeating work. Entries store the value, depth and
+//! whether the value is exact or a bound (upper/lower), allowing callers to
+//! perform alpha-beta cutoffs when appropriate.
+//!
+//! References:
+//! - Zobrist hashing: <https://en.wikipedia.org/wiki/Zobrist_hashing>
+//! - Transposition tables: <https://www.chessprogramming.org/Transposition_Table>
+
 use std::collections::HashMap;
 use bevy::prelude::*;
 
@@ -38,6 +49,8 @@ impl TranspositionTable {
     }
     
     pub fn store(&mut self, key: u64, value: i32, depth: i32, entry_type: EntryType, best_move: Option<(usize, usize)>) {
+        // Store or replace an existing entry based on depth/age.
+        // The table has a soft cleanup policy to prevent unbounded growth.
         if self.table.len() >= self.max_size {
             self.cleanup_old_entries();
         }
@@ -64,6 +77,10 @@ impl TranspositionTable {
     }
     
     pub fn probe(&mut self, key: u64, depth: i32, alpha: i32, beta: i32) -> TTResult {
+        // Probe the TT for a matching entry. If an entry provides an exact
+        // value or a bounding value that causes a cutoff for the current
+        // (alpha, beta) window, return it as a cutoff. Otherwise return a
+        // hit with only the best-move information to aid move ordering.
         if let Some(entry) = self.table.get(&key) {
             self.hits += 1;
             
@@ -169,10 +186,13 @@ impl TTResult {
     }
     
     pub fn hit_with_cutoff(value: i32, best_move: Option<(usize, usize)>) -> Self {
+        // Create a TTResult that indicates a cutoff (value satisfies the
+        // current alpha/beta bounds and is exact or sufficiently bounding).
         Self { value: Some(value), best_move, cutoff: true }
     }
     
     pub fn hit_move_only(best_move: Option<(usize, usize)>) -> Self {
+        // Create a TTResult that carries only a best-move suggestion.
         Self { value: None, best_move, cutoff: false }
     }
 }

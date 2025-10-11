@@ -1,3 +1,15 @@
+//! GameState holds the full mutable game representation used by the engine.
+//!
+//! Responsibilities:
+//! - Maintain the `Board` and player to move.
+//! - Track captures, history and a running Zobrist hash for fast TT lookups.
+//! - Provide helper methods used by search (make_move, undo_move,
+//!   get_candidate_moves, is_terminal, ...).
+//!
+//! Important invariants:
+//! - `current_hash` must reflect the board and current player and is updated
+//!   on every make/undo move path.
+//!
 use crate::core::zobrist::ZobristHash;
 use crate::ai::pattern_history::PatternHistoryAnalyzer;
 use crate::ai::move_generation::MoveGenerator;

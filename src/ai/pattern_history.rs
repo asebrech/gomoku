@@ -1,3 +1,11 @@
+//! Lightweight pattern history analyzer used to bias the heuristic based on
+//! recent capture momentum or initiative.
+//!
+//! This is not a full Monte-Carlo history heuristic; it's a simple history
+//! tracking of the last few moves used to prefer moves for the player who
+//! has recent initiative (captures or aggressive play). It produces a small
+//! bonus/penalty applied to the heuristic evaluation.
+
 use crate::core::board::Player;
 
 const CAPTURE_MOMENTUM_BONUS: i32 = 200;

@@ -1,3 +1,17 @@
+//! Candidate move generation heuristics.
+//!
+//! Move generation is a key performance lever in board-game AI. This module
+//! implements a prioritized candidate move generator for Gomoku. Instead of
+//! returning every empty square, it prefers:
+//! 1. Immediate winning moves.
+//! 2. Forced blocks / must-block moves.
+//! 3. Threat moves (moves that create threats or block opponent threats).
+//! 4. A local zone around existing stones for general play.
+//!
+//! This reduces branching factor and lets the search focus on promising
+//! continuations. The generator also filters moves that create illegal
+//! double-threes according to usual Gomoku rules.
+
 use crate::core::board::{Board, Player};
 use crate::core::patterns::{PatternAnalyzer, DIRECTIONS};
 use crate::core::rules::GameRules;

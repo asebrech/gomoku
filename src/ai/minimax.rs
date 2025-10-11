@@ -1,9 +1,42 @@
+//! Minimax search with alpha-beta pruning and MTDF driver.
+//!
+//! This module contains an alpha-beta implementation augmented with a
+//! transposition table (memory) and an MTDF driver. The implementation is
+//! intentionally small and focused on clarity rather than squeezing every
+//! last micro-optimization.
+//!
+//! Key algorithms explained:
+//! - Alpha-Beta pruning: standard minimax pruning to reduce the number of
+//!   nodes visited. (<https://en.wikipedia.org/wiki/Alpha%E2%80%93beta_pruning>)
+//! - Transposition table: stores previously computed results keyed by a
+//!   Zobrist hash to avoid re-searching identical positions.
+//! - MTDF: a memory-enhanced driver around zero-window alpha-beta calls to
+//!   converge quickly to the minimax value. See: <https://www.researchgate.net/publication/220728459_MTD-f_A_New_Optimal_Minimax_Search_Algorithm>
+//!
+//! Notes on integration:
+//! - The transposition table returns either exact values or bounds which are
+//!   used to cut off search early where possible.
+
 use crate::core::state::GameState;
 use std::cmp::{max, min};
 use std::time::{Duration, Instant};
 
 use super::{heuristic::Heuristic, transposition::{TranspositionTable, EntryType}};
 
+/// Alpha-beta search with transposition table (memory) support.
+///
+/// This function implements a standard minimax search with alpha-beta
+/// pruning. It also probes a transposition table (TT) to find cached
+/// results and stores the final value back into the TT. The returned
+/// tuple is (value, nodes_visited).
+///
+/// Important behaviour:
+/// - If the TT contains a cutoff (exact value or an applicable bound)
+///   the function returns immediately without expanding children.
+/// - At leaf nodes the heuristic is used and the value is stored as
+///   an Exact entry in the TT.
+///
+/// See: https://en.wikipedia.org/wiki/Alpha%E2%80%93beta_pruning
 fn alpha_beta_with_memory(
     state: &mut GameState,
     depth: i32,
@@ -101,6 +134,14 @@ fn alpha_beta_with_memory(
     (value, nodes_visited)
 }
 
+/// MTDF driver around zero-window alpha-beta searches.
+///
+/// MTDF repeatedly calls a zero-width alpha-beta (beta-1, beta) to
+/// converge on the minimax value using bounds. It requires a
+/// transposition table to be efficient since it relies heavily on
+/// stored information to avoid re-searching.
+///
+/// Reference: "MTD(f) - A New Optimal Minimax Search Algorithm".
 pub fn mtdf(
     state: &mut GameState,
     first_guess: i32,
