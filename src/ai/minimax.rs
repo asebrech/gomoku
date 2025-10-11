@@ -2,7 +2,7 @@ use crate::core::state::GameState;
 use std::cmp::{max, min};
 use std::time::{Duration, Instant};
 
-use super::{heuristic::Heuristic, move_ordering::MoveOrdering, transposition::{TranspositionTable, EntryType}};
+use super::{heuristic::Heuristic, transposition::{TranspositionTable, EntryType}};
 
 /// Zero-window alpha-beta search with memory (transposition table)
 /// This is the core search function used by MTD(f)
@@ -41,17 +41,10 @@ fn alpha_beta_with_memory(
         return (eval, nodes_visited);
     }
 
-    // Get and order moves with depth-based limiting
+    // Get candidate moves (already prioritized by move_generation)
     let mut moves = state.get_candidate_moves();
     
-    // Apply aggressive move limiting at high depths
-    if depth >= 4 {
-        MoveOrdering::order_and_limit_moves(state, &mut moves, depth);
-    } else {
-        MoveOrdering::order_moves(state, &mut moves);
-    }
-    
-    // Use TT best move first
+    // Use TT best move first (most important ordering)
     if let Some(best_move) = tt_result.best_move {
         if let Some(pos) = moves.iter().position(|&m| m == best_move) {
             moves.swap(0, pos);
