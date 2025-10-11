@@ -30,10 +30,7 @@ impl MoveGenerator {
     }
 
     fn find_winning_move(board: &Board, player: Player) -> Option<(usize, usize)> {
-        let player_bits = match player {
-            Player::Max => &board.max_bits,
-            Player::Min => &board.min_bits,
-        };
+        let player_bits = board.get_player_bits(player);
 
         for array_idx in 0..board.u64_count {
             let mut bits = player_bits[array_idx];
@@ -130,10 +127,7 @@ impl MoveGenerator {
 
     fn find_open_four_threats(board: &Board, player: Player) -> Vec<(usize, usize)> {
         let mut threats = HashSet::new();
-        let player_bits = match player {
-            Player::Max => &board.max_bits,
-            Player::Min => &board.min_bits,
-        };
+        let player_bits = board.get_player_bits(player);
 
         for array_idx in 0..board.u64_count {
             let mut bits = player_bits[array_idx];
@@ -252,7 +246,7 @@ impl MoveGenerator {
 
         // Bonus for center proximity
         let center = board.size / 2;
-        let distance = ((row as isize - center as isize).abs() + (col as isize - center as isize).abs()) as i32;
+        let distance = PatternAnalyzer::manhattan_distance(row, col, center, center) as i32;
         priority += 10 - distance.min(10);
 
         priority
@@ -260,10 +254,7 @@ impl MoveGenerator {
 
     fn find_threat_creating_moves(board: &Board, player: Player) -> HashSet<(usize, usize)> {
         let mut moves = HashSet::new();
-        let player_bits = match player {
-            Player::Max => &board.max_bits,
-            Player::Min => &board.min_bits,
-        };
+        let player_bits = board.get_player_bits(player);
 
         for array_idx in 0..board.u64_count {
             let mut bits = player_bits[array_idx];

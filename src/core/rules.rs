@@ -1,7 +1,6 @@
 use crate::core::board::{Board, Player};
-use crate::core::patterns::PatternAnalyzer;
+use crate::core::patterns::{PatternAnalyzer, DIRECTIONS};
 
-const DIRECTIONS: [(isize, isize); 4] = [(1, 0), (0, 1), (1, 1), (1, -1)];
 const FREE_THREE_LENGTH: usize = 3;
 const MAX_SEARCH_DISTANCE: isize = 4;
 
@@ -94,14 +93,8 @@ impl GameRules {
         dr: isize,
         dc: isize,
     ) -> (usize, bool) {
-        let player_bits = match player {
-            Player::Max => &board.max_bits,
-            Player::Min => &board.min_bits,
-        };
-        let opponent_bits = match player.opponent() {
-            Player::Max => &board.max_bits,
-            Player::Min => &board.min_bits,
-        };
+        let player_bits = board.get_player_bits(player);
+        let opponent_bits = board.get_player_bits(player.opponent());
 
         let mut stones = 0;
         let mut empty_found = false;
@@ -111,7 +104,7 @@ impl GameRules {
             let new_row = row as isize + dr * i;
             let new_col = col as isize + dc * i;
 
-            if !Self::is_valid_pos(board, new_row, new_col) {
+            if !PatternAnalyzer::is_in_bounds(board, new_row, new_col) {
                 break;
             }
             let idx = board.index(new_row as usize, new_col as usize);
@@ -140,10 +133,5 @@ impl GameRules {
     #[inline]
     fn can_form_open_four(left_open: bool, right_open: bool) -> bool {
         left_open || right_open
-    }
-
-    #[inline]
-    fn is_valid_pos(board: &Board, row: isize, col: isize) -> bool {
-        row >= 0 && col >= 0 && row < board.size as isize && col < board.size as isize
     }
 }

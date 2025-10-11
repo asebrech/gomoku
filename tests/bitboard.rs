@@ -141,9 +141,10 @@ fn test_is_full_partial() {
     assert!(!board.is_full());
 }
 
-// Tests for count_in_line
+// Tests for consecutive counting (using PatternAnalyzer)
 #[test]
-fn test_count_in_line_horizontal() {
+fn test_count_consecutive_horizontal() {
+    use gomoku::core::patterns::PatternAnalyzer;
     let board = create_test_board(
         5,
         vec![
@@ -152,20 +153,31 @@ fn test_count_in_line_horizontal() {
             ((2, 4), Player::Max),
         ],
     );
-    assert_eq!(board.count_in_line(2, 2, Player::Max, (0, 1), 5), 3);
+    // Count consecutive from (2,2) in direction (0,1) - should find 2 more stones
+    let count = PatternAnalyzer::count_consecutive(&board, 2, 2, 0, 1, Player::Max);
+    assert_eq!(count + 1, 3); // +1 for the starting position
 }
 
 #[test]
-fn test_count_in_line_diagonal_boundary() {
+fn test_count_consecutive_diagonal_boundary() {
+    use gomoku::core::patterns::PatternAnalyzer;
     let board = create_test_board(5, vec![((0, 0), Player::Min), ((1, 1), Player::Min)]);
-    assert_eq!(board.count_in_line(0, 0, Player::Min, (1, 1), 3), 2);
-    assert_eq!(board.count_in_line(2, 2, Player::Min, (1, 1), 3), 0); // No stones
+    // Count consecutive from (0,0) in direction (1,1) - should find 1 more stone
+    let count = PatternAnalyzer::count_consecutive(&board, 0, 0, 1, 1, Player::Min);
+    assert_eq!(count + 1, 2); // +1 for the starting position
+    
+    // Test empty position - should return 0 consecutive
+    let count_empty = PatternAnalyzer::count_consecutive(&board, 2, 2, 1, 1, Player::Min);
+    assert_eq!(count_empty, 0); // No stones from empty position
 }
 
 #[test]
-fn test_count_in_line_zero() {
+fn test_count_consecutive_zero() {
+    use gomoku::core::patterns::PatternAnalyzer;
     let board = Board::new(5);
-    assert_eq!(board.count_in_line(2, 2, Player::Max, (1, 0), 5), 0);
+    // Empty board should have 0 consecutive stones
+    let count = PatternAnalyzer::count_consecutive(&board, 2, 2, 1, 0, Player::Max);
+    assert_eq!(count, 0);
 }
 
 // Tests for get_empty_positions

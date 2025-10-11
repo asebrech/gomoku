@@ -1,6 +1,7 @@
 use std::hash::Hash;
 
 use bevy::prelude::*;
+use crate::core::patterns::{PatternAnalyzer, ALL_DIRECTIONS};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Player {
@@ -81,11 +82,17 @@ impl Board {
     }
 
     pub fn count_player_stones(&self, player: Player) -> usize {
-        let bits = match player {
+        let bits = self.get_player_bits(player);
+        bits.iter().map(|&b| b.count_ones() as usize).sum()
+    }
+
+    /// Get the bit array for a specific player
+    #[inline]
+    pub fn get_player_bits(&self, player: Player) -> &Vec<u64> {
+        match player {
             Player::Max => &self.max_bits,
             Player::Min => &self.min_bits,
-        };
-        bits.iter().map(|&b| b.count_ones() as usize).sum()
+        }
     }
 
     pub fn center(&self) -> (usize, usize) {
@@ -141,19 +148,13 @@ impl Board {
             return false;
         }
         
-        let directions = [-1isize, 0, 1];
-        for &dr in &directions {
-            for &dc in &directions {
-                if dr == 0 && dc == 0 {
-                    continue;
-                }
-                let nr = row as isize + dr;
-                let nc = col as isize + dc;
-                if nr >= 0 && nc >= 0 && nr < self.size as isize && nc < self.size as isize {
-                    let idx = self.index(nr as usize, nc as usize);
-                    if Self::is_bit_set(&self.occupied, idx) {
-                        return true;
-                    }
+        for &(dr, dc) in &ALL_DIRECTIONS {
+            let nr = row as isize + dr;
+            let nc = col as isize + dc;
+            if PatternAnalyzer::is_in_bounds(self, nr, nc) {
+                let idx = self.index(nr as usize, nc as usize);
+                if Self::is_bit_set(&self.occupied, idx) {
+                    return true;
                 }
             }
         }
@@ -178,44 +179,6 @@ impl Board {
         }
 
         total_set_bits == self.total_cells
-    }
-
-    pub fn count_in_line(
-        &self,
-        row: usize,
-        col: usize,
-        player: Player,
-        direction: (isize, isize),
-        length: usize,
-    ) -> usize {
-        if row >= self.size || col >= self.size {
-            return 0;
-        }
-        let bits = match player {
-            Player::Max => &self.max_bits,
-            Player::Min => &self.min_bits,
-        };
-        let mut count = 0;
-        let mut current_row = row as isize;
-        let mut current_col = col as isize;
-        for _ in 0..length {
-            if current_row < 0
-                || current_col < 0
-                || current_row >= self.size as isize
-                || current_col >= self.size as isize
-            {
-                break;
-            }
-            let idx = self.index(current_row as usize, current_col as usize);
-            if Self::is_bit_set(bits, idx) {
-                count += 1;
-            } else {
-                break;
-            }
-            current_row += direction.0;
-            current_col += direction.1;
-        }
-        count
     }
 
     pub fn get_empty_positions(&self) -> Vec<(usize, usize)> {

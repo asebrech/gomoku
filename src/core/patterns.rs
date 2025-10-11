@@ -26,10 +26,7 @@ impl PatternAnalyzer {
         dy: isize,
         player: Player,
     ) -> usize {
-        let player_bits = match player {
-            Player::Max => &board.max_bits,
-            Player::Min => &board.min_bits,
-        };
+        let player_bits = board.get_player_bits(player);
         
         let mut count = 0;
         let mut current_row = row as isize + dx;
@@ -68,20 +65,19 @@ impl PatternAnalyzer {
     }
 
     #[inline]
+    pub fn is_in_bounds(board: &Board, row: isize, col: isize) -> bool {
+        row >= 0 && col >= 0 && row < board.size as isize && col < board.size as isize
+    }
+
+    #[inline]
     pub fn is_valid_empty(board: &Board, row: isize, col: isize) -> bool {
-        row >= 0
-            && col >= 0
-            && row < board.size as isize
-            && col < board.size as isize
+        Self::is_in_bounds(board, row, col)
             && !Board::is_bit_set(&board.occupied, board.index(row as usize, col as usize))
     }
 
     #[inline]
     pub fn is_valid_occupied(board: &Board, row: isize, col: isize) -> bool {
-        row >= 0
-            && col >= 0
-            && row < board.size as isize
-            && col < board.size as isize
+        Self::is_in_bounds(board, row, col)
             && Board::is_bit_set(&board.occupied, board.index(row as usize, col as usize))
     }
 
@@ -93,10 +89,7 @@ impl PatternAnalyzer {
         dy: isize,
         player: Player,
     ) -> (usize, usize) {
-        let player_bits = match player {
-            Player::Max => &board.max_bits,
-            Player::Min => &board.min_bits,
-        };
+        let player_bits = board.get_player_bits(player);
         
         let mut current_row = row as isize;
         let mut current_col = col as isize;

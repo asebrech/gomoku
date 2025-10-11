@@ -1,4 +1,5 @@
 use crate::core::board::{Board, Player};
+use crate::core::patterns::DIRECTIONS;
 
 pub struct CaptureHandler;
 
@@ -10,18 +11,11 @@ impl CaptureHandler {
         player: Player,
     ) -> Vec<(usize, usize)> {
         let mut captures = Vec::new();
-        let directions = [(1, 0), (0, 1), (1, 1), (1, -1)];
         let opponent = player.opponent();
-        let player_bits = match player {
-            Player::Max => &board.max_bits,
-            Player::Min => &board.min_bits,
-        };
-        let opponent_bits = match opponent {
-            Player::Max => &board.max_bits,
-            Player::Min => &board.min_bits,
-        };
+        let player_bits = board.get_player_bits(player);
+        let opponent_bits = board.get_player_bits(opponent);
 
-        for &(dx, dy) in &directions {
+        for &(dx, dy) in &DIRECTIONS {
             for &multiplier in &[1, -1] {
                 let actual_dx = dx as isize * multiplier as isize;
                 let actual_dy = dy as isize * multiplier as isize;
