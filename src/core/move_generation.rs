@@ -56,6 +56,14 @@ impl MoveGenerator {
         None
     }
 
+    /// Find a winning move in a specific direction from a given stone.
+    /// 
+    /// This function handles three cases:
+    /// 1. Solid pattern (XXXX_): Check endpoints
+    /// 2. Pattern with one gap (XXX_X): Check the gap
+    /// 3. Pattern with multiple gaps: Check each gap
+    /// 
+    /// Returns the position that completes five-in-a-row if found.
     fn find_win_in_direction(
         board: &Board,
         row: usize,
@@ -68,38 +76,48 @@ impl MoveGenerator {
         let forward = PatternAnalyzer::count_consecutive(board, row, col, dx, dy, player);
         let total = backward + forward + 1;
 
-        if total >= 4 {
-            let back_row = row as isize - dx * (backward as isize + 1);
-            let back_col = col as isize - dy * (backward as isize + 1);
-            if PatternAnalyzer::is_valid_empty(board, back_row, back_col) {
+        // Need at least 4 stones to potentially create 5
+        if total < 4 {
+            return None;
+        }
+
+        // Case 1: Check endpoint positions (handles solid patterns like XXXX_)
+        let back_row = row as isize - dx * (backward as isize + 1);
+        let back_col = col as isize - dy * (backward as isize + 1);
+        if PatternAnalyzer::is_valid_empty(board, back_row, back_col) {
+            if Self::creates_five_in_row(board, (back_row as usize, back_col as usize), player) {
                 return Some((back_row as usize, back_col as usize));
             }
+        }
 
-            let fwd_row = row as isize + dx * (forward as isize + 1);
-            let fwd_col = col as isize + dy * (forward as isize + 1);
-            if PatternAnalyzer::is_valid_empty(board, fwd_row, fwd_col) {
+        let fwd_row = row as isize + dx * (forward as isize + 1);
+        let fwd_col = col as isize + dy * (forward as isize + 1);
+        if PatternAnalyzer::is_valid_empty(board, fwd_row, fwd_col) {
+            if Self::creates_five_in_row(board, (fwd_row as usize, fwd_col as usize), player) {
                 return Some((fwd_row as usize, fwd_col as usize));
             }
+        }
 
-            for i in 1..=backward {
-                let check_row = row as isize - dx * i as isize;
-                let check_col = col as isize - dy * i as isize;
-                if PatternAnalyzer::is_valid_empty(board, check_row, check_col) {
-                    let pos = (check_row as usize, check_col as usize);
-                    if Self::creates_five_in_row(board, pos, player) {
-                        return Some(pos);
-                    }
+        // Case 2 & 3: Check for gaps within the pattern (handles patterns like XXX_X or XX_XX)
+        // This is necessary because the consecutive count breaks at gaps
+        for i in 1..=backward {
+            let check_row = row as isize - dx * i as isize;
+            let check_col = col as isize - dy * i as isize;
+            if PatternAnalyzer::is_valid_empty(board, check_row, check_col) {
+                let pos = (check_row as usize, check_col as usize);
+                if Self::creates_five_in_row(board, pos, player) {
+                    return Some(pos);
                 }
             }
+        }
 
-            for i in 1..=forward {
-                let check_row = row as isize + dx * i as isize;
-                let check_col = col as isize + dy * i as isize;
-                if PatternAnalyzer::is_valid_empty(board, check_row, check_col) {
-                    let pos = (check_row as usize, check_col as usize);
-                    if Self::creates_five_in_row(board, pos, player) {
-                        return Some(pos);
-                    }
+        for i in 1..=forward {
+            let check_row = row as isize + dx * i as isize;
+            let check_col = col as isize + dy * i as isize;
+            if PatternAnalyzer::is_valid_empty(board, check_row, check_col) {
+                let pos = (check_row as usize, check_col as usize);
+                if Self::creates_five_in_row(board, pos, player) {
+                    return Some(pos);
                 }
             }
         }
@@ -109,7 +127,12 @@ impl MoveGenerator {
 
     fn creates_five_in_row(board: &Board, pos: (usize, usize), player: Player) -> bool {
         for &(dx, dy) in &DIRECTIONS {
-            let total = PatternAnalyzer::count_consecutive_bidirectional(board, pos.0, pos.1, dx, dy, player);
+            // Count stones in both directions from this empty position
+            // Note: pos is empty, so we count around it, not including it
+            let backward = PatternAnalyzer::count_consecutive(board, pos.0, pos.1, -dx, -dy, player);
+            let forward = PatternAnalyzer::count_consecutive(board, pos.0, pos.1, dx, dy, player);
+            // Add 1 for the stone we would place at pos
+            let total = backward + forward + 1;
             if total >= 5 {
                 return true;
             }
@@ -181,14 +204,83 @@ impl MoveGenerator {
         let opp_threats = Self::find_threat_creating_moves(board, player.opponent());
         moves.extend(opp_threats);
 
-        if moves.len() > 30 {
-            return Vec::new();
-        }
-
-        moves
+        let filtered_moves: Vec<(usize, usize)> = moves
             .into_iter()
             .filter(|&(row, col)| !GameRules::creates_double_three(board, row, col, player))
-            .collect()
+            .collect();
+
+        // If too many threat moves, prioritize and limit them instead of abandoning
+        if filtered_moves.len() > 30 {
+            let mut prioritized_moves: Vec<((usize, usize), i32)> = filtered_moves
+                .into_iter()
+                .map(|mv| {
+                    let priority = Self::calculate_threat_priority(board, mv, player);
+                    (mv, priority)
+                })
+                .collect();
+            
+            // Sort by priority (descending)
+            prioritized_moves.sort_by_key(|(_, priority)| -priority);
+            
+            // Take top 30 moves
+            prioritized_moves.truncate(30);
+            prioritized_moves.into_iter().map(|(mv, _)| mv).collect()
+        } else {
+            filtered_moves
+        }
+    }
+
+    /// Calculate the tactical priority of a threat move
+    fn calculate_threat_priority(board: &Board, mv: (usize, usize), player: Player) -> i32 {
+        let (row, col) = mv;
+        let mut priority = 0;
+
+        // Check both our threats and opponent's threats at this position
+        for &check_player in &[player, player.opponent()] {
+            for &(dx, dy) in &DIRECTIONS {
+                let backward = PatternAnalyzer::count_consecutive(board, row, col, -dx, -dy, check_player);
+                let forward = PatternAnalyzer::count_consecutive(board, row, col, dx, dy, check_player);
+                let total = backward + forward + 1;
+
+                // Prioritize based on pattern strength
+                let pattern_value = match total {
+                    5 => 10000,  // Creates five - winning move
+                    4 => {
+                        // Check if it's open four
+                        let back_row = row as isize - dx * (backward as isize + 1);
+                        let back_col = col as isize - dy * (backward as isize + 1);
+                        let fwd_row = row as isize + dx * (forward as isize + 1);
+                        let fwd_col = col as isize + dy * (forward as isize + 1);
+                        
+                        let back_open = PatternAnalyzer::is_valid_empty(board, back_row, back_col);
+                        let fwd_open = PatternAnalyzer::is_valid_empty(board, fwd_row, fwd_col);
+                        
+                        if back_open && fwd_open {
+                            1000  // Open four - very strong
+                        } else {
+                            500   // Half-open four
+                        }
+                    }
+                    3 => 200,  // Three in a row
+                    2 => 50,   // Two in a row
+                    _ => 0,
+                };
+
+                // Double the value if it's our threat (offensive), keep normal if opponent's (defensive)
+                if check_player == player {
+                    priority += pattern_value * 2;
+                } else {
+                    priority += pattern_value;
+                }
+            }
+        }
+
+        // Bonus for center proximity
+        let center = board.size / 2;
+        let distance = ((row as isize - center as isize).abs() + (col as isize - center as isize).abs()) as i32;
+        priority += 10 - distance.min(10);
+
+        priority
     }
 
     fn find_threat_creating_moves(board: &Board, player: Player) -> HashSet<(usize, usize)> {
