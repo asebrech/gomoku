@@ -58,12 +58,13 @@ impl MoveGenerator {
 
     /// Find a winning move in a specific direction from a given stone.
     /// 
-    /// This function handles three cases:
-    /// 1. Solid pattern (XXXX_): Check endpoints
-    /// 2. Pattern with one gap (XXX_X): Check the gap
-    /// 3. Pattern with multiple gaps: Check each gap
+    /// This function needs to detect winning moves in patterns with gaps:
+    /// - XXXX_: solid four with one endpoint
+    /// - XXX_X: four with gap adjacent to the stone we're checking from
+    /// - XX_XX: four with gap in the middle (needs wider search)
     /// 
-    /// Returns the position that completes five-in-a-row if found.
+    /// The key insight: count_consecutive stops at gaps, so we need to look
+    /// beyond gaps to find all positions within a winning range.
     fn find_win_in_direction(
         board: &Board,
         row: usize,
@@ -72,50 +73,24 @@ impl MoveGenerator {
         dy: isize,
         player: Player,
     ) -> Option<(usize, usize)> {
-        let backward = PatternAnalyzer::count_consecutive(board, row, col, -dx, -dy, player);
-        let forward = PatternAnalyzer::count_consecutive(board, row, col, dx, dy, player);
-        let total = backward + forward + 1;
-
-        // Need at least 4 stones to potentially create 5
-        if total < 4 {
-            return None;
-        }
-
-        // Case 1: Check endpoint positions (handles solid patterns like XXXX_)
-        let back_row = row as isize - dx * (backward as isize + 1);
-        let back_col = col as isize - dy * (backward as isize + 1);
-        if PatternAnalyzer::is_valid_empty(board, back_row, back_col) {
-            if Self::creates_five_in_row(board, (back_row as usize, back_col as usize), player) {
-                return Some((back_row as usize, back_col as usize));
+        // Search in a wider range (up to 5 positions in each direction)
+        // to catch patterns like XX_XX where the gap is in the middle
+        const MAX_SEARCH_DISTANCE: isize = 5;
+        
+        // Check all positions within range that could complete 5-in-a-row
+        for offset in -MAX_SEARCH_DISTANCE..=MAX_SEARCH_DISTANCE {
+            let check_row = row as isize + dx * offset;
+            let check_col = col as isize + dy * offset;
+            
+            // Skip the current stone position
+            if offset == 0 {
+                continue;
             }
-        }
-
-        let fwd_row = row as isize + dx * (forward as isize + 1);
-        let fwd_col = col as isize + dy * (forward as isize + 1);
-        if PatternAnalyzer::is_valid_empty(board, fwd_row, fwd_col) {
-            if Self::creates_five_in_row(board, (fwd_row as usize, fwd_col as usize), player) {
-                return Some((fwd_row as usize, fwd_col as usize));
-            }
-        }
-
-        // Case 2 & 3: Check for gaps within the pattern (handles patterns like XXX_X or XX_XX)
-        // This is necessary because the consecutive count breaks at gaps
-        for i in 1..=backward {
-            let check_row = row as isize - dx * i as isize;
-            let check_col = col as isize - dy * i as isize;
+            
+            // Check if this position is valid and empty
             if PatternAnalyzer::is_valid_empty(board, check_row, check_col) {
                 let pos = (check_row as usize, check_col as usize);
-                if Self::creates_five_in_row(board, pos, player) {
-                    return Some(pos);
-                }
-            }
-        }
-
-        for i in 1..=forward {
-            let check_row = row as isize + dx * i as isize;
-            let check_col = col as isize + dy * i as isize;
-            if PatternAnalyzer::is_valid_empty(board, check_row, check_col) {
-                let pos = (check_row as usize, check_col as usize);
+                // Would placing a stone here create 5 in a row?
                 if Self::creates_five_in_row(board, pos, player) {
                     return Some(pos);
                 }
