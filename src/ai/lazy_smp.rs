@@ -183,7 +183,7 @@ pub fn lazy_smp_search(
             .min(8) // Cap at 8 threads for diminishing returns
     });
 
-    let initial_moves = state.get_possible_moves();
+    let initial_moves = state.get_candidate_moves();
     if initial_moves.is_empty() {
         return SearchResult {
             best_move: None,

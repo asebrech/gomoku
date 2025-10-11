@@ -9,7 +9,7 @@ fn test_move_ordering_prioritizes_center() {
     // Place one stone to enable adjacent moves
     state.board.place_stone(7, 7, Player::Max);
     
-    let mut moves = state.get_possible_moves();
+    let mut moves = state.get_candidate_moves();
     let original_moves = moves.clone();
     
     MoveOrdering::order_moves(&state, &mut moves);
@@ -44,7 +44,7 @@ fn test_move_ordering_prioritizes_threats() {
     state.board.place_stone(5, 5, Player::Min);
     state.board.place_stone(9, 9, Player::Min);
     
-    let mut moves = state.get_possible_moves();
+    let mut moves = state.get_candidate_moves();
     MoveOrdering::order_moves(&state, &mut moves);
     
     // Move that completes the threat (7,8) or blocks it (7,4) should be first
@@ -63,7 +63,7 @@ fn test_move_ordering_adjacency_bonus() {
     state.board.place_stone(9, 9, Player::Min);  // Far from Max stone
     state.board.place_stone(5, 5, Player::Max);  // Far from first Max stone
     
-    let mut moves = state.get_possible_moves();
+    let mut moves = state.get_candidate_moves();
     MoveOrdering::order_moves(&state, &mut moves);
     
     // Moves adjacent to stones should be prioritized
@@ -90,8 +90,8 @@ fn test_move_ordering_consistency() {
     state.board.place_stone(7, 7, Player::Max);
     state.board.place_stone(8, 8, Player::Min);
     
-    let mut moves1 = state.get_possible_moves();
-    let mut moves2 = state.get_possible_moves();
+    let mut moves1 = state.get_candidate_moves();
+    let mut moves2 = state.get_candidate_moves();
     
     MoveOrdering::order_moves(&state, &mut moves1);
     MoveOrdering::order_moves(&state, &mut moves2);
@@ -115,7 +115,7 @@ fn test_move_ordering_performance() {
         }
     }
     
-    let mut moves = state.get_possible_moves();
+    let mut moves = state.get_candidate_moves();
     let start = std::time::Instant::now();
     
     MoveOrdering::order_moves(&state, &mut moves);

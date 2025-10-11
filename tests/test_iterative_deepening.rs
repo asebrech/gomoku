@@ -90,7 +90,7 @@ fn test_iterative_deepening_vs_direct_minimax() {
     println!("Regular result: {:?}", regular_result);
     
     // The moves might be different due to different search strategies, but both should be valid
-    let moves = state.get_possible_moves();
+    let moves = state.get_candidate_moves();
     assert!(moves.contains(&iterative_result.best_move.unwrap()));
     assert!(moves.contains(&regular_result.best_move.unwrap()));
 }
@@ -175,7 +175,7 @@ fn test_complex_board_with_short_time_limit() {
     println!("Board state before search:");
     println!("Current player: {:?}", state.current_player);
     println!("Is terminal: {}", state.is_terminal());
-    let moves = state.get_possible_moves();
+    let moves = state.get_candidate_moves();
     println!("Available moves: {} moves", moves.len());
     
     // Check if AI can win in one move - this would make the search trivial
@@ -195,7 +195,7 @@ fn test_complex_board_with_short_time_limit() {
     // Check if opponent can win in one move (forcing defensive play)
     let mut must_defend = false;
     state.current_player = Player::Max; // Temporarily switch to check opponent threats
-    let opponent_moves = state.get_possible_moves();
+    let opponent_moves = state.get_candidate_moves();
     for &mv in &opponent_moves {
         state.make_move(mv);
         if state.is_terminal() && state.check_winner() == Some(Player::Max) {
@@ -232,7 +232,7 @@ fn test_complex_board_with_short_time_limit() {
     assert!(result.time_elapsed.as_millis() <= 600); // Allow some margin
     
     // The move should be valid
-    let valid_moves = state.get_possible_moves();
+    let valid_moves = state.get_candidate_moves();
     assert!(valid_moves.contains(&result.best_move.unwrap()));
     
     println!("Complex board test result: {:?}", result);
@@ -262,7 +262,7 @@ fn test_500ms_time_limit() {
     assert!(result.nodes_searched > 0);
     
     // Move should be valid
-    let valid_moves = state.get_possible_moves();
+    let valid_moves = state.get_candidate_moves();
     assert!(valid_moves.contains(&result.best_move.unwrap()));
     
     println!("500ms time test result: {:?}", result);
@@ -446,7 +446,7 @@ fn test_very_complex_board_500ms() {
     println!("Board state after setup:");
     println!("Terminal: {}", state.is_terminal());
     println!("Current player: {:?}", state.current_player);
-    println!("Possible moves count: {}", state.get_possible_moves().len());
+    println!("Candidate moves count: {}", state.get_candidate_moves().len());
     if let Some(winner) = state.check_winner() {
         println!("Winner: {:?}", winner);
     }
@@ -472,7 +472,7 @@ fn test_very_complex_board_500ms() {
     assert!(result.nodes_searched > 0, "AI should search at least some nodes, got {}", result.nodes_searched);
     
     // The move should be valid
-    let valid_moves = state.get_possible_moves();
+    let valid_moves = state.get_candidate_moves();
     assert!(valid_moves.contains(&result.best_move.unwrap()), "AI move should be valid");
 
     // Should respect the time limit (important for game performance)
@@ -531,7 +531,7 @@ fn test_game_like_conditions() {
     assert!(result.time_elapsed.as_millis() <= 600, "Should respect time limit");
     
     // Quality assertions
-    let valid_moves = state.get_possible_moves();
+    let valid_moves = state.get_candidate_moves();
     assert!(valid_moves.contains(&result.best_move.unwrap()), "Move should be valid");
     
     // With 500ms, should be able to search multiple depths

@@ -18,7 +18,7 @@ fn test_game_state_creation() {
 #[test]
 fn test_first_move_only_center() {
     let state = GameState::new(19, 5);
-    let moves = state.get_possible_moves();
+    let moves = state.get_candidate_moves();
 
     assert_eq!(moves.len(), 1);
     assert_eq!(moves[0], (9, 9));
@@ -259,8 +259,8 @@ fn test_game_state_different_sizes() {
     assert_eq!(state19.board.size, 19);
 
     // Different sized boards should have different starting moves
-    let moves15 = state15.get_possible_moves();
-    let moves19 = state19.get_possible_moves();
+    let moves15 = state15.get_candidate_moves();
+    let moves19 = state19.get_candidate_moves();
 
     assert_ne!(moves15[0], moves19[0]);
 }

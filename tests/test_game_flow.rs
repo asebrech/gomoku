@@ -68,7 +68,7 @@ fn test_full_game_with_captures() {
     
     // Continue game to test further mechanics
     for i in 0..10 {
-        let moves = state.get_possible_moves();
+        let moves = state.get_candidate_moves();
         if !moves.is_empty() && !state.is_terminal() {
             state.make_move(moves[i % moves.len()]);
         } else {
@@ -307,7 +307,7 @@ fn test_edge_case_board_full() {
 
     // Last move
     state.current_player = Player::Max;
-    let moves = state.get_possible_moves();
+    let moves = state.get_candidate_moves();
 
     // Should have very few moves left
     assert!(moves.len() <= 1);

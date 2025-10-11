@@ -117,7 +117,7 @@ fn test_find_best_move_capture_opportunity() {
     let (row, col) = result.best_move.unwrap();
     
     // Verify it's a valid move
-    let possible_moves = state.get_possible_moves();
+    let possible_moves = state.get_candidate_moves();
     assert!(possible_moves.contains(&(row, col)), "Move should be valid");
     
     // Test the move leads to captures
@@ -208,7 +208,7 @@ fn test_find_best_move_complex_position() {
     assert!(result.best_move.is_some());
 
     let (row, col) = result.best_move.unwrap();
-    let possible_moves = state.get_possible_moves();
+    let possible_moves = state.get_candidate_moves();
     assert!(possible_moves.contains(&(row, col)));
 }
 
@@ -313,7 +313,7 @@ fn test_find_best_move_capture_win() {
     println!("Capture win test: {} -> {} captures", initial_captures, state.max_captures);
     
     // Verify it's a valid strategic move
-    let possible_moves = state.get_possible_moves();
+    let possible_moves = state.get_candidate_moves();
     assert!(!possible_moves.is_empty() || state.is_terminal());
 }
 

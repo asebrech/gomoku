@@ -42,7 +42,7 @@ fn alpha_beta_with_memory(
     }
 
     // Get and order moves with depth-based limiting
-    let mut moves = state.get_possible_moves();
+    let mut moves = state.get_candidate_moves();
     
     // Apply aggressive move limiting at high depths
     if depth >= 4 {

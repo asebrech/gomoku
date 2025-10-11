@@ -44,8 +44,8 @@ impl GameState {
         state
     }
 
-    pub fn get_possible_moves(&self) -> Vec<(usize, usize)> {
-        MoveGenerator::get_possible_moves(&self.board, self.current_player)
+    pub fn get_candidate_moves(&self) -> Vec<(usize, usize)> {
+        MoveGenerator::get_candidate_moves(&self.board, self.current_player)
     }
 
     pub fn make_move(&mut self, mv: (usize, usize)) {
@@ -128,7 +128,7 @@ impl GameState {
     }
 
     pub fn is_terminal(&self) -> bool {
-        self.winner.is_some() || self.get_possible_moves().is_empty()
+        self.winner.is_some() || self.get_candidate_moves().is_empty()
     }
 
     pub fn check_winner(&self) -> Option<Player> {
