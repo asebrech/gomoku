@@ -1,4 +1,4 @@
-use crate::ai::zobrist::ZobristHash;
+use crate::core::zobrist::ZobristHash;
 use crate::ai::pattern_history::PatternHistoryAnalyzer;
 use crate::ai::move_generation::MoveGenerator;
 use crate::core::board::{Board, Player};

@@ -5,7 +5,6 @@ pub mod ai {
     pub mod move_generation;
     pub mod pattern_history;
     pub mod transposition;
-    pub mod zobrist;
 }
 
 pub mod core {
@@ -14,6 +13,7 @@ pub mod core {
     pub mod patterns;
     pub mod rules;
     pub mod state;
+    pub mod zobrist;
 }
 
 pub mod ui {
