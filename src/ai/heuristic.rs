@@ -323,6 +323,18 @@ impl Heuristic {
     }
 
     fn calculate_capture_bonus(state: &GameState) -> i32 {
-        (state.max_captures as i32 - state.min_captures as i32) * CAPTURE_BONUS_MULTIPLIER
+        let max_bonus = if state.max_captures > 0 {
+            (CAPTURE_BONUS_MULTIPLIER as f32 * (state.max_captures as f32).sqrt()) as i32
+        } else {
+            0
+        };
+        
+        let min_bonus = if state.min_captures > 0 {
+            (CAPTURE_BONUS_MULTIPLIER as f32 * (state.min_captures as f32).sqrt()) as i32
+        } else {
+            0
+        };
+        
+        max_bonus - min_bonus
     }
 }

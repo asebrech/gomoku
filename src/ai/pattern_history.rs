@@ -106,7 +106,7 @@ impl PatternHistoryAnalyzer {
             .sum();
 
         if recent_captures > 0 {
-            CAPTURE_MOMENTUM_BONUS * recent_captures as i32
+            (CAPTURE_MOMENTUM_BONUS as f32 * (recent_captures as f32).sqrt()) as i32
         } else {
             0
         }

@@ -81,8 +81,9 @@ fn test_heuristic_capture_advantage() {
     // Should favor Max due to capture advantage
     assert!(score > 0);
 
-    // Should include capture bonus (3-1)*1000 = 2000
-    assert!(score >= 2000);
+    // With square root scaling: sqrt(3)*1000 - sqrt(1)*1000 = 1732 - 1000 = 732
+    // This is more balanced than linear scaling and follows real engine practices
+    assert!(score >= 700);
 }
 
 #[test]
