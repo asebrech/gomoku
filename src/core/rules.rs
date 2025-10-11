@@ -1,4 +1,5 @@
 use crate::core::board::{Board, Player};
+use crate::core::patterns::PatternAnalyzer;
 
 const DIRECTIONS: [(isize, isize); 4] = [(1, 0), (0, 1), (1, 1), (1, -1)];
 const FREE_THREE_LENGTH: usize = 3;
@@ -17,16 +18,18 @@ impl GameRules {
             return false;
         }
 
-        let player_bits = if Board::is_bit_set(&board.max_bits, idx) {
-            &board.max_bits
+        // Determine which player's stone this is
+        let player = if Board::is_bit_set(&board.max_bits, idx) {
+            Player::Max
         } else {
-            &board.min_bits
+            Player::Min
         };
 
+        // Use PatternAnalyzer::count_consecutive instead of duplicate count_direction
         for &(dx, dy) in &DIRECTIONS {
             let mut count = 1;
-            count += Self::count_direction(board, player_bits, row, col, dx, dy);
-            count += Self::count_direction(board, player_bits, row, col, -dx, -dy);
+            count += PatternAnalyzer::count_consecutive(board, row, col, dx, dy, player);
+            count += PatternAnalyzer::count_consecutive(board, row, col, -dx, -dy, player);
 
             if count >= win_condition {
                 return true;
@@ -34,37 +37,6 @@ impl GameRules {
         }
 
         false
-    }
-
-    fn count_direction(
-        board: &Board,
-        player_bits: &[u64],
-        row: usize,
-        col: usize,
-        dx: isize,
-        dy: isize,
-    ) -> usize {
-        let mut count = 0;
-        let mut step = 1;
-
-        loop {
-            let x = row as isize + dx * step;
-            let y = col as isize + dy * step;
-
-            if x < 0 || y < 0 || x >= board.size as isize || y >= board.size as isize {
-                break;
-            }
-
-            let check_idx = board.index(x as usize, y as usize);
-            if Board::is_bit_set(player_bits, check_idx) {
-                count += 1;
-                step += 1;
-            } else {
-                break;
-            }
-        }
-
-        count
     }
 
     pub fn check_capture_win(max_captures: usize, min_captures: usize) -> Option<Player> {
