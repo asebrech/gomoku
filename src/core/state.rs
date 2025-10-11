@@ -188,7 +188,7 @@ impl GameState {
 
                 for &(row, col) in &last_captures {
                     if row < self.board.size && col < self.board.size {
-                        // Use the board's place_stone method which handles bit manipulation
+
                         self.board.place_stone(row, col, opponent);
                     }
                 }

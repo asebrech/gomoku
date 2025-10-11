@@ -17,14 +17,12 @@ impl GameRules {
             return false;
         }
 
-        // Determine which player's stone this is
         let player = if Board::is_bit_set(&board.max_bits, idx) {
             Player::Max
         } else {
             Player::Min
         };
 
-        // Use PatternAnalyzer::count_consecutive instead of duplicate count_direction
         for &(dx, dy) in &DIRECTIONS {
             let mut count = 1;
             count += PatternAnalyzer::count_consecutive(board, row, col, dx, dy, player);

@@ -42,7 +42,6 @@ impl PatternHistoryAnalyzer {
         }
     }
 
-    /// Undo the last move analysis (for search rollback)
     pub fn undo_last_move(&mut self) {
         if !self.move_history.is_empty() {
             self.move_history.pop();
@@ -150,12 +149,10 @@ impl PatternHistoryAnalyzer {
         self.count_threat_patterns(state, position, player.opponent())
     }
 
-    /// Helper function to count threat patterns for a given player at a position
     fn count_threat_patterns(&self, state: &GameState, position: (usize, usize), player: Player) -> usize {
         let board = &state.board;
         let mut threats = 0;
         
-        // Check all directions for threat patterns
         for &(dx, dy) in &DIRECTIONS {
             let backward = crate::core::patterns::PatternAnalyzer::count_consecutive(
                 board, position.0, position.1, -dx, -dy, player
@@ -165,7 +162,6 @@ impl PatternHistoryAnalyzer {
             );
             let total = backward + forward + 1;
             
-            // Count as threat if it forms 3+ in a row
             if total >= 3 {
                 threats += 1;
             }
@@ -199,7 +195,6 @@ impl PatternHistoryAnalyzer {
 
         self.tempo_score = max_score - min_score;
         
-        // Determine who has initiative
         if self.tempo_score > 2 {
             self.initiative_player = Some(Player::Max);
         } else if self.tempo_score < -2 {
@@ -221,7 +216,6 @@ impl PatternHistoryAnalyzer {
             return 0;
         }
 
-        // Bonus for consistent aggressive play
         let aggressive_count = recent_moves
             .iter()
             .filter(|m| matches!(m.move_type, MoveType::Aggressive | MoveType::Capture))

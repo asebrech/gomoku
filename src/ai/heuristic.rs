@@ -231,10 +231,8 @@ impl Heuristic {
     ) -> usize {
         let mut space = pattern_length;
         
-        // Count space in backward direction
         space += Self::count_empty_in_direction(board, start_row as isize - dx, start_col as isize - dy, -dx, -dy);
         
-        // Count space in forward direction
         let end_row = start_row as isize + (pattern_length - 1) as isize * dx;
         let end_col = start_col as isize + (pattern_length - 1) as isize * dy;
         space += Self::count_empty_in_direction(board, end_row + dx, end_col + dy, dx, dy);

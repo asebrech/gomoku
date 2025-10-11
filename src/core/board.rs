@@ -46,13 +46,11 @@ impl Board {
         row * self.size + col
     }
 
-    /// Check if usize coordinates are within board bounds
     #[inline]
     pub fn is_valid_position(&self, row: usize, col: usize) -> bool {
         row < self.size && col < self.size
     }
 
-    /// Iterate over all set bits in a bitboard, calling the closure for each position
     pub fn iterate_bits<F>(&self, bitboard: &[u64], mut callback: F)
     where
         F: FnMut(usize, usize),
@@ -72,7 +70,6 @@ impl Board {
         }
     }
 
-    /// Collect all positions where bits are set in a bitboard
     pub fn collect_bit_positions(&self, bitboard: &[u64]) -> Vec<(usize, usize)> {
         let mut positions = Vec::new();
         self.iterate_bits(bitboard, |row, col| {
@@ -121,7 +118,6 @@ impl Board {
         bits.iter().map(|&b| b.count_ones() as usize).sum()
     }
 
-    /// Get the bit array for a specific player
     #[inline]
     pub fn get_player_bits(&self, player: Player) -> &Vec<u64> {
         match player {
@@ -130,7 +126,6 @@ impl Board {
         }
     }
 
-    /// Get mutable bit array for a specific player
     #[inline]
     pub fn get_player_bits_mut(&mut self, player: Player) -> &mut Vec<u64> {
         match player {
