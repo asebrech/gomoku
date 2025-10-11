@@ -1,5 +1,5 @@
 use gomoku::core::board::{Board, Player};
-use gomoku::core::move_generation::MoveGenerator;
+use gomoku::ai::move_generation::MoveGenerator;
 
 #[test]
 fn test_winning_position_from_image() {
