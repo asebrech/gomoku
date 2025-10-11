@@ -4,6 +4,8 @@ use std::collections::HashMap;
 
 #[derive(Resource, Debug, Clone, Serialize, Deserialize)]
 pub struct GameConfig {
+    #[serde(default, rename = "devMode")]
+    pub dev_mode: bool,
     pub assets: AssetConfig,
     pub colors: ColorConfig,
     pub ui: UiConfig,
@@ -232,6 +234,7 @@ impl GameConfig {
 
     pub fn default() -> Self {
         Self {
+            dev_mode: false,
             assets: AssetConfig {
                 backgrounds: BackgroundAssets {
                     splash: "backgrounds/login/gomoku-splash.png".to_string(),
@@ -378,12 +381,7 @@ pub fn update_config_elements(
 
 // Plugin to initialize the config system
 pub fn config_plugin(app: &mut App) {
-    let config = GameConfig::load_from_file("config/config.json")
-        .unwrap_or_else(|_| {
-            println!("Could not load config.json, using default config");
-            GameConfig::default()
-        });
-    
-    app.insert_resource(config)
-        .add_systems(Update, update_config_elements);
+    // Don't reload config here - it's already loaded in init_resources
+    // This plugin just adds the update system
+    app.add_systems(Update, update_config_elements);
 }

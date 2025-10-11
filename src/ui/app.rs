@@ -107,6 +107,7 @@ impl GomokuApp {
 		// Load game settings from config
 		let config = GameConfig::load_from_file("config/config.json")
 			.unwrap_or_else(|_| GameConfig::default());
+		
 		let (board_size, win_condition, ai_max_depth, ai_time_limit, pair_captures_to_win) = config.get_game_settings();
 		// Use the configured values directly
 		let ai_depth = ai_max_depth.unwrap_or(6) as i32; // Default to 6 if unlimited
@@ -131,8 +132,15 @@ impl GomokuApp {
 	}
 
 	fn init_plugins(&mut self) {
+		self.app.init_state::<AppState>();
+		let config = self.app.world().get_resource::<GameConfig>()
+			.expect("GameConfig should be initialized before plugins");
+		
+		if config.dev_mode {
+			self.app.world_mut().resource_mut::<NextState<AppState>>().set(AppState::Menu);
+		}
+		
 		self.app
-        .init_state::<AppState>()
         .add_systems(Startup, setup)
 		        .add_systems(
             Update,

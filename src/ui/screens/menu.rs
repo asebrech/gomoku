@@ -11,7 +11,7 @@
         audio::PlayClickSound,
         ui::{
             app::{AppState, GameSettings}, 
-            screens::utils::despawn_screen,
+            screens::{utils::despawn_screen, splash::PreloadedStones},
             config::GameConfig
         }
     };
@@ -126,7 +126,6 @@
         PairCapturesInc,
         PairCapturesDec,
         Fullscreen,
-        Vsync,
         VolumeControl,
         AudioMute,
     }
@@ -142,7 +141,6 @@
         WinConditionValue,
         PairCapturesValue,
         FullscreenToggle,
-        VsyncToggle,
         MutedToggle,
         AIMaxDepthValue,
         AITimeLimitValue,
@@ -153,7 +151,7 @@
             .init_state::<MenuState>()
             .init_resource::<MenuInitialized>()
             .init_resource::<LoadingProgress>()
-            .add_systems(OnEnter(AppState::Menu), menu_setup)
+            .add_systems(OnEnter(AppState::Menu), (init_dev_mode_resources, menu_setup).chain())
             .add_systems(OnEnter(MenuState::Splash), splash_screen_setup)
             .add_systems(OnEnter(MenuState::Main), (main_menu_setup, setup_audio_if_needed))
             .add_systems(OnEnter(MenuState::Settings), (settings_menu_setup, force_settings_display_update))
@@ -296,10 +294,6 @@
                                 let (fullscreen, _) = config.get_display_settings();
                                 if fullscreen { colors.button_pressed.clone() } else { colors.button_normal.clone() }
                             },
-                            SettingControl::Vsync => {
-                                let (_, vsync) = config.get_display_settings();
-                                if vsync { colors.button_pressed.clone() } else { colors.button_normal.clone() }
-                            },
                             SettingControl::AudioMute => {
                                 let (_, muted) = config.get_audio_settings();
                                 if muted { colors.button_pressed.clone() } else { colors.button_normal.clone() }
@@ -353,13 +347,42 @@
         }
     }
 
+    fn init_dev_mode_resources(
+        mut commands: Commands,
+        config: Res<GameConfig>,
+        asset_server: Res<AssetServer>,
+    ) {
+        if config.dev_mode {
+            let pink_stone = asset_server.load("icons/synthwave/pink-stone.png");
+            let blue_stone = asset_server.load("icons/synthwave/blue-stone.png");
+            
+            commands.insert_resource(PreloadedStones {
+                pink_stone,
+                blue_stone,
+            });
+            
+            commands.insert_resource(VideoFrames { 
+                frames: Vec::new(),
+                all_loaded: true,
+            });
+            commands.insert_resource(PreloadedAssets {
+                logo: Handle::default(),
+            });
+            commands.insert_resource(TrackedAssets::new());
+        }
+    }
+
     fn menu_setup(
         mut menu_state: ResMut<NextState<MenuState>>,
         mut menu_initialized: ResMut<MenuInitialized>,
+        config: Res<GameConfig>,
     ) {
         if !menu_initialized.first_time {
-            // First time entering menu - do the splash screen
-            menu_state.set(MenuState::Splash);
+            if config.dev_mode {
+                menu_state.set(MenuState::Main);
+            } else {
+                menu_state.set(MenuState::Splash);
+            }
             menu_initialized.first_time = true;
         } else {
             // Returning to menu - go directly to main menu
@@ -374,6 +397,31 @@
         mut loading_progress: ResMut<LoadingProgress>,
     ) {
         let colors = &config.colors;
+        
+        // Check if devMode is enabled
+        if config.dev_mode {
+            // Create minimal tracked assets for compatibility
+            let tracked_assets = TrackedAssets::new();
+            commands.insert_resource(tracked_assets);
+            
+            // Create empty video frames resource
+            commands.insert_resource(VideoFrames { 
+                frames: Vec::new(),
+                all_loaded: true,
+            });
+            
+            // Create dummy preloaded assets
+            commands.insert_resource(PreloadedAssets {
+                logo: Handle::default(),
+            });
+            
+            // Mark loading as complete
+            loading_progress.total_assets = 1;
+            loading_progress.loaded_assets = 1;
+            
+            // Skip to menu immediately by not creating the splash screen UI
+            return;
+        }
         
         // PRIORITY LOAD: Load splash background first with high priority
         let splash_bg = asset_server.load(&config.assets.backgrounds.splash);
@@ -532,10 +580,16 @@
         mut commands: Commands,
         time: Res<Time>,
         fade_query: Query<Entity, With<FadeTransition>>,
+        config: Res<GameConfig>,
     ) {
         loading_progress.loading_timer.tick(time.delta());
         
         if loading_progress.loading_timer.just_finished() {
+            if config.dev_mode && fade_query.is_empty() {
+                start_fade_transition(&mut commands);
+                return;
+            }
+            
             if let Some(tracked) = tracked_assets.as_ref() {
                 // Use the tracked assets system
                 let loaded_count = tracked.count_loaded(&asset_server);
@@ -673,8 +727,10 @@ fn main_menu_setup(
 ) {
     let colors = &config.colors;
     
-    // Get the already loaded video frames
-    let video_frame_handles = if let Some(frames) = video_frames.as_ref() {
+    // Get the already loaded video frames (or empty if devMode)
+    let video_frame_handles = if config.dev_mode {
+        Vec::new()
+    } else if let Some(frames) = video_frames.as_ref() {
         frames.frames.clone()
     } else {
         // Fallback: load frames if somehow not available
@@ -729,23 +785,38 @@ fn main_menu_setup(
             OnMainMenuScreen,
         ))
         .with_children(|parent| {
-            // Video background using frame sequence
-            parent.spawn((
-                Node {
-                    position_type: PositionType::Absolute,
-                    top: Val::Px(0.0),
-                    left: Val::Px(0.0),
-                    width: Val::Percent(100.0),
-                    height: Val::Percent(100.0),
-                    ..default()
-                },
-                ImageNode::new(video_frame_handles[0].clone()),
-                VideoBackground {
-                    current_frame: 0,
-                    timer: Timer::from_seconds(1.0 / 15.0, TimerMode::Repeating), // 15 FPS
-                    total_frames: 120,
-                },
-            ));
+            // Video background using frame sequence (skip in devMode)
+            if !config.dev_mode && !video_frame_handles.is_empty() {
+                parent.spawn((
+                    Node {
+                        position_type: PositionType::Absolute,
+                        top: Val::Px(0.0),
+                        left: Val::Px(0.0),
+                        width: Val::Percent(100.0),
+                        height: Val::Percent(100.0),
+                        ..default()
+                    },
+                    ImageNode::new(video_frame_handles[0].clone()),
+                    VideoBackground {
+                        current_frame: 0,
+                        timer: Timer::from_seconds(1.0 / 15.0, TimerMode::Repeating), // 15 FPS
+                        total_frames: 120,
+                    },
+                ));
+            } else if config.dev_mode {
+                // In devMode, show a simple colored background
+                parent.spawn((
+                    Node {
+                        position_type: PositionType::Absolute,
+                        top: Val::Px(0.0),
+                        left: Val::Px(0.0),
+                        width: Val::Percent(100.0),
+                        height: Val::Percent(100.0),
+                        ..default()
+                    },
+                    BackgroundColor(colors.background.clone().into()),
+                ));
+            }
 
             // Dark overlay for better text readability
             parent.spawn((
@@ -909,22 +980,38 @@ fn main_menu_setup(
                             },
                         ))
                         .with_children(|parent| {
-                            // Logo
-                            let logo_handle = if let Some(assets) = preloaded_assets.as_ref() {
-                                assets.logo.clone()
+                            // Logo (skip in devMode)
+                            if !config.dev_mode {
+                                let logo_handle = if let Some(assets) = preloaded_assets.as_ref() {
+                                    assets.logo.clone()
+                                } else {
+                                    asset_server.load(&config.assets.icons.logo)
+                                };
+                                
+                                parent.spawn((
+                                    ImageNode::new(logo_handle),
+                                    Node {
+                                        width: Val::Px(400.0),  // Scale down the logo
+                                        height: Val::Auto,      // Maintain aspect ratio
+                                        margin: UiRect::bottom(Val::Px(20.0)),
+                                        ..default()
+                                    },
+                                ));
                             } else {
-                                asset_server.load(&config.assets.icons.logo)
-                            };
-                            
-                            parent.spawn((
-                                ImageNode::new(logo_handle),
-                                Node {
-                                    width: Val::Px(400.0),  // Scale down the logo
-                                    height: Val::Auto,      // Maintain aspect ratio
-                                    margin: UiRect::bottom(Val::Px(20.0)),
-                                    ..default()
-                                },
-                            ));
+                                // In devMode, show text instead of logo
+                                parent.spawn((
+                                    Text::new("GOMOKU [DEV MODE]"),
+                                    TextFont {
+                                        font_size: config.ui.font_sizes.title * 1.5,
+                                        ..default()
+                                    },
+                                    TextColor(colors.primary.clone().into()),
+                                    Node {
+                                        margin: UiRect::bottom(Val::Px(20.0)),
+                                        ..default()
+                                    },
+                                ));
+                            }
                             
                             // Subtitle
                             parent.spawn((
@@ -1033,8 +1120,10 @@ fn settings_menu_setup(
 ) {
     let colors = &config.colors;
     
-    // Get the already loaded video frames for background
-    let video_frame_handles = if let Some(frames) = video_frames.as_ref() {
+    // Get the already loaded video frames for background (or empty if devMode)
+    let video_frame_handles = if config.dev_mode {
+        Vec::new()
+    } else if let Some(frames) = video_frames.as_ref() {
         frames.frames.clone()
     } else {
         // Fallback: load frames if somehow not available
@@ -1061,8 +1150,8 @@ fn settings_menu_setup(
             OnSettingsMenuScreen,
         ))
         .with_children(|parent| {
-            // Video background using frame sequence
-            if !video_frame_handles.is_empty() {
+            // Video background using frame sequence (skip in devMode)
+            if !config.dev_mode && !video_frame_handles.is_empty() {
                 parent.spawn((
                     Node {
                         position_type: PositionType::Absolute,
@@ -1078,6 +1167,18 @@ fn settings_menu_setup(
                         timer: Timer::from_seconds(1.0 / 15.0, TimerMode::Repeating),
                         total_frames: 120,
                     },
+                ));
+            } else if config.dev_mode {
+                parent.spawn((
+                    Node {
+                        position_type: PositionType::Absolute,
+                        top: Val::Px(0.0),
+                        left: Val::Px(0.0),
+                        width: Val::Percent(100.0),
+                        height: Val::Percent(100.0),
+                        ..default()
+                    },
+                    BackgroundColor(colors.background.clone().into()),
                 ));
             }
 
@@ -1170,7 +1271,6 @@ fn settings_menu_setup(
                                 "DISPLAY",
                                 &[
                                     ("Fullscreen", SettingType::Fullscreen),
-                                    ("VSync", SettingType::VSync),
                                 ],
                                 &config,
                             );
@@ -1237,7 +1337,6 @@ enum SettingType {
     AITimeLimit,
     PairCaptures,
     Fullscreen,
-    VSync,
 }
 
 fn create_settings_column(
@@ -1350,10 +1449,6 @@ fn create_setting_item(
                 SettingType::Fullscreen => {
                     let (fullscreen, _) = config.get_display_settings();
                     create_toggle_control(parent, fullscreen, "Fullscreen", colors);
-                }
-                SettingType::VSync => {
-                    let (_, vsync) = config.get_display_settings();
-                    create_toggle_control(parent, vsync, "VSync", colors);
                 }
             }
         });
@@ -1469,7 +1564,13 @@ fn create_menu_button_with_icon(
         time: Res<Time>,
         mut video_backgrounds: Query<(&mut VideoBackground, &mut ImageNode)>,
         video_frames: Option<Res<VideoFrames>>,
+        config: Res<GameConfig>,
     ) {
+        // Skip animation in devMode
+        if config.dev_mode {
+            return;
+        }
+        
         if let Some(frames) = video_frames {
             // Only animate if all frames are loaded (should be true after splash screen)
             for (mut video_bg, mut image_node) in video_backgrounds.iter_mut() {
@@ -1493,6 +1594,12 @@ fn create_menu_button_with_icon(
         mut menu_initialized: ResMut<MenuInitialized>,
         _game_audio: Option<Res<GameAudio>>,
     ) {
+        // Skip audio setup in devMode
+        if config.dev_mode {
+            menu_initialized.audio_started = true;
+            return;
+        }
+        
         // Only start audio if it hasn't been started yet
         if !menu_initialized.audio_started {
             let (volume, _muted) = config.get_audio_settings();
@@ -1836,15 +1943,6 @@ fn create_menu_button_with_icon(
                             }
                         }
                     }
-                    SettingControl::Vsync => {
-                        let (fullscreen, current_vsync) = config.get_display_settings();
-                        let new_vsync = !current_vsync;
-                        if let Err(e) = config.save_display_settings(fullscreen, new_vsync) {
-                            println!("Failed to save vsync setting: {}", e);
-                        } else {
-                            println!("VSync changed to: {}", new_vsync);
-                        }
-                    }
                     SettingControl::AudioMute => {
                         let (volume, current_muted) = config.get_audio_settings();
                         let new_muted = !current_muted;
@@ -1905,7 +2003,7 @@ fn create_menu_button_with_icon(
         )>,
     ) {
             let (board_size, win_condition, ai_max_depth, ai_time_limit, pair_captures) = config.get_game_settings();
-            let (fullscreen, vsync) = config.get_display_settings();
+            let (fullscreen, _) = config.get_display_settings();
             let (_, muted) = config.get_audio_settings();
             let colors = &config.colors;
 
@@ -1950,14 +2048,6 @@ fn create_menu_button_with_icon(
                     SettingDisplayType::FullscreenToggle => {
                         button_updates.push((children[0], if fullscreen { "ON" } else { "OFF" }));
                         *bg_color = BackgroundColor(if fullscreen { 
-                            colors.accent.clone() 
-                        } else { 
-                            colors.button_normal.clone() 
-                        }.into());
-                    }
-                    SettingDisplayType::VsyncToggle => {
-                        button_updates.push((children[0], if vsync { "ON" } else { "OFF" }));
-                        *bg_color = BackgroundColor(if vsync { 
                             colors.accent.clone() 
                         } else { 
                             colors.button_normal.clone() 
@@ -2089,13 +2179,11 @@ fn create_menu_button_with_icon(
             BorderColor(colors.secondary.clone().into()),
             match setting_name {
                 "Fullscreen" => SettingControl::Fullscreen,
-                "VSync" => SettingControl::Vsync,
                 _ => SettingControl::AudioMute, // Fallback for mute toggle
             },
             SettingDisplay {
                 setting_type: match setting_name {
                     "Fullscreen" => SettingDisplayType::FullscreenToggle,
-                    "VSync" => SettingDisplayType::VsyncToggle,
                     "Muted" => SettingDisplayType::MutedToggle,
                     _ => SettingDisplayType::MutedToggle,
                 }
