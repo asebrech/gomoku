@@ -1,10 +1,10 @@
 use gomoku::core::board::{Board, Player};
-use gomoku::core::moves::MoveHandler;
+use gomoku::core::moves::MoveGenerator;
 
 #[test]
 fn test_first_move_center_only() {
     let board = Board::new(19);
-    let moves = MoveHandler::get_possible_moves(&board, Player::Max);
+    let moves = MoveGenerator::get_possible_moves(&board, Player::Max);
 
     assert_eq!(moves.len(), 1);
     assert_eq!(moves[0], (9, 9)); // Center of 19x19 board
@@ -13,12 +13,12 @@ fn test_first_move_center_only() {
 #[test]
 fn test_first_move_different_board_sizes() {
     let board15 = Board::new(15);
-    let moves15 = MoveHandler::get_possible_moves(&board15, Player::Max);
+    let moves15 = MoveGenerator::get_possible_moves(&board15, Player::Max);
     assert_eq!(moves15.len(), 1);
     assert_eq!(moves15[0], (7, 7)); // Center of 15x15 board
 
     let board13 = Board::new(13);
-    let moves13 = MoveHandler::get_possible_moves(&board13, Player::Max);
+    let moves13 = MoveGenerator::get_possible_moves(&board13, Player::Max);
     assert_eq!(moves13.len(), 1);
     assert_eq!(moves13[0], (6, 6)); // Center of 13x13 board
 }
@@ -28,7 +28,7 @@ fn test_adjacent_moves_only() {
     let mut board = Board::new(19);
     board.place_stone(9, 9, Player::Max);
 
-    let moves = MoveHandler::get_possible_moves(&board, Player::Min);
+    let moves = MoveGenerator::get_possible_moves(&board, Player::Min);
 
     // Should include moves within zone (radius 2 in early game, < 10 stones)
     assert!(moves.len() > 0);
@@ -62,7 +62,7 @@ fn test_no_occupied_moves() {
     board.place_stone(9, 9, Player::Max);
     board.place_stone(8, 8, Player::Min);
 
-    let moves = MoveHandler::get_possible_moves(&board, Player::Max);
+    let moves = MoveGenerator::get_possible_moves(&board, Player::Max);
 
     // Should not include occupied positions
     assert!(!moves.contains(&(9, 9)));
@@ -80,7 +80,7 @@ fn test_edge_case_moves() {
     // Place stone at edge
     board.place_stone(0, 0, Player::Max);
 
-    let moves = MoveHandler::get_possible_moves(&board, Player::Min);
+    let moves = MoveGenerator::get_possible_moves(&board, Player::Min);
 
     // Should include only valid adjacent positions within board bounds
     let expected_moves = vec![(0, 1), (1, 0), (1, 1)];
@@ -108,7 +108,7 @@ fn test_corner_moves() {
     board.place_stone(18, 0, Player::Max);
     board.place_stone(18, 18, Player::Max);
 
-    let moves = MoveHandler::get_possible_moves(&board, Player::Min);
+    let moves = MoveGenerator::get_possible_moves(&board, Player::Min);
 
     // Should include adjacent positions for all corners
     let expected_corners = vec![
@@ -141,7 +141,7 @@ fn test_corner_moves() {
 
 #[test] 
 fn test_double_three_moves_excluded() {
-    use gomoku::core::moves::RuleValidator;
+    use gomoku::core::rules::GameRules;
     
     let mut board = Board::new(19);
     
@@ -192,11 +192,11 @@ fn test_double_three_moves_excluded() {
     // And both have space to extend to 4, making them "open threes"
     
     // Verify that position (9,9) would create double-three
-    assert!(RuleValidator::creates_double_three(&board, 9, 9, Player::Max),
+    assert!(GameRules::creates_double_three(&board, 9, 9, Player::Max),
             "Position (9,9) should create double-three");
     
-    // Now test that MoveHandler excludes this move
-    let moves = MoveHandler::get_possible_moves(&board, Player::Max);
+    // Now test that MoveGenerator excludes this move
+    let moves = MoveGenerator::get_possible_moves(&board, Player::Max);
     
     // The double-three creating move should NOT be in possible moves
     assert!(!moves.contains(&(9, 9)), "Double-three move (9,9) should be excluded from possible moves");
@@ -206,7 +206,7 @@ fn test_double_three_moves_excluded() {
     
     // Verify that ALL returned moves are valid (don't create double-three)
     for &mv in &moves {
-        assert!(!RuleValidator::creates_double_three(&board, mv.0, mv.1, Player::Max),
+        assert!(!GameRules::creates_double_three(&board, mv.0, mv.1, Player::Max),
                 "Move ({}, {}) should not create double-three but was included", mv.0, mv.1);
     }
     

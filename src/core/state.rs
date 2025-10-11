@@ -2,8 +2,8 @@ use crate::ai::zobrist::ZobristHash;
 use crate::ai::pattern_history::PatternHistoryAnalyzer;
 use crate::core::board::{Board, Player};
 use crate::core::captures::CaptureHandler;
-use crate::core::moves::MoveHandler;
-use crate::core::rules::WinChecker;
+use crate::core::moves::MoveGenerator;
+use crate::core::rules::GameRules;
 use bevy::prelude::*;
 use std::hash::Hash;
 
@@ -45,7 +45,7 @@ impl GameState {
     }
 
     pub fn get_possible_moves(&self) -> Vec<(usize, usize)> {
-        MoveHandler::get_possible_moves(&self.board, self.current_player)
+        MoveGenerator::get_possible_moves(&self.board, self.current_player)
     }
 
     pub fn make_move(&mut self, mv: (usize, usize)) {
@@ -218,10 +218,10 @@ impl GameState {
     }
 
     fn check_win_around(&self, mv: (usize, usize)) -> bool {
-        WinChecker::check_win_around(&self.board, mv.0, mv.1, self.win_condition)
+        GameRules::check_win_around(&self.board, mv.0, mv.1, self.win_condition)
     }
 
     pub fn check_capture_win(&self) -> Option<Player> {
-        WinChecker::check_capture_win(self.max_captures, self.min_captures)
+        GameRules::check_capture_win(self.max_captures, self.min_captures)
     }
 }

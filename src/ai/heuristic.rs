@@ -166,7 +166,6 @@ impl Heuristic {
         let consecutive_after_start =
             PatternAnalyzer::count_consecutive(board, pattern_start_row, pattern_start_col, dx, dy, player);
 
-        // count_consecutive counts stones AFTER the start position, so add 1 for the start itself
         let length = consecutive_after_start + 1;
 
         if length < 2 {
@@ -175,8 +174,6 @@ impl Heuristic {
 
         let length = length.min(win_condition);
         
-        // Check if there's enough total space (including pattern itself) to reach win_condition
-        // This is a simple bounds check - pattern freedom analysis handles tactical evaluation
         let total_available_space = Self::count_total_space(
             board,
             pattern_start_row,
@@ -187,7 +184,7 @@ impl Heuristic {
         );
         
         if total_available_space < win_condition {
-            return None; // Pattern can never lead to a win due to board size
+            return None;
         }
         
         let freedom =
@@ -224,9 +221,6 @@ impl Heuristic {
         }
     }
 
-    /// Count the maximum possible space available in a line direction
-    /// This includes the pattern itself plus empty spaces in both directions
-    /// Used to determine if a pattern can theoretically reach win_condition
     fn count_total_space(
         board: &Board,
         start_row: usize,
@@ -235,9 +229,8 @@ impl Heuristic {
         dy: isize,
         pattern_length: usize,
     ) -> usize {
-        let mut space = pattern_length; // Include the pattern itself
+        let mut space = pattern_length;
         
-        // Count empty spaces backward from start
         let mut current_row = start_row as isize - dx;
         let mut current_col = start_col as isize - dy;
         while current_row >= 0
@@ -251,11 +244,10 @@ impl Heuristic {
                 current_row -= dx;
                 current_col -= dy;
             } else {
-                break; // Stop at any stone (own or opponent)
+                break;
             }
         }
         
-        // Count empty spaces forward from end of pattern
         let end_row = start_row as isize + (pattern_length - 1) as isize * dx;
         let end_col = start_col as isize + (pattern_length - 1) as isize * dy;
         current_row = end_row + dx;
@@ -271,7 +263,7 @@ impl Heuristic {
                 current_row += dx;
                 current_col += dy;
             } else {
-                break; // Stop at any stone (own or opponent)
+                break;
             }
         }
         
@@ -294,7 +286,7 @@ impl Heuristic {
             2 => match pattern.freedom {
                 PatternFreedom::Free => counts.live_two += 1,
                 PatternFreedom::HalfFree => counts.half_free_two += 1,
-                PatternFreedom::Flanked => {}, // Don't count flanked twos
+                PatternFreedom::Flanked => {},
             },
             _ => {}
         }

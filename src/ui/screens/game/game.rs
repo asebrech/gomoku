@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use crate::{ai::lazy_smp::lazy_smp_search, core::{board::Player, moves::RuleValidator, state::GameState}, ui::{app::{AppState, GameSettings}, screens::{game::{board::{BoardRoot, BoardUtils, PreviewDot}, settings::spawn_settings_panel}, utils::despawn_screen}}};
+use crate::{ai::lazy_smp::lazy_smp_search, core::{board::Player, rules::GameRules, state::GameState}, ui::{app::{AppState, GameSettings}, screens::{game::{board::{BoardRoot, BoardUtils, PreviewDot}, settings::spawn_settings_panel}, utils::despawn_screen}}};
 
 // Game status resource
 #[derive(Resource, Default)]
@@ -104,7 +104,7 @@ pub fn update_available_placement(
     for (entity, children, cell) in parents.iter() {
         // Check if position is empty and doesn't create double-three
         let is_valid = game_state.board.is_empty_position(cell.x, cell.y)
-            && !RuleValidator::creates_double_three(&game_state.board, cell.x, cell.y, game_state.current_player);
+            && !GameRules::creates_double_three(&game_state.board, cell.x, cell.y, game_state.current_player);
         
         if is_valid {
             for &child in children {
