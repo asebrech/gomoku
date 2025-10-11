@@ -1,6 +1,6 @@
 use crate::core::board::{Board, Player};
 use crate::core::state::GameState;
-use crate::core::pattern_analysis::{PatternAnalyzer, PatternFreedom, DIRECTIONS};
+use crate::core::patterns::{PatternAnalyzer, PatternFreedom, DIRECTIONS};
 
 pub struct Heuristic;
 

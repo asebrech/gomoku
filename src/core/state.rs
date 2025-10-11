@@ -2,7 +2,7 @@ use crate::ai::zobrist::ZobristHash;
 use crate::ai::pattern_history::PatternHistoryAnalyzer;
 use crate::core::board::{Board, Player};
 use crate::core::captures::CaptureHandler;
-use crate::core::moves::MoveGenerator;
+use crate::core::move_generation::MoveGenerator;
 use crate::core::rules::GameRules;
 use bevy::prelude::*;
 use std::hash::Hash;

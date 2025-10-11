@@ -1,5 +1,5 @@
 use crate::core::board::{Board, Player};
-use crate::core::pattern_analysis::{PatternAnalyzer, DIRECTIONS};
+use crate::core::patterns::{PatternAnalyzer, DIRECTIONS};
 use crate::core::rules::GameRules;
 use std::collections::HashSet;
 

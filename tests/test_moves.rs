@@ -1,5 +1,5 @@
 use gomoku::core::board::{Board, Player};
-use gomoku::core::moves::MoveGenerator;
+use gomoku::core::move_generation::MoveGenerator;
 
 #[test]
 fn test_first_move_center_only() {
