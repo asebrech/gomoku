@@ -31,26 +31,21 @@ impl MoveGenerator {
 
     fn find_winning_move(board: &Board, player: Player) -> Option<(usize, usize)> {
         let player_bits = board.get_player_bits(player);
-
-        for array_idx in 0..board.u64_count {
-            let mut bits = player_bits[array_idx];
-            while bits != 0 {
-                let bit_pos = bits.trailing_zeros() as usize;
-                let global_idx = array_idx * 64 + bit_pos;
-                if global_idx < board.total_cells {
-                    let row = global_idx / board.size;
-                    let col = global_idx % board.size;
-
-                    for &(dx, dy) in &DIRECTIONS {
-                        if let Some(win_pos) = Self::find_win_in_direction(board, row, col, dx, dy, player) {
-                            return Some(win_pos);
-                        }
-                    }
-                }
-                bits &= bits - 1;
+        let mut result = None;
+        
+        board.iterate_bits(player_bits, |row, col| {
+            if result.is_some() {
+                return;
             }
-        }
-        None
+            for &(dx, dy) in &DIRECTIONS {
+                if let Some(win_pos) = Self::find_win_in_direction(board, row, col, dx, dy, player) {
+                    result = Some(win_pos);
+                    return;
+                }
+            }
+        });
+        
+        result
     }
 
     /// Find a winning move in a specific direction from a given stone.
@@ -101,10 +96,7 @@ impl MoveGenerator {
         for &(dx, dy) in &DIRECTIONS {
             // Count stones in both directions from this empty position
             // Note: pos is empty, so we count around it, not including it
-            let backward = PatternAnalyzer::count_consecutive(board, pos.0, pos.1, -dx, -dy, player);
-            let forward = PatternAnalyzer::count_consecutive(board, pos.0, pos.1, dx, dy, player);
-            // Add 1 for the stone we would place at pos
-            let total = backward + forward + 1;
+            let total = PatternAnalyzer::count_consecutive_bidirectional(board, pos.0, pos.1, dx, dy, player);
             if total >= 5 {
                 return true;
             }
@@ -129,37 +121,26 @@ impl MoveGenerator {
         let mut threats = HashSet::new();
         let player_bits = board.get_player_bits(player);
 
-        for array_idx in 0..board.u64_count {
-            let mut bits = player_bits[array_idx];
-            while bits != 0 {
-                let bit_pos = bits.trailing_zeros() as usize;
-                let global_idx = array_idx * 64 + bit_pos;
-                if global_idx < board.total_cells {
-                    let row = global_idx / board.size;
-                    let col = global_idx % board.size;
+        board.iterate_bits(player_bits, |row, col| {
+            for &(dx, dy) in &DIRECTIONS {
+                let backward = PatternAnalyzer::count_consecutive(board, row, col, -dx, -dy, player);
+                let forward = PatternAnalyzer::count_consecutive(board, row, col, dx, dy, player);
+                
+                if backward + forward + 1 == 4 {
+                    let back_row = row as isize - dx * (backward as isize + 1);
+                    let back_col = col as isize - dy * (backward as isize + 1);
+                    let fwd_row = row as isize + dx * (forward as isize + 1);
+                    let fwd_col = col as isize + dy * (forward as isize + 1);
 
-                    for &(dx, dy) in &DIRECTIONS {
-                        let backward = PatternAnalyzer::count_consecutive(board, row, col, -dx, -dy, player);
-                        let forward = PatternAnalyzer::count_consecutive(board, row, col, dx, dy, player);
-                        
-                        if backward + forward + 1 == 4 {
-                            let back_row = row as isize - dx * (backward as isize + 1);
-                            let back_col = col as isize - dy * (backward as isize + 1);
-                            let fwd_row = row as isize + dx * (forward as isize + 1);
-                            let fwd_col = col as isize + dy * (forward as isize + 1);
-
-                            if PatternAnalyzer::is_valid_empty(board, back_row, back_col) {
-                                threats.insert((back_row as usize, back_col as usize));
-                            }
-                            if PatternAnalyzer::is_valid_empty(board, fwd_row, fwd_col) {
-                                threats.insert((fwd_row as usize, fwd_col as usize));
-                            }
-                        }
+                    if PatternAnalyzer::is_valid_empty(board, back_row, back_col) {
+                        threats.insert((back_row as usize, back_col as usize));
+                    }
+                    if PatternAnalyzer::is_valid_empty(board, fwd_row, fwd_col) {
+                        threats.insert((fwd_row as usize, fwd_col as usize));
                     }
                 }
-                bits &= bits - 1;
             }
-        }
+        });
 
         threats.into_iter().collect()
     }
@@ -256,34 +237,23 @@ impl MoveGenerator {
         let mut moves = HashSet::new();
         let player_bits = board.get_player_bits(player);
 
-        for array_idx in 0..board.u64_count {
-            let mut bits = player_bits[array_idx];
-            while bits != 0 {
-                let bit_pos = bits.trailing_zeros() as usize;
-                let global_idx = array_idx * 64 + bit_pos;
-                if global_idx < board.total_cells {
-                    let row = global_idx / board.size;
-                    let col = global_idx % board.size;
+        board.iterate_bits(player_bits, |row, col| {
+            for &(dx, dy) in &DIRECTIONS {
+                let backward = PatternAnalyzer::count_consecutive(board, row, col, -dx, -dy, player);
+                let forward = PatternAnalyzer::count_consecutive(board, row, col, dx, dy, player);
+                let total = backward + forward + 1;
 
-                    for &(dx, dy) in &DIRECTIONS {
-                        let backward = PatternAnalyzer::count_consecutive(board, row, col, -dx, -dy, player);
-                        let forward = PatternAnalyzer::count_consecutive(board, row, col, dx, dy, player);
-                        let total = backward + forward + 1;
-
-                        if total >= 2 && total <= 4 {
-                            for offset in -(backward as isize + 1)..=(forward as isize + 1) {
-                                let r = row as isize + dx * offset;
-                                let c = col as isize + dy * offset;
-                                if PatternAnalyzer::is_valid_empty(board, r, c) {
-                                    moves.insert((r as usize, c as usize));
-                                }
-                            }
+                if total >= 2 && total <= 4 {
+                    for offset in -(backward as isize + 1)..=(forward as isize + 1) {
+                        let r = row as isize + dx * offset;
+                        let c = col as isize + dy * offset;
+                        if PatternAnalyzer::is_valid_empty(board, r, c) {
+                            moves.insert((r as usize, c as usize));
                         }
                     }
                 }
-                bits &= bits - 1;
             }
-        }
+        });
 
         moves
     }
@@ -294,32 +264,21 @@ impl MoveGenerator {
         
         let zone_radius = if stone_count < 10 { 2 } else { 1 };
 
-        for array_idx in 0..board.u64_count {
-            let mut bits = board.occupied[array_idx];
-            while bits != 0 {
-                let bit_pos = bits.trailing_zeros() as usize;
-                let global_idx = array_idx * 64 + bit_pos;
-                if global_idx < board.total_cells {
-                    let row = global_idx / board.size;
-                    let col = global_idx % board.size;
-
-                    for dr in -(zone_radius as isize)..=(zone_radius as isize) {
-                        for dc in -(zone_radius as isize)..=(zone_radius as isize) {
-                            if dr == 0 && dc == 0 {
-                                continue;
-                            }
-                            let nr = row as isize + dr;
-                            let nc = col as isize + dc;
-                            
-                            if PatternAnalyzer::is_valid_empty(board, nr, nc) {
-                                candidates.insert((nr as usize, nc as usize));
-                            }
-                        }
+        board.iterate_bits(&board.occupied, |row, col| {
+            for dr in -(zone_radius as isize)..=(zone_radius as isize) {
+                for dc in -(zone_radius as isize)..=(zone_radius as isize) {
+                    if dr == 0 && dc == 0 {
+                        continue;
+                    }
+                    let nr = row as isize + dr;
+                    let nc = col as isize + dc;
+                    
+                    if PatternAnalyzer::is_valid_empty(board, nr, nc) {
+                        candidates.insert((nr as usize, nc as usize));
                     }
                 }
-                bits &= bits - 1;
             }
-        }
+        });
 
         candidates
             .into_iter()

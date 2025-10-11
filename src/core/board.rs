@@ -46,6 +46,35 @@ impl Board {
         row * self.size + col
     }
 
+    /// Iterate over all set bits in a bitboard, calling the closure for each position
+    pub fn iterate_bits<F>(&self, bitboard: &[u64], mut callback: F)
+    where
+        F: FnMut(usize, usize),
+    {
+        for array_idx in 0..self.u64_count {
+            let mut bits = bitboard[array_idx];
+            while bits != 0 {
+                let bit_pos = bits.trailing_zeros() as usize;
+                let global_idx = array_idx * 64 + bit_pos;
+                if global_idx < self.total_cells {
+                    let row = global_idx / self.size;
+                    let col = global_idx % self.size;
+                    callback(row, col);
+                }
+                bits &= bits - 1;
+            }
+        }
+    }
+
+    /// Collect all positions where bits are set in a bitboard
+    pub fn collect_bit_positions(&self, bitboard: &[u64]) -> Vec<(usize, usize)> {
+        let mut positions = Vec::new();
+        self.iterate_bits(bitboard, |row, col| {
+            positions.push((row, col));
+        });
+        positions
+    }
+
     pub fn set_bit(bits: &mut [u64], idx: usize) {
         let array_idx = idx / 64;
         if array_idx >= bits.len() {
@@ -216,26 +245,15 @@ impl Board {
 
     pub fn get_occupied_positions(&self) -> Vec<((usize, usize), Player)> {
         let mut positions = Vec::new();
-        for array_idx in 0..self.u64_count {
-            let mut occupied_bits = self.occupied[array_idx];
-            let max_bits = self.max_bits[array_idx];
-            
-            while occupied_bits != 0 {
-                let bit_pos = occupied_bits.trailing_zeros() as usize;
-                let global_idx = array_idx * 64 + bit_pos;
-                if global_idx < self.total_cells {
-                    let row = global_idx / self.size;
-                    let col = global_idx % self.size;
-                    let player = if (max_bits & (1u64 << bit_pos)) != 0 {
-                        Player::Max
-                    } else {
-                        Player::Min
-                    };
-                    positions.push(((row, col), player));
-                }
-                occupied_bits &= occupied_bits - 1;
-            }
-        }
+        self.iterate_bits(&self.occupied, |row, col| {
+            let idx = self.index(row, col);
+            let player = if Self::is_bit_set(&self.max_bits, idx) {
+                Player::Max
+            } else {
+                Player::Min
+            };
+            positions.push(((row, col), player));
+        });
         positions
     }
 }
