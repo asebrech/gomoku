@@ -110,7 +110,7 @@ fn lazy_smp_worker(
             }
         }
 
-        let search_depth = (depth + depth_offset).max(1);
+        let search_depth = (depth + depth_offset).max(1).min(max_depth);
 
         let first_guess = shared_state.best_score.load(Ordering::Relaxed) + aspiration_offset;
 
@@ -150,11 +150,11 @@ fn lazy_smp_worker(
 pub fn lazy_smp_search(
     state: &mut GameState,
     time_limit_ms: u64,
+    max_depth: i32,
     num_threads: Option<usize>,
 ) -> SearchResult {
     let start_time = Instant::now();
     let time_limit = Duration::from_millis(time_limit_ms);
-    let max_depth = 100;
     
     let threads = num_threads.unwrap_or_else(|| {
         std::thread::available_parallelism()

@@ -9,7 +9,7 @@ fn test_parallel_search_functionality() {
     
     
     
-    let result = lazy_smp_search(&mut state, 300, Some(4));
+    let result = lazy_smp_search(&mut state, 300, 10, Some(4));
     
     assert!(result.best_move.is_some());
     assert!(result.depth_reached >= 1);
@@ -23,7 +23,7 @@ fn test_parallel_search_with_time_limit() {
     
     
     
-    let result = lazy_smp_search(&mut state, 50, Some(4));
+    let result = lazy_smp_search(&mut state, 50, 10, Some(4));
     
     // Allow some overhead for parallelization and first-move complexity
     assert!(result.time_elapsed.as_millis() <= 500, "Time elapsed: {}ms", result.time_elapsed.as_millis());
@@ -44,8 +44,8 @@ fn test_parallel_search_consistency() {
     
     
     
-    let result1 = lazy_smp_search(&mut state1, 200, Some(4));
-    let result2 = lazy_smp_search(&mut state2, 200, Some(4));
+    let result1 = lazy_smp_search(&mut state1, 200, 10, Some(4));
+    let result2 = lazy_smp_search(&mut state2, 200, 10, Some(4));
     
     // Parallel searches should find valid moves
     assert!(result1.best_move.is_some());

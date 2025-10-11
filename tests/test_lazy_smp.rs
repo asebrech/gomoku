@@ -19,7 +19,7 @@ fn test_parallel_search_basic() {
     // Test with 1000ms time limit for reasonable complexity
 
     // Parallel search
-    let result = lazy_smp_search(&mut state, 1000, Some(4));
+    let result = lazy_smp_search(&mut state, 1000, 10, Some(4));
 
     // Should find valid move
     assert!(result.best_move.is_some(), "Parallel search should find a move");
@@ -54,7 +54,7 @@ fn test_parallel_winning_position() {
     state.board = board;
     state.current_player = Player::Max;
 
-    let result = lazy_smp_search(&mut state, 500, Some(4));
+    let result = lazy_smp_search(&mut state, 500, 10, Some(4));
 
     assert!(result.best_move.is_some(), "Should find winning move");
     assert_eq!(result.best_move.unwrap(), (7, 11), "Should play the winning move");
@@ -80,7 +80,7 @@ fn test_parallel_blocking_position() {
     state.board = board;
     state.current_player = Player::Min;  // Min to move
 
-    let result = lazy_smp_search(&mut state, 500, Some(4));
+    let result = lazy_smp_search(&mut state, 500, 10, Some(4));
 
     assert!(result.best_move.is_some(), "Should find blocking move");
     
@@ -97,7 +97,7 @@ fn test_parallel_search_empty_board() {
     state.board = board;
     state.current_player = Player::Max;
 
-    let result = lazy_smp_search(&mut state, 200, Some(2));
+    let result = lazy_smp_search(&mut state, 200, 10, Some(2));
 
     assert!(result.best_move.is_some(), "Should find a move on empty board");
     // Should prefer center area
@@ -121,7 +121,7 @@ fn test_parallel_search_performance() {
     state.current_player = Player::Max;
 
     let start = std::time::Instant::now();
-    let result = lazy_smp_search(&mut state, 1000, Some(4));
+    let result = lazy_smp_search(&mut state, 1000, 10, Some(4));
     let elapsed = start.elapsed();
 
     assert!(result.best_move.is_some(), "Should find a move");

@@ -88,7 +88,7 @@ fn test_ai_vs_ai_game() {
     
 
     while !state.is_terminal() && move_count < max_moves {
-        let result = lazy_smp_search(&mut state, 100, Some(1));
+        let result = lazy_smp_search(&mut state, 100, 10, Some(1));
 
         if let Some(mv) = result.best_move {
             let current_player = state.current_player;
@@ -232,7 +232,7 @@ fn test_ai_decision_quality() {
     state.current_player = Player::Max;
     
 
-    let result = lazy_smp_search(&mut state, 200, Some(1));
+    let result = lazy_smp_search(&mut state, 200, 10, Some(1));
 
     // Should recognize this is a losing position
     assert!(result.best_move.is_some());
@@ -282,7 +282,7 @@ fn test_performance_constraints() {
     use std::time::Instant;
     let start = Instant::now();
 
-    let _result = lazy_smp_search(&mut state, 200, Some(1));
+    let _result = lazy_smp_search(&mut state, 200, 10, Some(1));
 
     let elapsed = start.elapsed();
 
@@ -336,7 +336,7 @@ fn test_simultaneous_threats() {
     println!("Critical blocking positions: (9,8), (9,13), (8,9), (13,9)");
 
     // AI should prioritize blocking one of the immediate threats
-    let result = lazy_smp_search(&mut state, 200, Some(1));
+    let result = lazy_smp_search(&mut state, 200, 10, Some(1));
     assert!(result.best_move.is_some());
 
     let (row, col) = result.best_move.unwrap();

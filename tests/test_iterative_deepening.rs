@@ -12,7 +12,7 @@ fn test_iterative_deepening_basic() {
     state.make_move((7, 8)); // Adjacent
     state.make_move((7, 6)); // Other side
     
-    let result = lazy_smp_search(&mut state, 100, Some(1));
+    let result = lazy_smp_search(&mut state, 100, 10, Some(1));
     
     assert!(result.best_move.is_some());
     assert!(result.depth_reached > 0);
@@ -29,7 +29,7 @@ fn test_iterative_deepening_time_limit() {
     state.make_move((7, 7));
     state.make_move((7, 8));
     
-    let result = lazy_smp_search(&mut state, 100, Some(1));
+    let result = lazy_smp_search(&mut state, 100, 10, Some(1));
     
     assert!(result.best_move.is_some());
     assert!(result.time_elapsed.as_millis() <= 150); // Allow some margin
@@ -45,7 +45,7 @@ fn test_find_best_move_without_time_limit() {
     state.make_move((7, 7));
     state.make_move((7, 8));
     
-    let result = lazy_smp_search(&mut state, 100, Some(1));
+    let result = lazy_smp_search(&mut state, 100, 10, Some(1));
     assert!(result.best_move.is_some());
     println!("Best move from search without time limit: {:?}", result.best_move);
 }
@@ -59,7 +59,7 @@ fn test_find_best_move_with_time_limit() {
     state.make_move((7, 7));
     state.make_move((7, 8));
     
-    let result = lazy_smp_search(&mut state, 50, Some(1));
+    let result = lazy_smp_search(&mut state, 50, 10, Some(1));
     assert!(result.best_move.is_some());
     println!("Best move from timed search: {:?}", result.best_move);
 }
@@ -77,10 +77,10 @@ fn test_iterative_deepening_vs_direct_minimax() {
     }
     
     // Test iterative deepening
-    let iterative_result = lazy_smp_search(&mut state, 100, Some(1));
+    let iterative_result = lazy_smp_search(&mut state, 100, 10, Some(1));
     
     // Test direct search using the regular find_best_move function  
-    let regular_result = lazy_smp_search(&mut state, 100, Some(1));
+    let regular_result = lazy_smp_search(&mut state, 100, 10, Some(1));
     
     // Both should find a move
     assert!(iterative_result.best_move.is_some());
@@ -111,7 +111,7 @@ fn test_early_termination_on_win() {
     state.make_move((7, 10)); // Max - now has 4 in a row
     
     // Min should find the blocking move immediately
-    let result = lazy_smp_search(&mut state, 100, Some(1));
+    let result = lazy_smp_search(&mut state, 100, 10, Some(1));
     
     assert!(result.best_move.is_some());
     // Should find the winning/blocking move quickly
@@ -212,7 +212,7 @@ fn test_complex_board_with_short_time_limit() {
     println!("Immediate win available: {}, Must defend: {}", has_immediate_win, must_defend);
     
     let start_time = std::time::Instant::now();
-    let result = lazy_smp_search(&mut state, 500, Some(1));
+    let result = lazy_smp_search(&mut state, 500, 10, Some(1));
     let actual_time = start_time.elapsed();
     
     println!("Search completed in {:?} (measured externally)", actual_time);
@@ -250,7 +250,7 @@ fn test_500ms_time_limit() {
     state.make_move((8, 7));
     
     // Short time limit (500ms) like in real game
-    let result = lazy_smp_search(&mut state, 500, Some(1));
+    let result = lazy_smp_search(&mut state, 500, 10, Some(1));
     
     // Should still find a move
     assert!(result.best_move.is_some());
@@ -279,7 +279,7 @@ fn test_progressive_depth_improvement() {
     state.make_move((7, 6));
     state.make_move((8, 7));
     
-    let result = lazy_smp_search(&mut state, 100, Some(1));
+    let result = lazy_smp_search(&mut state, 100, 10, Some(1));
     
     // Should reach decent depth
     assert!(result.depth_reached >= 3);
@@ -302,10 +302,10 @@ fn test_time_vs_depth_consistency() {
     state.make_move((8, 7));
     
     // Test with short time limit
-    let short_result = lazy_smp_search(&mut state, 50, Some(1));
+    let short_result = lazy_smp_search(&mut state, 50, 10, Some(1));
     
     // Test with generous time limit that should allow reaching deeper
-    let long_result = lazy_smp_search(&mut state, 5000, Some(1));
+    let long_result = lazy_smp_search(&mut state, 5000, 10, Some(1));
     
     // Both should find moves
     assert!(short_result.best_move.is_some());
@@ -333,7 +333,7 @@ fn test_winning_position_early_termination() {
     
     state.current_player = Player::Max;
     
-    let result = lazy_smp_search(&mut state, 100, Some(1));
+    let result = lazy_smp_search(&mut state, 100, 10, Some(1));
     
     // Should find the winning move
     assert!(result.best_move.is_some());
@@ -367,7 +367,7 @@ fn test_defensive_play_under_pressure() {
     state.current_player = Player::Min;
     
     // Use a 500ms time limit to test under pressure
-    let result = lazy_smp_search(&mut state, 500, Some(1));
+    let result = lazy_smp_search(&mut state, 500, 10, Some(1));
     
     // Should find the blocking move
     assert!(result.best_move.is_some());
@@ -394,10 +394,10 @@ fn test_transposition_table_benefits() {
     state.make_move((8, 7));
     
     // First search to populate transposition table
-    let first_result = lazy_smp_search(&mut state, 100, Some(1));
+    let first_result = lazy_smp_search(&mut state, 100, 10, Some(1));
     
     // Second search should benefit from transposition table
-    let second_result = lazy_smp_search(&mut state, 100, Some(1));
+    let second_result = lazy_smp_search(&mut state, 100, 10, Some(1));
     
     // Both should find the same move (or equally good moves)
     assert!(first_result.best_move.is_some());
@@ -452,7 +452,7 @@ fn test_very_complex_board_500ms() {
     }
     
     // 500ms time limit - this should reproduce the issue you mentioned
-    let result = lazy_smp_search(&mut state, 500, Some(1));
+    let result = lazy_smp_search(&mut state, 500, 10, Some(1));
     
     println!("Search result: {:?}", result);
     
@@ -519,7 +519,7 @@ fn test_game_like_conditions() {
     }
     
     // Test with game-like 500ms time limit
-    let result = lazy_smp_search(&mut state, 500, Some(1));
+    let result = lazy_smp_search(&mut state, 500, 10, Some(1));
     
     // Basic assertions
     assert!(result.best_move.is_some(), "Should find a move");
