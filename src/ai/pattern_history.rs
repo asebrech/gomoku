@@ -1,4 +1,5 @@
 use crate::core::board::Player;
+use crate::core::patterns::DIRECTIONS;
 use crate::core::state::GameState;
 
 const TEMPO_BONUS: i32 = 300;
@@ -142,13 +143,20 @@ impl PatternHistoryAnalyzer {
     }
 
     fn count_threats_created(&self, state: &GameState, position: (usize, usize), player: Player) -> usize {
-        // Count threats created by placing a stone at this position
-        // This is a simplified version that counts immediate pattern formations
+        self.count_threat_patterns(state, position, player)
+    }
+
+    fn count_threats_blocked(&self, state: &GameState, position: (usize, usize), player: Player) -> usize {
+        self.count_threat_patterns(state, position, player.opponent())
+    }
+
+    /// Helper function to count threat patterns for a given player at a position
+    fn count_threat_patterns(&self, state: &GameState, position: (usize, usize), player: Player) -> usize {
         let board = &state.board;
         let mut threats = 0;
         
-        // Check all directions for new threat patterns
-        for &(dx, dy) in &[(1, 0), (0, 1), (1, 1), (1, -1)] {
+        // Check all directions for threat patterns
+        for &(dx, dy) in &DIRECTIONS {
             let backward = crate::core::patterns::PatternAnalyzer::count_consecutive(
                 board, position.0, position.1, -dx, -dy, player
             );
@@ -164,31 +172,6 @@ impl PatternHistoryAnalyzer {
         }
         
         threats
-    }
-
-    fn count_threats_blocked(&self, state: &GameState, position: (usize, usize), player: Player) -> usize {
-        // Count opponent threats that would be blocked by this move
-        // Check if opponent would have formed threats at this position
-        let opponent = player.opponent();
-        let board = &state.board;
-        let mut blocked = 0;
-        
-        for &(dx, dy) in &[(1, 0), (0, 1), (1, 1), (1, -1)] {
-            let backward = crate::core::patterns::PatternAnalyzer::count_consecutive(
-                board, position.0, position.1, -dx, -dy, opponent
-            );
-            let forward = crate::core::patterns::PatternAnalyzer::count_consecutive(
-                board, position.0, position.1, dx, dy, opponent
-            );
-            let total = backward + forward + 1;
-            
-            // Count as blocked threat if opponent would have formed 3+ in a row
-            if total >= 3 {
-                blocked += 1;
-            }
-        }
-        
-        blocked
     }
 
     fn update_tempo_and_initiative(&mut self) {

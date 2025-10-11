@@ -46,6 +46,12 @@ impl Board {
         row * self.size + col
     }
 
+    /// Check if usize coordinates are within board bounds
+    #[inline]
+    pub fn is_valid_position(&self, row: usize, col: usize) -> bool {
+        row < self.size && col < self.size
+    }
+
     /// Iterate over all set bits in a bitboard, calling the closure for each position
     pub fn iterate_bits<F>(&self, bitboard: &[u64], mut callback: F)
     where
@@ -138,7 +144,7 @@ impl Board {
     }
 
     pub fn is_empty_position(&self, row: usize, col: usize) -> bool {
-        if row >= self.size || col >= self.size {
+        if !self.is_valid_position(row, col) {
             return false;
         }
         let idx = self.index(row, col);
@@ -146,7 +152,7 @@ impl Board {
     }
 
     pub fn get_player(&self, row: usize, col: usize) -> Option<Player> {
-        if row >= self.size || col >= self.size {
+        if !self.is_valid_position(row, col) {
             return None;
         }
         let idx = self.index(row, col);
@@ -160,7 +166,7 @@ impl Board {
     }
 
     pub fn place_stone(&mut self, row: usize, col: usize, player: Player) {
-        if row >= self.size || col >= self.size {
+        if !self.is_valid_position(row, col) {
             return;
         }
         let idx = self.index(row, col);
@@ -172,7 +178,7 @@ impl Board {
     }
 
     pub fn remove_stone(&mut self, row: usize, col: usize) {
-        if row >= self.size || col >= self.size {
+        if !self.is_valid_position(row, col) {
             return;
         }
         let idx = self.index(row, col);
@@ -182,7 +188,7 @@ impl Board {
     }
 
     pub fn is_adjacent_to_stone(&self, row: usize, col: usize) -> bool {
-        if row >= self.size || col >= self.size {
+        if !self.is_valid_position(row, col) {
             return false;
         }
         
