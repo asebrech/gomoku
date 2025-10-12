@@ -21,10 +21,7 @@ use crate::core::state::GameState;
 use std::cmp::{max, min};
 use std::time::{Duration, Instant};
 
-use super::{
-    heuristic::Heuristic,
-    transposition::{EntryType, TranspositionTable},
-};
+use super::{heuristic::Heuristic, transposition::{TranspositionTable, EntryType}};
 
 /// Alpha-beta search with transposition table (memory) support.
 ///
@@ -54,13 +51,13 @@ fn alpha_beta_with_memory(
     let original_beta = beta;
     let hash_key = state.hash();
     let mut nodes_visited = 1u64;
-
+    
     if let Some(limit) = time_limit {
         if start_time.elapsed() >= limit {
             return (0, nodes_visited);
         }
     }
-
+    
     let tt_result = tt.probe(hash_key, depth, alpha, beta);
     if tt_result.cutoff {
         return (tt_result.value.unwrap(), nodes_visited);
@@ -73,7 +70,7 @@ fn alpha_beta_with_memory(
     }
 
     let mut moves = state.get_candidate_moves();
-
+    
     if let Some(best_move) = tt_result.best_move {
         if let Some(pos) = moves.iter().position(|&m| m == best_move) {
             moves.swap(0, pos);
@@ -85,35 +82,19 @@ fn alpha_beta_with_memory(
 
     if maximizing_player {
         value = i32::MIN;
-        for (move_index, move_) in moves.iter().enumerate() {
-            state.make_move(*move_);
-
-            let reduction = if move_index >= 6 && depth >= 4 && !state.is_terminal() {
-                1
-            } else {
-                0
-            };
-
-            let search_depth = (depth - 1 - reduction).max(0);
-
+        for move_ in moves {
+            state.make_move(move_);
             let (eval, child_nodes) = alpha_beta_with_memory(
-                state,
-                search_depth,
-                alpha,
-                beta,
-                false,
-                tt,
-                start_time,
-                time_limit,
+                state, depth - 1, alpha, beta, false, tt, start_time, time_limit
             );
-            state.undo_move(*move_);
+            state.undo_move(move_);
             nodes_visited += child_nodes;
-
+            
             if eval > value {
                 value = eval;
-                best_move = Some(*move_);
+                best_move = Some(move_);
             }
-
+            
             if value >= beta {
                 break;
             }
@@ -121,35 +102,19 @@ fn alpha_beta_with_memory(
         }
     } else {
         value = i32::MAX;
-        for (move_index, move_) in moves.iter().enumerate() {
-            state.make_move(*move_);
-
-            let reduction = if move_index >= 6 && depth >= 4 && !state.is_terminal() {
-                1
-            } else {
-                0
-            };
-
-            let search_depth = (depth - 1 - reduction).max(0);
-
+        for move_ in moves {
+            state.make_move(move_);
             let (eval, child_nodes) = alpha_beta_with_memory(
-                state,
-                search_depth,
-                alpha,
-                beta,
-                true,
-                tt,
-                start_time,
-                time_limit,
+                state, depth - 1, alpha, beta, true, tt, start_time, time_limit
             );
-            state.undo_move(*move_);
+            state.undo_move(move_);
             nodes_visited += child_nodes;
-
+            
             if eval < value {
                 value = eval;
-                best_move = Some(*move_);
+                best_move = Some(move_);
             }
-
+            
             if value <= alpha {
                 break;
             }
@@ -164,7 +129,7 @@ fn alpha_beta_with_memory(
     } else {
         EntryType::Exact
     };
-
+    
     tt.store(hash_key, value, depth, entry_type, best_move);
     (value, nodes_visited)
 }
@@ -190,16 +155,16 @@ pub fn mtdf(
     let mut lower_bound = i32::MIN;
     let mut total_nodes = 0u64;
     let is_maximizing = state.current_player == crate::core::board::Player::Max;
-
+    
     while lower_bound < upper_bound {
         if let Some(limit) = time_limit {
             if start_time.elapsed() >= limit {
                 break;
             }
         }
-
+        
         let beta = if g == lower_bound { g + 1 } else { g };
-
+        
         let (value, nodes) = alpha_beta_with_memory(
             state,
             depth,
@@ -210,20 +175,21 @@ pub fn mtdf(
             start_time,
             time_limit,
         );
-
+        
         total_nodes += nodes;
-
+        
         if value < beta {
             upper_bound = value;
         } else {
             lower_bound = value;
         }
-
+        
         g = value;
     }
-
+    
     let hash_key = state.hash();
     let best_move = tt.get_best_move(hash_key);
-
+    
     (g, total_nodes, best_move)
 }
+
