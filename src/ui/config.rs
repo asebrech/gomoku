@@ -75,6 +75,8 @@ pub struct ColorConfig {
     pub button_normal: ColorData,
     pub button_hovered: ColorData,
     pub button_pressed: ColorData,
+    pub stone_player1: ColorData,
+    pub stone_player2: ColorData,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -134,6 +136,12 @@ pub struct UserSettings {
     pub audio: AudioSettings,
     pub display: DisplaySettings,
     pub gameplay: GameplaySettings,
+    pub theme: ThemeSettings,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThemeSettings {
+    pub current_theme: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -215,6 +223,93 @@ impl GameConfig {
         (self.settings.gameplay.show_move_hints, self.settings.gameplay.animation_speed, self.settings.gameplay.auto_save)
     }
 
+    // Save theme preference
+    pub fn save_theme(&mut self, theme_name: String) -> Result<(), Box<dyn std::error::Error>> {
+        self.settings.theme.current_theme = theme_name;
+        self.save_to_file("config/config.json")
+    }
+
+    // Get current theme
+    pub fn get_current_theme(&self) -> String {
+        self.settings.theme.current_theme.clone()
+    }
+
+    // Sync colors from theme manager
+    pub fn sync_colors_from_theme(&mut self, theme_colors: &crate::ui::theme::ThemeColors) {
+        self.colors.primary = ColorData {
+            r: theme_colors.primary.r,
+            g: theme_colors.primary.g,
+            b: theme_colors.primary.b,
+            a: theme_colors.primary.a,
+        };
+        self.colors.secondary = ColorData {
+            r: theme_colors.secondary.r,
+            g: theme_colors.secondary.g,
+            b: theme_colors.secondary.b,
+            a: theme_colors.secondary.a,
+        };
+        self.colors.accent = ColorData {
+            r: theme_colors.accent.r,
+            g: theme_colors.accent.g,
+            b: theme_colors.accent.b,
+            a: theme_colors.accent.a,
+        };
+        self.colors.background = ColorData {
+            r: theme_colors.background.r,
+            g: theme_colors.background.g,
+            b: theme_colors.background.b,
+            a: theme_colors.background.a,
+        };
+        self.colors.surface = ColorData {
+            r: theme_colors.surface.r,
+            g: theme_colors.surface.g,
+            b: theme_colors.surface.b,
+            a: theme_colors.surface.a,
+        };
+        self.colors.text_primary = ColorData {
+            r: theme_colors.text_primary.r,
+            g: theme_colors.text_primary.g,
+            b: theme_colors.text_primary.b,
+            a: theme_colors.text_primary.a,
+        };
+        self.colors.text_secondary = ColorData {
+            r: theme_colors.text_secondary.r,
+            g: theme_colors.text_secondary.g,
+            b: theme_colors.text_secondary.b,
+            a: theme_colors.text_secondary.a,
+        };
+        self.colors.button_normal = ColorData {
+            r: theme_colors.button_normal.r,
+            g: theme_colors.button_normal.g,
+            b: theme_colors.button_normal.b,
+            a: theme_colors.button_normal.a,
+        };
+        self.colors.button_hovered = ColorData {
+            r: theme_colors.button_hovered.r,
+            g: theme_colors.button_hovered.g,
+            b: theme_colors.button_hovered.b,
+            a: theme_colors.button_hovered.a,
+        };
+        self.colors.button_pressed = ColorData {
+            r: theme_colors.button_pressed.r,
+            g: theme_colors.button_pressed.g,
+            b: theme_colors.button_pressed.b,
+            a: theme_colors.button_pressed.a,
+        };
+        self.colors.stone_player1 = ColorData {
+            r: theme_colors.stone_player1.r,
+            g: theme_colors.stone_player1.g,
+            b: theme_colors.stone_player1.b,
+            a: theme_colors.stone_player1.a,
+        };
+        self.colors.stone_player2 = ColorData {
+            r: theme_colors.stone_player2.r,
+            g: theme_colors.stone_player2.g,
+            b: theme_colors.stone_player2.b,
+            a: theme_colors.stone_player2.a,
+        };
+    }
+
     // Save game settings
     pub fn save_game_settings(&mut self, board_size: u32, win_condition: u32, ai_max_depth: Option<u32>, ai_time_limit: Option<u64>, pair_captures_to_win: u32) -> Result<(), Box<dyn std::error::Error>> {
         self.game.board_size = board_size;
@@ -281,6 +376,8 @@ impl GameConfig {
                 button_normal: ColorData { r: 0.2, g: 0.0, b: 0.4, a: 1.0 },
                 button_hovered: ColorData { r: 0.4, g: 0.0, b: 0.6, a: 1.0 },
                 button_pressed: ColorData { r: 1.0, g: 0.2, b: 0.8, a: 1.0 },
+                stone_player1: ColorData { r: 1.0, g: 0.4, b: 0.7, a: 1.0 }, // Pink
+                stone_player2: ColorData { r: 0.2, g: 0.6, b: 1.0, a: 1.0 }, // Blue
             },
             ui: UiConfig {
                 window_titles: vec![
@@ -328,6 +425,9 @@ impl GameConfig {
                     show_move_hints: true,
                     animation_speed: 1.0,
                     auto_save: true,
+                },
+                theme: ThemeSettings {
+                    current_theme: "Synthwave".to_string(),
                 },
             },
         }

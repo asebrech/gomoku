@@ -12,7 +12,8 @@
         ui::{
             app::{AppState, GameSettings}, 
             screens::{utils::despawn_screen, splash::PreloadedStones},
-            config::GameConfig
+            config::GameConfig,
+            theme::{ThemeManager, update_theme_elements},
         }
     };
 
@@ -128,6 +129,8 @@
         Fullscreen,
         VolumeControl,
         AudioMute,
+        ThemePrev,
+        ThemeNext,
     }
 
     #[derive(Component)]
@@ -144,6 +147,7 @@
         MutedToggle,
         AIMaxDepthValue,
         AITimeLimitValue,
+        ThemeValue,
     }
 
     pub fn menu_plugin(app: &mut App) {
@@ -196,6 +200,8 @@
                     update_volume_display,
                     handle_settings_controls,
                     update_settings_display,
+                    update_theme_elements,
+                    rebuild_settings_on_config_change,
                     handle_escape_key,
                 ).run_if(in_state(AppState::Menu).and(not(in_state(MenuState::Splash)))),
             );
@@ -1130,12 +1136,21 @@ fn settings_menu_setup(
     asset_server: Res<AssetServer>,
     video_frames: Option<Res<VideoFrames>>,
 ) {
+    settings_menu_setup_internal(&mut commands, &config, &asset_server, video_frames.as_deref());
+}
+
+fn settings_menu_setup_internal(
+    commands: &mut Commands,
+    config: &GameConfig,
+    asset_server: &AssetServer,
+    video_frames: Option<&VideoFrames>,
+) {
     let colors = &config.colors;
     
     // Get the already loaded video frames for background (or empty if devMode)
     let video_frame_handles = if config.dev_mode {
         Vec::new()
-    } else if let Some(frames) = video_frames.as_ref() {
+    } else if let Some(frames) = video_frames {
         frames.frames.clone()
     } else {
         // Fallback: load frames if somehow not available
@@ -1283,6 +1298,7 @@ fn settings_menu_setup(
                                 "DISPLAY",
                                 &[
                                     ("Fullscreen", SettingType::Fullscreen),
+                                    ("Theme", SettingType::Theme),
                                 ],
                                 &config,
                             );
@@ -1565,6 +1581,7 @@ enum SettingType {
     AITimeLimit,
     PairCaptures,
     Fullscreen,
+    Theme,
 }
 
 fn create_settings_column(
@@ -1586,7 +1603,12 @@ fn create_settings_column(
                 border: UiRect::all(Val::Px(1.0)),
                 ..default()
             },
-            BackgroundColor(Color::srgba(0.1, 0.0, 0.2, 0.7)),
+            BackgroundColor(Color::srgba(
+                colors.surface.r * 0.7,
+                colors.surface.g * 0.7,
+                colors.surface.b * 0.7,
+                0.7
+            )),
             BorderColor(colors.secondary.clone().into()),
         ))
         .with_children(|parent| {
@@ -1673,6 +1695,10 @@ fn create_setting_item(
                 SettingType::Fullscreen => {
                     let (fullscreen, _) = config.get_display_settings();
                     create_toggle_control(parent, fullscreen, "Fullscreen", colors);
+                }
+                SettingType::Theme => {
+                    let current_theme = config.get_current_theme();
+                    create_theme_selector(parent, &current_theme, colors);
                 }
             }
         });
@@ -2055,6 +2081,7 @@ fn create_menu_button_with_icon(
     fn handle_settings_controls(
         settings_query: Query<(&Interaction, &SettingControl), (Changed<Interaction>, With<Button>)>,
         mut config: ResMut<GameConfig>,
+        mut theme_manager: ResMut<ThemeManager>,
         mut audio_sink_query: Query<&mut AudioSink>,
         game_audio: Option<Res<GameAudio>>,
         mut windows: Query<&mut bevy::window::Window>,
@@ -2179,6 +2206,54 @@ fn create_menu_button_with_icon(
                             }
                         }
                     }
+                    SettingControl::ThemePrev => {
+                        // Get list of available themes
+                        let themes = theme_manager.get_available_themes();
+                        let current_theme = config.get_current_theme();
+                        
+                        // Find current theme index
+                        let current_index = themes.iter().position(|t| t == &current_theme).unwrap_or(0);
+                        
+                        // Go to previous theme (wrapping around)
+                        let new_index = if current_index == 0 { themes.len() - 1 } else { current_index - 1 };
+                        let new_theme = themes[new_index].clone();
+                        
+                        // Set theme in theme manager and save to config
+                        if theme_manager.set_theme(&new_theme) {
+                            // Sync colors from theme to config
+                            config.sync_colors_from_theme(&theme_manager.current_theme.colors);
+                            
+                            if let Err(e) = config.save_theme(new_theme.clone()) {
+                                println!("Failed to save theme: {}", e);
+                            } else {
+                                println!("Theme changed to: {}", new_theme);
+                            }
+                        }
+                    }
+                    SettingControl::ThemeNext => {
+                        // Get list of available themes
+                        let themes = theme_manager.get_available_themes();
+                        let current_theme = config.get_current_theme();
+                        
+                        // Find current theme index
+                        let current_index = themes.iter().position(|t| t == &current_theme).unwrap_or(0);
+                        
+                        // Go to next theme (wrapping around)
+                        let new_index = (current_index + 1) % themes.len();
+                        let new_theme = themes[new_index].clone();
+                        
+                        // Set theme in theme manager and save to config
+                        if theme_manager.set_theme(&new_theme) {
+                            // Sync colors from theme to config
+                            config.sync_colors_from_theme(&theme_manager.current_theme.colors);
+                            
+                            if let Err(e) = config.save_theme(new_theme.clone()) {
+                                println!("Failed to save theme: {}", e);
+                            } else {
+                                println!("Theme changed to: {}", new_theme);
+                            }
+                        }
+                    }
                     _ => {} // Other controls handled elsewhere
                 }
             }
@@ -2221,6 +2296,7 @@ fn create_menu_button_with_icon(
             let (board_size, win_condition, ai_max_depth, ai_time_limit, pair_captures) = config.get_game_settings();
             let (fullscreen, _) = config.get_display_settings();
             let (_, muted) = config.get_audio_settings();
+            let current_theme = config.get_current_theme();
             let colors = &config.colors;
 
             // Update value displays (text elements with SettingDisplay)
@@ -2246,6 +2322,9 @@ fn create_menu_button_with_icon(
                             Some(ms) => format!("{}ms", ms),
                             None => "50ms".to_string(), // Fallback to 50ms if somehow None
                         };
+                    }
+                    SettingDisplayType::ThemeValue => {
+                        text.0 = current_theme.clone();
                     }
                     _ => {}
                 }
@@ -2282,6 +2361,26 @@ fn create_menu_button_with_icon(
                 }
             }
         }
+
+    fn rebuild_settings_on_config_change(
+        mut commands: Commands,
+        config: Res<GameConfig>,
+        asset_server: Res<AssetServer>,
+        video_frames: Option<Res<VideoFrames>>,
+        menu_state: Res<State<MenuState>>,
+        settings_screen_query: Query<Entity, With<OnSettingsMenuScreen>>,
+    ) {
+        // Only rebuild if we're in Settings state and config changed
+        if config.is_changed() && !config.is_added() && *menu_state.get() == MenuState::Settings {
+            // Despawn current settings screen
+            for entity in settings_screen_query.iter() {
+                commands.entity(entity).despawn();
+            }
+            
+            // Rebuild settings screen
+            settings_menu_setup_internal(&mut commands, &config, &asset_server, video_frames.as_deref());
+        }
+    }
 
     fn create_volume_control(
         parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
@@ -2681,6 +2780,91 @@ fn create_menu_button_with_icon(
                 )).with_children(|parent| {
                     parent.spawn((
                         Text::new("+"),
+                        TextFont { font_size: 14.0, ..default() },
+                        TextColor(colors.text_primary.clone().into()),
+                    ));
+                });
+            });
+    }
+
+    fn create_theme_selector(
+        parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
+        current_theme: &str,
+        colors: &crate::ui::config::ColorConfig,
+    ) {
+        parent
+            .spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    height: Val::Px(30.0),
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    justify_content: JustifyContent::SpaceBetween,
+                    ..default()
+                },
+            ))
+            .with_children(|parent| {
+                // Previous theme button (<)
+                parent.spawn((
+                    Button,
+                    PlayClickSound,
+                    Node {
+                        width: Val::Px(25.0),
+                        height: Val::Px(25.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        border: UiRect::all(Val::Px(1.0)),
+                        ..default()
+                    },
+                    BackgroundColor(colors.button_normal.clone().into()),
+                    BorderColor(colors.secondary.clone().into()),
+                    SettingControl::ThemePrev,
+                )).with_children(|parent| {
+                    parent.spawn((
+                        Text::new("<"),
+                        TextFont { font_size: 14.0, ..default() },
+                        TextColor(colors.text_primary.clone().into()),
+                    ));
+                });
+
+                // Current theme display
+                parent.spawn((
+                    Text::new(current_theme),
+                    TextFont { font_size: 13.0, ..default() },
+                    TextColor(colors.text_secondary.clone().into()),
+                    TextLayout {
+                        justify: JustifyText::Center,
+                        ..default()
+                    },
+                    Node {
+                        min_width: Val::Px(100.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    SettingDisplay {
+                        setting_type: SettingDisplayType::ThemeValue,
+                    },
+                ));
+
+                // Next theme button (>)
+                parent.spawn((
+                    Button,
+                    PlayClickSound,
+                    Node {
+                        width: Val::Px(25.0),
+                        height: Val::Px(25.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        border: UiRect::all(Val::Px(1.0)),
+                        ..default()
+                    },
+                    BackgroundColor(colors.button_normal.clone().into()),
+                    BorderColor(colors.secondary.clone().into()),
+                    SettingControl::ThemeNext,
+                )).with_children(|parent| {
+                    parent.spawn((
+                        Text::new(">"),
                         TextFont { font_size: 14.0, ..default() },
                         TextColor(colors.text_primary.clone().into()),
                     ));

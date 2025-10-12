@@ -85,7 +85,7 @@ fn setup_tutorial(mut commands: Commands, config: Res<GameConfig>, preloaded_sto
                 TutorialContent,
             )).with_children(|builder| {
                 // Spawn initial content (Win Example)
-                spawn_win_example(builder, &preloaded_stones, colors);
+                spawn_win_example(builder, colors, &preloaded_stones, &config);
             });
 
             // Navigation buttons
@@ -163,8 +163,8 @@ fn update_tutorial_content(
     tutorial_state: Res<State<TutorialState>>,
     content_query: Query<Entity, With<TutorialContent>>,
     children_query: Query<&Children>,
-    preloaded_stones: Res<PreloadedStones>,
     config: Res<GameConfig>,
+    preloaded_stones: Res<PreloadedStones>,
 ) {
     if tutorial_state.is_changed() {
         let colors = &config.colors;
@@ -181,8 +181,8 @@ fn update_tutorial_content(
             // Add new content based on state
             commands.entity(content_entity).with_children(|builder| {
                 match tutorial_state.get() {
-                    TutorialState::WinExample => spawn_win_example(builder, &preloaded_stones, colors),
-                    TutorialState::CaptureExample => spawn_capture_example(builder, &preloaded_stones, colors),
+                    TutorialState::WinExample => spawn_win_example(builder, colors, &preloaded_stones, &config),
+                    TutorialState::CaptureExample => spawn_capture_example(builder, colors, &preloaded_stones, &config),
                 }
             });
         }
@@ -191,8 +191,9 @@ fn update_tutorial_content(
 
 fn spawn_win_example(
     builder: &mut ChildSpawnerCommands, 
-    preloaded_stones: &PreloadedStones,
     colors: &crate::ui::config::ColorConfig,
+    preloaded_stones: &PreloadedStones,
+    config: &GameConfig,
 ) {
     // Left side: explanation
     builder.spawn((
@@ -207,7 +208,12 @@ fn spawn_win_example(
             padding: UiRect::all(Val::Px(20.0)),
             ..default()
         },
-        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.7)),
+        BackgroundColor(Color::srgba(
+            colors.surface.r * 0.7,
+            colors.surface.g * 0.7,
+            colors.surface.b * 0.7,
+            0.7
+        )),
         BorderColor(colors.secondary.clone().into()),
         BorderRadius::all(Val::Px(10.0)),
     )).with_children(|builder| {
@@ -242,14 +248,15 @@ fn spawn_win_example(
             ..default()
         },
     )).with_children(|builder| {
-        spawn_demo_board(builder, preloaded_stones, create_win_pattern());
+        spawn_demo_board(builder, create_win_pattern(), colors, preloaded_stones, config);
     });
 }
 
 fn spawn_capture_example(
     builder: &mut ChildSpawnerCommands, 
-    preloaded_stones: &PreloadedStones,
     colors: &crate::ui::config::ColorConfig,
+    preloaded_stones: &PreloadedStones,
+    config: &GameConfig,
 ) {
     // Left side: explanation
     builder.spawn((
@@ -264,7 +271,12 @@ fn spawn_capture_example(
             padding: UiRect::all(Val::Px(20.0)),
             ..default()
         },
-        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.7)),
+        BackgroundColor(Color::srgba(
+            colors.surface.r * 0.7,
+            colors.surface.g * 0.7,
+            colors.surface.b * 0.7,
+            0.7
+        )),
         BorderColor(colors.secondary.clone().into()),
         BorderRadius::all(Val::Px(10.0)),
     )).with_children(|builder| {
@@ -299,11 +311,17 @@ fn spawn_capture_example(
             ..default()
         },
     )).with_children(|builder| {
-        spawn_demo_board(builder, preloaded_stones, create_capture_pattern());
+        spawn_demo_board(builder, create_capture_pattern(), colors, preloaded_stones, config);
     });
 }
 
-fn spawn_demo_board(builder: &mut ChildSpawnerCommands, preloaded_stones: &PreloadedStones, pattern: Vec<(usize, usize, StoneType)>) {
+fn spawn_demo_board(
+    builder: &mut ChildSpawnerCommands, 
+    pattern: Vec<(usize, usize, StoneType)>, 
+    colors: &crate::ui::config::ColorConfig,
+    preloaded_stones: &PreloadedStones,
+    config: &GameConfig,
+) {
     let board_size = 9; // Smaller demo board
     let cell_size = 40.0;
     let total_size = (board_size as f32) * cell_size;
@@ -317,7 +335,12 @@ fn spawn_demo_board(builder: &mut ChildSpawnerCommands, preloaded_stones: &Prelo
             position_type: PositionType::Relative,
             ..default()
         },
-        BackgroundColor(Color::srgba(0.02, 0.0, 0.08, 0.9)),
+        BackgroundColor(Color::srgba(
+            colors.background.r * 0.8,
+            colors.background.g * 0.8,
+            colors.background.b * 0.8,
+            0.9
+        )),
         BorderRadius::all(Val::Px(8.0)),
     )).with_children(|builder| {
         // Draw vertical lines at cell centers (creating intersections)
@@ -331,7 +354,12 @@ fn spawn_demo_board(builder: &mut ChildSpawnerCommands, preloaded_stones: &Prelo
                     height: Val::Px(cell_size * board_size as f32),
                     ..default()
                 },
-                BackgroundColor(Color::srgba(0.8, 0.4, 1.0, 0.4)),
+                BackgroundColor(Color::srgba(
+                    colors.primary.r * 0.7,
+                    colors.primary.g * 0.7,
+                    colors.primary.b * 0.7,
+                    0.4
+                )),
             ));
         }
 
@@ -346,30 +374,72 @@ fn spawn_demo_board(builder: &mut ChildSpawnerCommands, preloaded_stones: &Prelo
                     height: Val::Px(line_thickness),
                     ..default()
                 },
-                BackgroundColor(Color::srgba(0.8, 0.4, 1.0, 0.4)),
+                BackgroundColor(Color::srgba(
+                    colors.primary.r * 0.7,
+                    colors.primary.g * 0.7,
+                    colors.primary.b * 0.7,
+                    0.4
+                )),
             ));
         }
 
         // Add stones according to pattern - now at intersections (cell centers)
+        let current_theme = config.get_current_theme();
+        let is_synthwave = current_theme == "Synthwave";
+        
         for (x, y, stone_type) in pattern {
-            let stone_handle = match stone_type {
-                StoneType::Pink => preloaded_stones.pink_stone.clone(),
-                StoneType::Blue => preloaded_stones.blue_stone.clone(),
-            };
-
             let stone_size = 30.0;
-            builder.spawn((
-                Node {
-                    position_type: PositionType::Absolute,
-                    left: Val::Px(x as f32 * cell_size + cell_size / 2.0 - stone_size / 2.0),
-                    top: Val::Px(y as f32 * cell_size + cell_size / 2.0 - stone_size / 2.0),
-                    width: Val::Px(stone_size),
-                    height: Val::Px(stone_size),
-                    ..default()
-                },
-                ImageNode::new(stone_handle),
-                ZIndex(10),
-            ));
+            
+            if is_synthwave {
+                // Use image assets for Synthwave theme
+                let stone_handle = match stone_type {
+                    StoneType::Pink => preloaded_stones.pink_stone.clone(),
+                    StoneType::Blue => preloaded_stones.blue_stone.clone(),
+                };
+                
+                builder.spawn((
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: Val::Px(x as f32 * cell_size + cell_size / 2.0 - stone_size / 2.0),
+                        top: Val::Px(y as f32 * cell_size + cell_size / 2.0 - stone_size / 2.0),
+                        width: Val::Px(stone_size),
+                        height: Val::Px(stone_size),
+                        ..default()
+                    },
+                    ImageNode::new(stone_handle),
+                    ZIndex(10),
+                ));
+            } else {
+                // Use theme colors for other themes - circular nodes
+                let stone_color = match stone_type {
+                    StoneType::Pink => Color::srgba(
+                        colors.stone_player1.r,
+                        colors.stone_player1.g,
+                        colors.stone_player1.b,
+                        colors.stone_player1.a,
+                    ),
+                    StoneType::Blue => Color::srgba(
+                        colors.stone_player2.r,
+                        colors.stone_player2.g,
+                        colors.stone_player2.b,
+                        colors.stone_player2.a,
+                    ),
+                };
+                
+                builder.spawn((
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: Val::Px(x as f32 * cell_size + cell_size / 2.0 - stone_size / 2.0),
+                        top: Val::Px(y as f32 * cell_size + cell_size / 2.0 - stone_size / 2.0),
+                        width: Val::Px(stone_size),
+                        height: Val::Px(stone_size),
+                        ..default()
+                    },
+                    BackgroundColor(stone_color),
+                    BorderRadius::all(Val::Percent(50.0)), // Perfect circle
+                    ZIndex(10),
+                ));
+            }
         }
     });
 }

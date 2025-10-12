@@ -1,0 +1,20 @@
+{
+	"name": "Test Theme",
+	"colors": {
+		"primary": { "r": 1.0, "g": 0.5, "b": 0.0, "a": 1.0 },
+		"secondary": { "r": 1.0, "g": 0.7, "b": 0.3, "a": 1.0 },
+		"accent": { "r": 1.0, "g": 0.3, "b": 0.0, "a": 1.0 },
+		"background": { "r": 0.1, "g": 0.05, "b": 0.0, "a": 1.0 },
+		"surface": { "r": 0.2, "g": 0.1, "b": 0.0, "a": 1.0 },
+		"text_primary": { "r": 1.0, "g": 0.9, "b": 0.8, "a": 1.0 },
+		"text_secondary": { "r": 1.0, "g": 0.7, "b": 0.5, "a": 1.0 },
+		"button_normal": { "r": 0.3, "g": 0.15, "b": 0.0, "a": 1.0 },
+		"button_hovered": { "r": 0.5, "g": 0.25, "b": 0.0, "a": 1.0 },
+		"button_pressed": { "r": 1.0, "g": 0.5, "b": 0.0, "a": 1.0 },
+		"stone_player1": { "r": 1.0, "g": 0.8, "b": 0.4, "a": 1.0 },
+		"stone_player2": { "r": 0.6, "g": 0.3, "b": 0.0, "a": 1.0 },
+		"title_background": { "r": 0.2, "g": 0.1, "b": 0.0, "a": 0.9 },
+		"content_background": { "r": 0.25, "g": 0.12, "b": 0.0, "a": 0.8 },
+		"footer_background": { "r": 0.3, "g": 0.15, "b": 0.0, "a": 0.85 }
+	}
+}

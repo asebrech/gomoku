@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use crate::ui::{app::GameSettings, screens::game::game::{GridCell, OnGameScreen}};
+use crate::ui::{app::GameSettings, config::GameConfig, screens::game::game::{GridCell, OnGameScreen}};
 
 #[derive(Component)]
 pub struct BoardRoot;
@@ -12,7 +12,7 @@ pub struct BoardUtils;
 impl BoardUtils {
     pub const CELL_SIZE: f32 = 32.0;
     pub const LINE_THICKNESS: f32 = 2.0;
-    pub const STONE_SIZE: f32 = 28.0; // Increased from 24.0 to 28.0 for bigger stones
+    pub const STONE_SIZE: f32 = 26.0; // Slightly smaller circular stones
     pub const PREVIEW_SIZE: f32 = 8.0; // Reduced from 16.0 to 8.0 - much smaller available spots
     
     /// Calculate the spacing between major grid lines based on board size
@@ -118,7 +118,8 @@ impl BoardUtils {
         }
     }
     
-    pub fn spawn_board(builder: &mut ChildSpawnerCommands, game_settings: &GameSettings) {
+    pub fn spawn_board(builder: &mut ChildSpawnerCommands, game_settings: &GameSettings, config: &GameConfig) {
+        let colors = &config.colors;
         let total_size = (game_settings.board_size as f32) * Self::CELL_SIZE;
         
         // Outer glow container
@@ -133,7 +134,7 @@ impl BoardUtils {
                     align_items: AlignItems::Center,
                     ..default()
                 },
-                BackgroundColor(Color::srgba(1.0, 0.0, 1.0, 0.1)), // Magenta outer glow
+                BackgroundColor(Color::srgba(colors.accent.r, colors.accent.g, colors.accent.b, 0.1)),
                 BorderRadius::all(Val::Px(15.0)),
                 OnGameScreen,
             ))
@@ -148,12 +149,12 @@ impl BoardUtils {
                             position_type: PositionType::Relative,
                             ..default()
                         },
-                        BackgroundColor(Color::srgba(0.02, 0.0, 0.08, 0.9)), // Even darker with slight transparency
+                        BackgroundColor(Color::srgba(colors.background.r * 0.1, colors.background.g * 0.1, colors.background.b * 0.1, 0.9)),
                         BorderRadius::all(Val::Px(8.0)),
                         BoardRoot,
                     ))
                     .with_children(|builder| {
-                        Self::draw_board(builder, game_settings.board_size);
+                        Self::draw_board(builder, game_settings.board_size, colors);
                         Self::insert_intersection_hitboxes(builder, game_settings.board_size);
                     });
             });
@@ -161,7 +162,7 @@ impl BoardUtils {
         info!("Board initialized with size {}x{}", game_settings.board_size, game_settings.board_size);
     }
     
-    fn draw_board(builder: &mut ChildSpawnerCommands, board_size: usize) {
+    fn draw_board(builder: &mut ChildSpawnerCommands, board_size: usize, colors: &crate::ui::config::ColorConfig) {
         info!("Drawing board grid lines...");
         
         // Calculate major line positions for balanced spacing
@@ -179,9 +180,11 @@ impl BoardUtils {
             };
             
             let base_color = if is_major_line {
-                Color::srgba(0.7, 0.08, 0.7, 0.7) // Dimmed magenta for major lines with transparency
+                // Major lines: dim uniformly to preserve theme color ratios
+                Color::srgba(colors.primary.r * 0.7, colors.primary.g * 0.7, colors.primary.b * 0.7, 0.5)
             } else {
-                Color::srgba(0.08, 0.4, 0.6, 0.4) // More subtle cyan for regular lines with transparency
+                // Regular lines: dim uniformly but more transparent
+                Color::srgba(colors.secondary.r * 0.6, colors.secondary.g * 0.6, colors.secondary.b * 0.6, 0.3)
             };
             
             // Main line
@@ -208,7 +211,7 @@ impl BoardUtils {
                         height: Val::Px(Self::CELL_SIZE * board_size as f32 + 2.0),
                         ..default()
                     },
-                    BackgroundColor(Color::srgba(0.7, 0.08, 0.7, 0.15)), // Reduced glow effect
+                    BackgroundColor(Color::srgba(colors.primary.r * 0.7, colors.primary.g * 0.7, colors.primary.b * 0.7, 0.08)),
                     ZIndex(-1),
                 ));
             }
@@ -225,9 +228,11 @@ impl BoardUtils {
             };
             
             let base_color = if is_major_line {
-                Color::srgba(0.7, 0.08, 0.7, 0.7) // Dimmed magenta for major lines with transparency
+                // Major lines: dim uniformly to preserve theme color ratios
+                Color::srgba(colors.primary.r * 0.7, colors.primary.g * 0.7, colors.primary.b * 0.7, 0.5)
             } else {
-                Color::srgba(0.08, 0.4, 0.6, 0.4) // More subtle cyan for regular lines with transparency
+                // Regular lines: dim uniformly but more transparent
+                Color::srgba(colors.secondary.r * 0.6, colors.secondary.g * 0.6, colors.secondary.b * 0.6, 0.3)
             };
             
             // Main line
@@ -254,7 +259,7 @@ impl BoardUtils {
                         height: Val::Px(line_thickness + 2.0),
                         ..default()
                     },
-                    BackgroundColor(Color::srgba(0.7, 0.08, 0.7, 0.15)), // Reduced glow effect
+                    BackgroundColor(Color::srgba(colors.primary.r * 0.7, colors.primary.g * 0.7, colors.primary.b * 0.7, 0.08)),
                     ZIndex(-1),
                 ));
             }
@@ -272,7 +277,7 @@ impl BoardUtils {
                         height: Val::Px(3.0),
                         ..default()
                     },
-                    BackgroundColor(Color::srgb(1.0, 0.8, 1.0)), // Bright white-magenta
+                    BackgroundColor(colors.accent.clone().into()),
                     BorderRadius::all(Val::Percent(50.0)),
                     ZIndex(2),
                 ));
@@ -291,7 +296,7 @@ impl BoardUtils {
                     height: Val::Px(3.0),
                     ..default()
                 },
-                BackgroundColor(Color::srgb(1.0, 0.8, 1.0)), // Bright white-magenta
+                BackgroundColor(colors.accent.clone().into()),
                 BorderRadius::all(Val::Percent(50.0)),
                 ZIndex(2),
             ));
@@ -310,7 +315,7 @@ impl BoardUtils {
                     height: Val::Px(6.0),
                     ..default()
                 },
-                BackgroundColor(Color::srgb(1.0, 0.2, 0.8)), // Accent color
+                BackgroundColor(colors.accent.clone().into()),
                 BorderRadius::all(Val::Percent(50.0)),
             ));
             
@@ -324,7 +329,7 @@ impl BoardUtils {
                     height: Val::Px(8.0),
                     ..default()
                 },
-                BackgroundColor(Color::srgba(1.0, 0.2, 0.8, 0.2)), // Much more subtle
+                BackgroundColor(Color::srgba(colors.accent.r, colors.accent.g, colors.accent.b, 0.2)),
                 BorderRadius::all(Val::Percent(50.0)),
                 ZIndex(-1),
             ));

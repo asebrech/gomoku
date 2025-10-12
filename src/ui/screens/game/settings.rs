@@ -5,7 +5,7 @@ use crate::{
     ui::{
         app::GameSettings,
         config::GameConfig,
-        screens::game::game::{AITimeText, AIDepthText}
+        screens::game::game::{AITimeText, AIDepthText, RoundNumberText},
     }
 };
 
@@ -28,6 +28,8 @@ pub struct ResetBoardButton;
 pub struct BackToMenuButton;
 
 pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &GameSettings, config: &GameConfig) {
+    let colors = &config.colors;
+    
     builder
         .spawn((
             Node {
@@ -39,6 +41,38 @@ pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &
             GameSettingsPanel,
         ))
         .with_children(|builder| {
+            // Turns display (at the top)
+            builder.spawn((
+                Node {
+                    display: Display::Flex,
+                    flex_direction: FlexDirection::Column,
+                    padding: UiRect::all(Val::Px(15.0)),
+                    width: Val::Px(350.0),
+                    border: UiRect::all(Val::Px(2.0)),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(
+                    colors.surface.r * 0.8,
+                    colors.surface.g * 0.8,
+                    colors.surface.b * 0.8,
+                    0.8
+                )),
+                BorderColor(colors.accent.clone().into()),
+                BorderRadius::all(Val::Px(8.0)),
+            )).with_children(|builder| {
+                builder.spawn((
+                    Text::new("Turns: 1"),
+                    TextFont {
+                        font_size: 22.0,
+                        ..default()
+                    },
+                    TextColor(colors.accent.clone().into()),
+                    RoundNumberText, // Component for updating the turn count
+                ));
+            });
+            
             // Settings content container
             builder.spawn((
                 Node {
@@ -50,8 +84,8 @@ pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &
                     border: UiRect::all(Val::Px(2.0)),
                     ..default()
                 },
-                BackgroundColor(Color::srgb(0.15, 0.15, 0.15)),
-                BorderColor(Color::srgb(0.3, 0.3, 0.3)),
+                BackgroundColor(colors.surface.clone().into()),
+                BorderColor(colors.accent.clone().into()),
                 BorderRadius::all(Val::Px(8.0)),
             ))
             .with_children(|builder| {
@@ -61,21 +95,21 @@ pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &
                         font_size: 24.0,
                         ..default()
                     },
-                    TextColor(Color::WHITE),
+                    TextColor(colors.accent.clone().into()),
                     Node {
                         margin: UiRect::bottom(Val::Px(10.0)),
                         ..default()
                     },
                 ));
 
-                spawn_setting_row(builder, "Board Size", &format!("{}x{}", game_settings.board_size, game_settings.board_size));
+                spawn_setting_row(builder, config, "Board Size", &format!("{}x{}", game_settings.board_size, game_settings.board_size));
 
-                spawn_setting_row(builder, "Chain to Win", &game_settings.minimum_chain_to_win.to_string());
+                spawn_setting_row(builder, config, "Chain to Win", &game_settings.minimum_chain_to_win.to_string());
 
-                spawn_setting_row(builder, "Captures to Win", &game_settings.total_capture_to_win.to_string());
+                spawn_setting_row(builder, config, "Captures to Win", &game_settings.total_capture_to_win.to_string());
 
                 let game_mode = if game_settings.versus_ai { "vs AI" } else { "Multiplayer" };
-                spawn_setting_row(builder, "Game Mode", game_mode);
+                spawn_setting_row(builder, config, "Game Mode", game_mode);
 
                 if game_settings.versus_ai {
                     let max_depth_display = if game_settings.ai_depth == 0 {
@@ -83,10 +117,10 @@ pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &
                     } else {
                         game_settings.ai_depth.to_string()
                     };
-                    spawn_setting_row(builder, "Maximum Depth", &max_depth_display);
+                    spawn_setting_row(builder, config, "Maximum Depth", &max_depth_display);
 
-                    spawn_timer_row(builder, "AI Time", "");
-                    spawn_depth_row(builder, "Depth Reached", "");
+                    spawn_timer_row(builder, config, "AI Time", "");
+                    spawn_depth_row(builder, config, "Depth Reached", "");
                 }
 
                 // Time Limit
@@ -94,21 +128,22 @@ pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &
                     Some(seconds) => format!("{}s", seconds),
                     None => "Unlimited".to_string(),
                 };
-                spawn_setting_row(builder, "Time Limit", &time_limit);
+                spawn_setting_row(builder, config, "Time Limit", &time_limit);
 
                 // Volume Control Section
                 spawn_volume_control(builder, config);
 
                 // Reset Board button (inside settings panel)
-                spawn_reset_button(builder);
+                spawn_reset_button(builder, config);
             });
 
             // Back to Menu button (outside settings panel, separate container)
-            spawn_back_to_menu_button(builder);
+            spawn_back_to_menu_button(builder, config);
         });
 }
 
-fn spawn_setting_row(builder: &mut ChildSpawnerCommands, label: &str, value: &str) {
+fn spawn_setting_row(builder: &mut ChildSpawnerCommands, config: &GameConfig, label: &str, value: &str) {
+    let colors = &config.colors;
     builder
         .spawn((
             Node {
@@ -120,7 +155,7 @@ fn spawn_setting_row(builder: &mut ChildSpawnerCommands, label: &str, value: &st
                 padding: UiRect::all(Val::Px(8.0)),
                 ..default()
             },
-            BackgroundColor(Color::srgb(0.08, 0.08, 0.08)),
+            BackgroundColor(colors.surface.clone().into()),
             BorderRadius::all(Val::Px(4.0)),
         ))
         .with_children(|builder| {
@@ -130,7 +165,7 @@ fn spawn_setting_row(builder: &mut ChildSpawnerCommands, label: &str, value: &st
                     font_size: 16.0,
                     ..default()
                 },
-                TextColor(Color::srgb(0.8, 0.8, 0.8)),
+                TextColor(colors.text_primary.clone().into()),
             ));
 
             builder.spawn((
@@ -139,12 +174,13 @@ fn spawn_setting_row(builder: &mut ChildSpawnerCommands, label: &str, value: &st
                     font_size: 16.0,
                     ..default()
                 },
-                TextColor(Color::WHITE),
+                TextColor(colors.accent.clone().into()),
             ));
         });
 }
 
-fn spawn_timer_row(builder: &mut ChildSpawnerCommands, label: &str, _value: &str) {
+fn spawn_timer_row(builder: &mut ChildSpawnerCommands, config: &GameConfig, label: &str, _value: &str) {
+    let colors = &config.colors;
     builder
         .spawn((
             Node {
@@ -156,7 +192,7 @@ fn spawn_timer_row(builder: &mut ChildSpawnerCommands, label: &str, _value: &str
                 padding: UiRect::all(Val::Px(8.0)),
                 ..default()
             },
-            BackgroundColor(Color::srgb(0.08, 0.08, 0.08)),
+            BackgroundColor(colors.surface.clone().into()),
             BorderRadius::all(Val::Px(4.0)),
         ))
         .with_children(|builder| {
@@ -166,7 +202,7 @@ fn spawn_timer_row(builder: &mut ChildSpawnerCommands, label: &str, _value: &str
                     font_size: 16.0,
                     ..default()
                 },
-                TextColor(Color::srgb(0.8, 0.8, 0.8)),
+                TextColor(colors.text_primary.clone().into()),
             ));
 
 				builder.spawn((
@@ -175,7 +211,7 @@ fn spawn_timer_row(builder: &mut ChildSpawnerCommands, label: &str, _value: &str
                         font_size: 16.0,
                         ..default()
                     },
-                    TextColor(Color::WHITE),
+                    TextColor(colors.accent.clone().into()),
                     AITimeText,
                     Node {
                         margin: UiRect::top(Val::Px(8.0)),
@@ -185,7 +221,8 @@ fn spawn_timer_row(builder: &mut ChildSpawnerCommands, label: &str, _value: &str
         });
 }
 
-fn spawn_depth_row(builder: &mut ChildSpawnerCommands, label: &str, _value: &str) {
+fn spawn_depth_row(builder: &mut ChildSpawnerCommands, config: &GameConfig, label: &str, _value: &str) {
+    let colors = &config.colors;
     builder
         .spawn((
             Node {
@@ -197,7 +234,7 @@ fn spawn_depth_row(builder: &mut ChildSpawnerCommands, label: &str, _value: &str
                 padding: UiRect::all(Val::Px(8.0)),
                 ..default()
             },
-            BackgroundColor(Color::srgb(0.08, 0.08, 0.08)),
+            BackgroundColor(colors.surface.clone().into()),
             BorderRadius::all(Val::Px(4.0)),
         ))
         .with_children(|builder| {
@@ -207,7 +244,7 @@ fn spawn_depth_row(builder: &mut ChildSpawnerCommands, label: &str, _value: &str
                     font_size: 16.0,
                     ..default()
                 },
-                TextColor(Color::srgb(0.8, 0.8, 0.8)),
+                TextColor(colors.text_primary.clone().into()),
             ));
 
             builder.spawn((
@@ -216,7 +253,7 @@ fn spawn_depth_row(builder: &mut ChildSpawnerCommands, label: &str, _value: &str
                     font_size: 16.0,
                     ..default()
                 },
-                TextColor(Color::WHITE),
+                TextColor(colors.accent.clone().into()),
                 AIDepthText,
                 Node {
                     margin: UiRect::top(Val::Px(8.0)),
@@ -227,6 +264,7 @@ fn spawn_depth_row(builder: &mut ChildSpawnerCommands, label: &str, _value: &str
 }
 
 fn spawn_volume_control(builder: &mut ChildSpawnerCommands, config: &GameConfig) {
+    let colors = &config.colors;
     // Get current volume settings
     let (volume, muted) = config.get_audio_settings();
     let volume_text = if muted {
@@ -242,7 +280,7 @@ fn spawn_volume_control(builder: &mut ChildSpawnerCommands, config: &GameConfig)
             font_size: 20.0,
             ..default()
         },
-        TextColor(Color::WHITE),
+        TextColor(colors.accent.clone().into()),
         Node {
             margin: UiRect::vertical(Val::Px(10.0)),
             ..default()
@@ -261,7 +299,7 @@ fn spawn_volume_control(builder: &mut ChildSpawnerCommands, config: &GameConfig)
                 padding: UiRect::all(Val::Px(8.0)),
                 ..default()
             },
-            BackgroundColor(Color::srgb(0.08, 0.08, 0.08)),
+            BackgroundColor(colors.surface.clone().into()),
             BorderRadius::all(Val::Px(4.0)),
         ))
         .with_children(|builder| {
@@ -272,7 +310,7 @@ fn spawn_volume_control(builder: &mut ChildSpawnerCommands, config: &GameConfig)
                     font_size: 16.0,
                     ..default()
                 },
-                TextColor(Color::srgb(0.8, 0.8, 0.8)),
+                TextColor(colors.text_primary.clone().into()),
             ));
 
             // Volume controls container
@@ -297,8 +335,8 @@ fn spawn_volume_control(builder: &mut ChildSpawnerCommands, config: &GameConfig)
                         border: UiRect::all(Val::Px(1.0)),
                         ..default()
                     },
-                    BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
-                    BorderColor(Color::srgb(0.4, 0.4, 0.4)),
+                    BackgroundColor(colors.button_normal.clone().into()),
+                    BorderColor(colors.accent.clone().into()),
                     BorderRadius::all(Val::Px(4.0)),
                     VolumeDown,
                 )).with_children(|builder| {
@@ -308,7 +346,7 @@ fn spawn_volume_control(builder: &mut ChildSpawnerCommands, config: &GameConfig)
                             font_size: 14.0,
                             ..default()
                         },
-                        TextColor(Color::WHITE),
+                        TextColor(colors.text_primary.clone().into()),
                     ));
                 });
 
@@ -319,7 +357,7 @@ fn spawn_volume_control(builder: &mut ChildSpawnerCommands, config: &GameConfig)
                         font_size: 14.0,
                         ..default()
                     },
-                    TextColor(Color::WHITE),
+                    TextColor(colors.accent.clone().into()),
                     VolumeDisplay,
                     Node {
                         width: Val::Px(40.0),
@@ -341,8 +379,8 @@ fn spawn_volume_control(builder: &mut ChildSpawnerCommands, config: &GameConfig)
                         border: UiRect::all(Val::Px(1.0)),
                         ..default()
                     },
-                    BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
-                    BorderColor(Color::srgb(0.4, 0.4, 0.4)),
+                    BackgroundColor(colors.button_normal.clone().into()),
+                    BorderColor(colors.accent.clone().into()),
                     BorderRadius::all(Val::Px(4.0)),
                     VolumeUp,
                 )).with_children(|builder| {
@@ -352,14 +390,15 @@ fn spawn_volume_control(builder: &mut ChildSpawnerCommands, config: &GameConfig)
                             font_size: 14.0,
                             ..default()
                         },
-                        TextColor(Color::WHITE),
+                        TextColor(colors.text_primary.clone().into()),
                     ));
                 });
             });
         });
 }
 
-fn spawn_reset_button(builder: &mut ChildSpawnerCommands) {
+fn spawn_reset_button(builder: &mut ChildSpawnerCommands, config: &GameConfig) {
+    let colors = &config.colors;
     // Game control section header
     builder.spawn((
         Text::new("Game Controls"),
@@ -367,7 +406,7 @@ fn spawn_reset_button(builder: &mut ChildSpawnerCommands) {
             font_size: 20.0,
             ..default()
         },
-        TextColor(Color::WHITE),
+        TextColor(colors.accent.clone().into()),
         Node {
             margin: UiRect::vertical(Val::Px(10.0)),
             ..default()
@@ -386,8 +425,8 @@ fn spawn_reset_button(builder: &mut ChildSpawnerCommands) {
             border: UiRect::all(Val::Px(2.0)),
             ..default()
         },
-        BackgroundColor(Color::srgb(0.3, 0.5, 0.3)),
-        BorderColor(Color::srgb(0.4, 0.6, 0.4)),
+        BackgroundColor(colors.button_normal.clone().into()),
+        BorderColor(colors.accent.clone().into()),
         BorderRadius::all(Val::Px(4.0)),
         ResetBoardButton,
     )).with_children(|builder| {
@@ -397,12 +436,13 @@ fn spawn_reset_button(builder: &mut ChildSpawnerCommands) {
                 font_size: 16.0,
                 ..default()
             },
-            TextColor(Color::WHITE),
+            TextColor(colors.text_primary.clone().into()),
         ));
     });
 }
 
-fn spawn_back_to_menu_button(builder: &mut ChildSpawnerCommands) {
+fn spawn_back_to_menu_button(builder: &mut ChildSpawnerCommands, config: &GameConfig) {
+    let colors = &config.colors;
     // Back to Menu button - in its own container, not constrained by column
     builder.spawn((
         Button,
@@ -416,8 +456,8 @@ fn spawn_back_to_menu_button(builder: &mut ChildSpawnerCommands) {
             border: UiRect::all(Val::Px(2.0)),
             ..default()
         },
-        BackgroundColor(Color::srgb(0.5, 0.3, 0.3)),
-        BorderColor(Color::srgb(0.6, 0.4, 0.4)),
+        BackgroundColor(colors.button_normal.clone().into()),
+        BorderColor(colors.accent.clone().into()),
         BorderRadius::all(Val::Px(4.0)),
         BackToMenuButton,
     )).with_children(|builder| {
@@ -427,7 +467,7 @@ fn spawn_back_to_menu_button(builder: &mut ChildSpawnerCommands) {
                 font_size: 16.0,
                 ..default()
             },
-            TextColor(Color::WHITE),
+            TextColor(colors.accent.clone().into()),
             TextLayout {
                 justify: JustifyText::Center,
                 linebreak: LineBreak::NoWrap,

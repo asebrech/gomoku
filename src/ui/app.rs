@@ -136,7 +136,7 @@ impl GomokuApp {
 
 	fn init_resources(&mut self) {
 		// Load game settings from config
-		let config = GameConfig::load_from_file("config/config.json")
+		let mut config = GameConfig::load_from_file("config/config.json")
 			.unwrap_or_else(|_| GameConfig::default());
 		
 		let (board_size, win_condition, ai_max_depth, ai_time_limit, pair_captures_to_win) = config.get_game_settings();
@@ -153,11 +153,20 @@ impl GomokuApp {
 			time_limit,
 		};
 		
+		// Get the saved theme from config
+		let current_theme = config.get_current_theme();
+		
+		// Create theme manager with saved theme
+		let theme_manager = ThemeManager::with_theme(&current_theme);
+		
+		// Sync config colors from theme
+		config.sync_colors_from_theme(&theme_manager.current_theme.colors);
+		
 		self.app
 		.insert_resource(GameState::new(settings.board_size, settings.minimum_chain_to_win, settings.total_capture_to_win))
         .insert_resource(settings)
         .insert_resource(config)
-        .insert_resource(ThemeManager::new())
+        .insert_resource(theme_manager)
         .init_resource::<TranspositionTable>();
 
 	}

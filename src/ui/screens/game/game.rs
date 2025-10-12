@@ -115,6 +115,11 @@ pub fn game_plugin(app: &mut App) {
                 reset_board.run_if(on_event::<ResetBoard>),
                 toggle_pause,
                 handle_escape_key,
+            ).run_if(in_state(AppState::Game)),
+        )
+        .add_systems(
+            Update,
+            (
                 update_ai_time_display.run_if(on_event::<UpdateAITimeDisplay>),
                 update_ai_depth_display.run_if(on_event::<UpdateAIDepthDisplay>),
                 handle_game_volume_control,
@@ -254,87 +259,46 @@ fn setup_game_ui(
                 ));
                 
                 // Board
-                BoardUtils::spawn_board(builder, &game_settings);
+                BoardUtils::spawn_board(builder, &game_settings, &config);
                 
-                // Capture and round info display (below board)
+                // Capture info display (below board)
                 builder.spawn(Node {
                     display: Display::Flex,
-                    flex_direction: FlexDirection::Row,
-                    justify_content: JustifyContent::SpaceEvenly,
+                    flex_direction: FlexDirection::Column,
+                    justify_content: JustifyContent::Center,
                     align_items: AlignItems::Center,
                     width: Val::Percent(100.0),
                     margin: UiRect::top(Val::Px(15.0)),
+                    row_gap: Val::Px(10.0),
                     ..default()
                 }).with_children(|builder| {
-                    // Player 1 (Pink) captures box
+                    // Score display box
                     builder.spawn((
                         Node {
-                            padding: UiRect::all(Val::Px(12.0)),
+                            padding: UiRect::all(Val::Px(15.0)),
                             border: UiRect::all(Val::Px(2.0)),
                             justify_content: JustifyContent::Center,
                             align_items: AlignItems::Center,
-                            min_width: Val::Px(120.0),
-                            ..default()
-                        },
-                        BorderColor(crate::ui::config::ColorData { r: 1.0, g: 0.4, b: 0.7, a: 0.6 }.into()), // Pink border
-                        BackgroundColor(crate::ui::config::ColorData { r: 0.15, g: 0.15, b: 0.2, a: 0.8 }.into()),
-                    )).with_children(|builder| {
-                        builder.spawn((
-                            Text::new("You: 0"),
-                            TextFont {
-                                font_size: 20.0,
-                                ..default()
-                            },
-                            TextColor(crate::ui::config::ColorData { r: 1.0, g: 0.4, b: 0.7, a: 1.0 }.into()), // Pink
-                            Player1CapturesText,
-                        ));
-                    });
-                    
-                    // Round number box (center)
-                    builder.spawn((
-                        Node {
-                            padding: UiRect::all(Val::Px(12.0)),
-                            border: UiRect::all(Val::Px(2.0)),
-                            justify_content: JustifyContent::Center,
-                            align_items: AlignItems::Center,
-                            min_width: Val::Px(120.0),
+                            min_width: Val::Px(300.0),
                             ..default()
                         },
                         BorderColor(colors.accent.clone().into()),
-                        BackgroundColor(crate::ui::config::ColorData { r: 0.15, g: 0.15, b: 0.2, a: 0.8 }.into()),
+                        BackgroundColor(Color::srgba(
+                            colors.surface.r * 0.8,
+                            colors.surface.g * 0.8,
+                            colors.surface.b * 0.8,
+                            0.8
+                        )),
                     )).with_children(|builder| {
+                        // Score text - will be updated to show "Pink 0 - 0 Blue"
                         builder.spawn((
-                            Text::new("Round 1"),
+                            Text::new("Pink 0 - 0 Blue"),
                             TextFont {
-                                font_size: 22.0,
+                                font_size: 24.0,
                                 ..default()
                             },
-                            TextColor(colors.accent.clone().into()),
-                            RoundNumberText,
-                        ));
-                    });
-                    
-                    // Player 2 (Blue) captures box
-                    builder.spawn((
-                        Node {
-                            padding: UiRect::all(Val::Px(12.0)),
-                            border: UiRect::all(Val::Px(2.0)),
-                            justify_content: JustifyContent::Center,
-                            align_items: AlignItems::Center,
-                            min_width: Val::Px(120.0),
-                            ..default()
-                        },
-                        BorderColor(crate::ui::config::ColorData { r: 0.2, g: 0.6, b: 1.0, a: 0.6 }.into()), // Blue border
-                        BackgroundColor(crate::ui::config::ColorData { r: 0.15, g: 0.15, b: 0.2, a: 0.8 }.into()),
-                    )).with_children(|builder| {
-                        builder.spawn((
-                            Text::new("AI: 0"),
-                            TextFont {
-                                font_size: 20.0,
-                                ..default()
-                            },
-                            TextColor(crate::ui::config::ColorData { r: 0.2, g: 0.6, b: 1.0, a: 1.0 }.into()), // Blue
-                            Player2CapturesText,
+                            TextColor(colors.text_primary.clone().into()),
+                            Player1CapturesText, // Reusing this component to store the score
                         ));
                     });
                 });
@@ -383,6 +347,7 @@ pub fn update_available_placement(
 
 pub fn place_stone(
     mut commands: Commands,
+    config: Res<GameConfig>,
     preloaded_stones: Res<PreloadedStones>,
     board_query: Query<Entity, With<BoardRoot>>,
     mut game_state: ResMut<GameState>,
@@ -418,23 +383,55 @@ pub fn place_stone(
             // Color mapping: Player::Max (first player) = Pink, Player::Min (second player/AI) = Blue
             let is_first_player = player == Player::Max;
             
+            // Check if current theme is Synthwave
+            let current_theme = config.get_current_theme();
+            let is_synthwave = current_theme == "Synthwave";
+            
             commands.entity(board_entity).with_children(|builder| {
-                // Use preloaded stone images
-                let stone_handle = if is_first_player {
-                    preloaded_stones.pink_stone.clone()  // Pink for first player (human)
+                if is_synthwave {
+                    // Use image assets for Synthwave theme
+                    let stone_handle = if is_first_player {
+                        preloaded_stones.pink_stone.clone()
+                    } else {
+                        preloaded_stones.blue_stone.clone()
+                    };
+                    
+                    builder.spawn((
+                        BoardUtils::stone_node(ev.x, ev.y, BoardUtils::STONE_SIZE),
+                        ImageNode::new(stone_handle),
+                        Stone(player),
+                        ZIndex(15),
+                        OnGameScreen,
+                        GridCell { x: ev.x, y: ev.y },
+                    ));
                 } else {
-                    preloaded_stones.blue_stone.clone()  // Blue for second player (AI)
-                };
-                
-                // Spawn stone with preloaded image
-                builder.spawn((
-                    BoardUtils::stone_node(ev.x, ev.y, BoardUtils::STONE_SIZE),
-                    ImageNode::new(stone_handle),
-                    Stone(player),
-                    ZIndex(15),
-                    OnGameScreen,
-                    GridCell { x: ev.x, y: ev.y },
-                ));
+                    // Use theme colors for other themes - circular UI nodes
+                    let stone_color = if is_first_player {
+                        Color::srgba(
+                            config.colors.stone_player1.r,
+                            config.colors.stone_player1.g,
+                            config.colors.stone_player1.b,
+                            config.colors.stone_player1.a,
+                        )
+                    } else {
+                        Color::srgba(
+                            config.colors.stone_player2.r,
+                            config.colors.stone_player2.g,
+                            config.colors.stone_player2.b,
+                            config.colors.stone_player2.a,
+                        )
+                    };
+                    
+                    builder.spawn((
+                        BoardUtils::stone_node(ev.x, ev.y, BoardUtils::STONE_SIZE),
+                        BackgroundColor(stone_color),
+                        BorderRadius::all(Val::Percent(50.0)), // Perfect circle
+                        Stone(player),
+                        ZIndex(15),
+                        OnGameScreen,
+                        GridCell { x: ev.x, y: ev.y },
+                    ));
+                }
             });
         }
         move_played.write(MovePlayed);
@@ -931,9 +928,9 @@ fn show_game_over_screen(
                     "Player 2 (Blue) Wins!"
                 },
                 if game_settings.versus_ai {
-                    crate::ui::config::ColorData { r: 0.8, g: 0.2, b: 0.3, a: 1.0 } // Red for defeat
+                    colors.secondary.clone() // Use secondary color for AI defeat
                 } else {
-                    crate::ui::config::ColorData { r: 0.2, g: 0.6, b: 1.0, a: 1.0 } // Blue for player 2 victory
+                    colors.secondary.clone() // Use secondary color for player 2 victory
                 },
             ),
             None => (
@@ -956,7 +953,12 @@ fn show_game_over_screen(
                     align_items: AlignItems::Center,
                     ..default()
                 },
-                BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.8)), // Dark overlay
+                BackgroundColor(Color::srgba(
+                    colors.background.r * 0.5,
+                    colors.background.g * 0.5,
+                    colors.background.b * 0.5,
+                    0.8
+                )),
                 ZIndex(100),
                 GameOverOverlay,
                 OnGameScreen,
@@ -975,7 +977,12 @@ fn show_game_over_screen(
                             border: UiRect::all(Val::Px(3.0)),
                             ..default()
                         },
-                        BackgroundColor(Color::srgba(0.05, 0.0, 0.15, 0.95)),
+                        BackgroundColor(Color::srgba(
+                            colors.surface.r * 0.9,
+                            colors.surface.g * 0.9,
+                            colors.surface.b * 0.9,
+                            0.95
+                        )),
                         BorderColor(title_color.clone().into()),
                         BorderRadius::all(Val::Px(15.0)),
                     ))
@@ -1170,37 +1177,22 @@ fn update_round_number_display(
     }
     
     for mut text in query.iter_mut() {
-        // Calculate round number (each round = 2 moves, one per player)
-        let round_number = (game_state.move_history.len() / 2) + 1;
-        text.0 = format!("Round {}", round_number);
+        // Calculate turn number (total moves made)
+        let turn_number = (game_state.move_history.len() / 2) + 1;
+        text.0 = format!("Turns: {}", turn_number);
     }
 }
 
 fn update_captures_display(
     game_state: Res<GameState>,
-    game_settings: Res<GameSettings>,
-    mut player1_query: Query<&mut Text, (With<Player1CapturesText>, Without<Player2CapturesText>)>,
-    mut player2_query: Query<&mut Text, With<Player2CapturesText>>,
+    mut score_query: Query<&mut Text, With<Player1CapturesText>>,
 ) {
     if !game_state.is_changed() {
         return;
     }
     
-    // Update Player 1 (Pink/Max) captures
-    for mut text in player1_query.iter_mut() {
-        if game_settings.versus_ai {
-            text.0 = format!("You: {}", game_state.max_captures);
-        } else {
-            text.0 = format!("Player 1: {}", game_state.max_captures);
-        }
-    }
-    
-    // Update Player 2 (Blue/Min) captures
-    for mut text in player2_query.iter_mut() {
-        if game_settings.versus_ai {
-            text.0 = format!("AI: {}", game_state.min_captures);
-        } else {
-            text.0 = format!("Player 2: {}", game_state.min_captures);
-        }
+    // Update the score display in "Pink X - Y Blue" format
+    for mut text in score_query.iter_mut() {
+        text.0 = format!("Pink {} - {} Blue", game_state.max_captures, game_state.min_captures);
     }
 }

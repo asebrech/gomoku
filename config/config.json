@@ -37,62 +37,74 @@
   "colors": {
     "primary": {
       "r": 1.0,
-      "g": 0.0,
-      "b": 1.0,
+      "g": 0.5,
+      "b": 0.0,
       "a": 1.0
     },
     "secondary": {
-      "r": 0.0,
-      "g": 1.0,
-      "b": 1.0,
+      "r": 1.0,
+      "g": 0.7,
+      "b": 0.3,
       "a": 1.0
     },
     "accent": {
       "r": 1.0,
-      "g": 0.2,
-      "b": 0.8,
+      "g": 0.3,
+      "b": 0.0,
       "a": 1.0
     },
     "background": {
-      "r": 0.05,
-      "g": 0.0,
-      "b": 0.15,
+      "r": 0.1,
+      "g": 0.05,
+      "b": 0.0,
       "a": 1.0
     },
     "surface": {
-      "r": 0.1,
-      "g": 0.0,
-      "b": 0.2,
+      "r": 0.2,
+      "g": 0.1,
+      "b": 0.0,
       "a": 1.0
     },
     "text_primary": {
-      "r": 0.0,
-      "g": 1.0,
-      "b": 1.0,
+      "r": 1.0,
+      "g": 0.9,
+      "b": 0.8,
       "a": 1.0
     },
     "text_secondary": {
       "r": 1.0,
-      "g": 0.0,
-      "b": 1.0,
+      "g": 0.7,
+      "b": 0.5,
       "a": 1.0
     },
     "button_normal": {
-      "r": 0.2,
-      "g": 0.0,
-      "b": 0.4,
+      "r": 0.3,
+      "g": 0.15,
+      "b": 0.0,
       "a": 1.0
     },
     "button_hovered": {
-      "r": 0.4,
-      "g": 0.0,
-      "b": 0.6,
+      "r": 0.5,
+      "g": 0.25,
+      "b": 0.0,
       "a": 1.0
     },
     "button_pressed": {
       "r": 1.0,
-      "g": 0.2,
-      "b": 0.8,
+      "g": 0.5,
+      "b": 0.0,
+      "a": 1.0
+    },
+    "stone_player1": {
+      "r": 1.0,
+      "g": 0.8,
+      "b": 0.4,
+      "a": 1.0
+    },
+    "stone_player2": {
+      "r": 0.6,
+      "g": 0.3,
+      "b": 0.0,
       "a": 1.0
     }
   },
@@ -120,14 +132,14 @@
       "Gomoku: Professional time waster since 2025!"
     ],
     "loading_messages": {
-      "100": "Complete!",
-      "81-95": "Renaming variables...",
-      "96-99": "Changing headers names...",
-      "0-10": "Initializing...",
-      "11-25": "Loading songs...",
       "61-80": "Importing neo-cat...",
+      "11-25": "Loading songs...",
+      "81-95": "Renaming variables...",
+      "41-60": "Using Minimax Algorithm...",
       "26-40": "Cloning heuristic...",
-      "41-60": "Using Minimax Algorithm..."
+      "100": "Complete!",
+      "96-99": "Changing headers names...",
+      "0-10": "Initializing..."
     },
     "font_sizes": {
       "title": 32.0,
@@ -157,6 +169,9 @@
       "show_move_hints": true,
       "animation_speed": 1.0,
       "auto_save": true
+    },
+    "theme": {
+      "current_theme": "Test Theme"
     }
   }
 }
