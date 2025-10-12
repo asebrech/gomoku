@@ -72,6 +72,12 @@ pub struct GridCell {
 pub struct CurrentPlayerText;
 
 #[derive(Component)]
+pub struct CurrentPlayerIndicator;
+
+#[derive(Component)]
+pub struct PlayerTurnCircle;
+
+#[derive(Component)]
 pub struct RoundNumberText;
 
 #[derive(Component)]
@@ -235,28 +241,68 @@ fn setup_game_ui(
                     ..default()
                 },
             )).with_children(|builder| {
-                // Current player turn display (above board)
-                let initial_text = if game_settings.versus_ai && game_state.current_player == Player::Min {
-                    "AI is thinking..."
-                } else if game_state.current_player == Player::Max {
-                    "Your Turn (Pink)"
-                } else {
-                    "Player 2's Turn (Blue)"
-                };
+                // Current player turn display (above board) with colored circle
+                let is_ai_turn = game_settings.versus_ai && game_state.current_player == Player::Min;
+                let is_player1 = game_state.current_player == Player::Max;
                 
                 builder.spawn((
-                    Text::new(initial_text),
-                    TextFont {
-                        font_size: 32.0,
-                        ..default()
-                    },
-                    TextColor(colors.accent.clone().into()),
-                    CurrentPlayerText,
                     Node {
+                        display: Display::Flex,
+                        flex_direction: FlexDirection::Row,
+                        align_items: AlignItems::Center,
+                        column_gap: Val::Px(12.0),
                         margin: UiRect::bottom(Val::Px(10.0)),
                         ..default()
                     },
-                ));
+                    CurrentPlayerIndicator,
+                )).with_children(|builder| {
+                    if !is_ai_turn {
+                        // Show colored circle for player turns
+                        builder.spawn((
+                            Node {
+                                width: Val::Px(24.0),
+                                height: Val::Px(24.0),
+                                ..default()
+                            },
+                            BackgroundColor(if is_player1 {
+                                Color::srgba(
+                                    colors.stone_player1.r,
+                                    colors.stone_player1.g,
+                                    colors.stone_player1.b,
+                                    colors.stone_player1.a,
+                                )
+                            } else {
+                                Color::srgba(
+                                    colors.stone_player2.r,
+                                    colors.stone_player2.g,
+                                    colors.stone_player2.b,
+                                    colors.stone_player2.a,
+                                )
+                            }),
+                            BorderRadius::all(Val::Percent(50.0)),
+                            PlayerTurnCircle,
+                        ));
+                    }
+                    
+                    // Turn text
+                    let initial_text = if is_ai_turn {
+                        "AI is thinking..."
+                    } else if game_settings.versus_ai {
+                        "Your Turn"
+                    } else {
+                        "Turn"
+                    };
+                    
+                    builder.spawn((
+                        Text::new(initial_text),
+                        TextFont {
+                            font_size: 32.0,
+                            ..default()
+                        },
+                        TextColor(colors.accent.clone().into()),
+                        CurrentPlayerText,
+                    ));
+                });
                 
                 // Board
                 BoardUtils::spawn_board(builder, &game_settings, &config);
@@ -290,16 +336,78 @@ fn setup_game_ui(
                             0.8
                         )),
                     )).with_children(|builder| {
-                        // Score text - will be updated to show "Pink 0 - 0 Blue"
-                        builder.spawn((
-                            Text::new("Pink 0 - 0 Blue"),
-                            TextFont {
-                                font_size: 24.0,
-                                ..default()
-                            },
-                            TextColor(colors.text_primary.clone().into()),
-                            Player1CapturesText, // Reusing this component to store the score
-                        ));
+                        // Score display with colored circles
+                        builder.spawn(Node {
+                            display: Display::Flex,
+                            flex_direction: FlexDirection::Row,
+                            align_items: AlignItems::Center,
+                            column_gap: Val::Px(15.0),
+                            ..default()
+                        }).with_children(|builder| {
+                            // Player 1 circle
+                            builder.spawn((
+                                Node {
+                                    width: Val::Px(20.0),
+                                    height: Val::Px(20.0),
+                                    ..default()
+                                },
+                                BackgroundColor(Color::srgba(
+                                    colors.stone_player1.r,
+                                    colors.stone_player1.g,
+                                    colors.stone_player1.b,
+                                    colors.stone_player1.a,
+                                )),
+                                BorderRadius::all(Val::Percent(50.0)),
+                            ));
+                            
+                            // Player 1 score
+                            builder.spawn((
+                                Text::new("0"),
+                                TextFont {
+                                    font_size: 24.0,
+                                    ..default()
+                                },
+                                TextColor(colors.text_primary.clone().into()),
+                                Player1CapturesText,
+                            ));
+                            
+                            // Separator
+                            builder.spawn((
+                                Text::new("-"),
+                                TextFont {
+                                    font_size: 24.0,
+                                    ..default()
+                                },
+                                TextColor(colors.text_primary.clone().into()),
+                            ));
+                            
+                            // Player 2 score
+                            builder.spawn((
+                                Text::new("0"),
+                                TextFont {
+                                    font_size: 24.0,
+                                    ..default()
+                                },
+                                TextColor(colors.text_primary.clone().into()),
+                                Player2CapturesText,
+                            ));
+                            
+                            // Player 2 circle
+                            builder.spawn((
+                                Node {
+                                    width: Val::Px(20.0),
+                                    height: Val::Px(20.0),
+                                    ..default()
+                                },
+                                BackgroundColor(Color::srgba(
+                                    colors.stone_player2.r,
+                                    colors.stone_player2.g,
+                                    colors.stone_player2.b,
+                                    colors.stone_player2.a,
+                                )),
+                                BorderRadius::all(Val::Percent(50.0)),
+                            ));
+                        });
                     });
                 });
             });
@@ -1095,15 +1203,24 @@ fn update_current_player_display(
     game_state: Res<GameState>,
     game_settings: Res<GameSettings>,
     game_status: Res<GameStatus>,
-    mut query: Query<&mut Text, With<CurrentPlayerText>>,
+    config: Res<GameConfig>,
+    mut text_query: Query<&mut Text, With<CurrentPlayerText>>,
+    mut circle_query: Query<&mut BackgroundColor, With<PlayerTurnCircle>>,
 ) {
     if !game_state.is_changed() && !game_status.is_changed() {
         return;
     }
     
-    for mut text in query.iter_mut() {
+    let colors = &config.colors;
+    
+    for mut text in text_query.iter_mut() {
         // Check if game is over
         if matches!(*game_status, GameStatus::GameOver) {
+            // Hide the circle when game is over
+            for mut circle_bg in circle_query.iter_mut() {
+                *circle_bg = BackgroundColor(Color::NONE);
+            }
+            
             // Determine winner message with win reason
             let message = if let Some(winner) = game_state.winner {
                 let winner_name = match winner {
@@ -1111,14 +1228,14 @@ fn update_current_player_display(
                         if game_settings.versus_ai {
                             "You Won!"
                         } else {
-                            "Player 1 (Pink) Won!"
+                            "Player 1 Won!"
                         }
                     }
                     Player::Min => {
                         if game_settings.versus_ai {
                             "AI Won"
                         } else {
-                            "Player 2 (Blue) Won!"
+                            "Player 2 Won!"
                         }
                     }
                 };
@@ -1143,25 +1260,43 @@ fn update_current_player_display(
             continue;
         }
         
+        // Update circle color based on current player
+        let is_ai_turn = game_settings.versus_ai && game_state.current_player == Player::Min;
+        let is_player1 = game_state.current_player == Player::Max;
+        
+        for mut circle_bg in circle_query.iter_mut() {
+            if is_ai_turn {
+                // Hide circle during AI turn
+                *circle_bg = BackgroundColor(Color::NONE);
+            } else {
+                // Show colored circle for player turns
+                *circle_bg = BackgroundColor(if is_player1 {
+                    Color::srgba(
+                        colors.stone_player1.r,
+                        colors.stone_player1.g,
+                        colors.stone_player1.b,
+                        colors.stone_player1.a,
+                    )
+                } else {
+                    Color::srgba(
+                        colors.stone_player2.r,
+                        colors.stone_player2.g,
+                        colors.stone_player2.b,
+                        colors.stone_player2.a,
+                    )
+                });
+            }
+        }
+        
         // Determine the message based on current player and game mode
-        let message = if game_settings.versus_ai {
-            // vs AI mode
-            // Player::Max = Human = Pink stones (first player)
-            // Player::Min = AI = Blue stones (second player)
-            if game_state.current_player == Player::Max {
-                "Your Turn (Pink)".to_string()
-            } else {
-                "AI is thinking...".to_string()
-            }
+        let message = if is_ai_turn {
+            "AI is thinking...".to_string()
+        } else if game_settings.versus_ai {
+            // vs AI: Just say "Your Turn" since circle shows the color
+            "Your Turn".to_string()
         } else {
-            // Multiplayer mode
-            // Player::Max = Pink stones (first player) 
-            // Player::Min = Blue stones (second player)
-            if game_state.current_player == Player::Max {
-                "Player 1's Turn (Pink)".to_string()
-            } else {
-                "Player 2's Turn (Blue)".to_string()
-            }
+            // Multiplayer: Show "Turn" with the circle indicating which player
+            "Turn".to_string()
         };
         
         text.0 = message;
@@ -1185,14 +1320,20 @@ fn update_round_number_display(
 
 fn update_captures_display(
     game_state: Res<GameState>,
-    mut score_query: Query<&mut Text, With<Player1CapturesText>>,
+    mut player1_query: Query<&mut Text, (With<Player1CapturesText>, Without<Player2CapturesText>)>,
+    mut player2_query: Query<&mut Text, With<Player2CapturesText>>,
 ) {
     if !game_state.is_changed() {
         return;
     }
     
-    // Update the score display in "Pink X - Y Blue" format
-    for mut text in score_query.iter_mut() {
-        text.0 = format!("Pink {} - {} Blue", game_state.max_captures, game_state.min_captures);
+    // Update player 1 score
+    for mut text in player1_query.iter_mut() {
+        text.0 = format!("{}", game_state.max_captures);
+    }
+    
+    // Update player 2 score
+    for mut text in player2_query.iter_mut() {
+        text.0 = format!("{}", game_state.min_captures);
     }
 }
