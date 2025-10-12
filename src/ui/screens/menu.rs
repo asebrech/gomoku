@@ -191,6 +191,7 @@
                     update_volume_display,
                     handle_settings_controls,
                     update_settings_display,
+                    handle_escape_key,
                 ).run_if(in_state(AppState::Menu).and(not(in_state(MenuState::Splash)))),
             );
     }
@@ -1556,6 +1557,27 @@ fn create_menu_button_with_icon(
                     }
                     MenuButtonAction::BackToMainMenu => menu_state.set(MenuState::Main),
                 }
+            }
+        }
+    }
+
+    fn handle_escape_key(
+        keyboard_input: Res<ButtonInput<KeyCode>>,
+        menu_state: Res<State<MenuState>>,
+        mut next_menu_state: ResMut<NextState<MenuState>>,
+        mut app_exit_events: EventWriter<AppExit>,
+    ) {
+        if keyboard_input.just_pressed(KeyCode::Escape) {
+            match menu_state.get() {
+                MenuState::Main => {
+                    // In main menu, quit the app
+                    app_exit_events.write(AppExit::Success);
+                }
+                MenuState::Settings | MenuState::SettingsDisplay | MenuState::SettingsSound | MenuState::Load => {
+                    // In submenus, go back to main menu
+                    next_menu_state.set(MenuState::Main);
+                }
+                _ => {}
             }
         }
     }

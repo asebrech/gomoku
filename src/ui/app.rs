@@ -76,10 +76,41 @@ impl GomokuApp {
 			.unwrap_or_else(|_| GameConfig::default());
 		let (fullscreen, _vsync) = config.get_display_settings();
 		
+		// Get a random window title
+		use rand::Rng;
+		let window_title = if !config.ui.window_titles.is_empty() {
+			let idx = rand::rng().gen_range(0..config.ui.window_titles.len());
+			config.ui.window_titles[idx].clone()
+		} else {
+			"Gomoku".to_string()
+		};
+		
+		// Get the executable's directory and navigate to project root, then to assets folder
+		let asset_path = if cfg!(debug_assertions) {
+			// In debug mode, use assets folder in current directory
+			"assets".to_string()
+		} else {
+			// In release mode, executable is in target/release/, so go up two levels to project root, then into assets
+			std::env::current_exe()
+				.ok()
+				.and_then(|exe_path| {
+					exe_path.parent() // target/release
+						.and_then(|p| p.parent()) // target
+						.and_then(|p| p.parent()) // project root
+						.map(|p| p.join("assets").to_string_lossy().into_owned())
+				})
+				.unwrap_or_else(|| "assets".to_string())
+		};
+		
 		self.app.add_plugins((
-            DefaultPlugins.set(WindowPlugin {
+            DefaultPlugins
+				.set(AssetPlugin {
+					file_path: asset_path,
+					..default()
+				})
+				.set(WindowPlugin {
                 primary_window: Some(Window {
-                    title: "I am a window!".into(),
+                    title: window_title.into(),
                     name: Some("bevy.app".into()),
                     resolution: (1600., 1000.).into(),
                     present_mode: PresentMode::AutoVsync,

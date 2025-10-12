@@ -97,6 +97,28 @@
 		}
 	},
 	"ui": {
+		"window_titles": [
+			"Gomoku: Now with 100% more stones!",
+			"Gomoku: Still better than your code!",
+			"Gomoku: Five in a row or go home!",
+			"Gomoku: The AI judges you silently...",
+			"Gomoku: Dolphin background not included!",
+			"Gomoku: Capturing pairs like a boss!",
+			"Gomoku: The thinking stones!",
+			"Gomoku: More addictive than coffee!",
+			"Gomoku: Where every move counts... probably",
+			"Gomoku: Powered by minimax and regret!",
+			"Gomoku: Ancient wisdom, modern memes!",
+			"Gomoku: Double-three? More like double-trouble!",
+			"Gomoku: The board game that fights back!",
+			"Gomoku: Making you question your life choices!",
+			"Gomoku: Synthwave edition!",
+			"Gomoku: Cat not included in starter pack",
+			"Gomoku: Bevy engine goes brrr...",
+			"Gomoku: It's not a bug, it's a feature!",
+			"Gomoku: Rust never sleeps!",
+			"Gomoku: Professional time waster since 2025!"
+		],
 		"loading_messages": {
 			"96-99": "Changing headers names...",
 			"100": "Complete!",

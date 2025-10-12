@@ -31,6 +31,7 @@ pub fn tutorial_plugin(app: &mut App) {
                 button_interaction_system,
                 handle_tutorial_navigation,
                 update_tutorial_content,
+                handle_escape_key,
             ).run_if(in_state(AppState::HowToPlay)),
         )
         .add_systems(OnExit(AppState::HowToPlay), despawn_screen::<OnTutorialScreen>);
@@ -145,6 +146,15 @@ fn handle_tutorial_navigation(
                 TutorialButton::BackToMenu => app_state.set(AppState::Menu),
             }
         }
+    }
+}
+
+fn handle_escape_key(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut app_state: ResMut<NextState<AppState>>,
+) {
+    if keyboard_input.just_pressed(KeyCode::Escape) {
+        app_state.set(AppState::Menu);
     }
 }
 

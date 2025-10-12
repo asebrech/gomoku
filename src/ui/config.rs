@@ -93,6 +93,7 @@ impl From<ColorData> for Color {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UiConfig {
+    pub window_titles: Vec<String>,
     pub loading_messages: HashMap<String, String>,
     pub font_sizes: FontSizes,
 }
@@ -282,6 +283,11 @@ impl GameConfig {
                 button_pressed: ColorData { r: 1.0, g: 0.2, b: 0.8, a: 1.0 },
             },
             ui: UiConfig {
+                window_titles: vec![
+                    "Gomoku: Now with 100% more stones!".to_string(),
+                    "Gomoku: Still better than your code!".to_string(),
+                    "Gomoku: Five in a row or go home!".to_string(),
+                ],
                 loading_messages: {
                     let mut messages = HashMap::new();
                     messages.insert("0-10".to_string(), "Initializing...".to_string());

@@ -114,6 +114,7 @@ pub fn game_plugin(app: &mut App) {
                 update_captures_display,
                 reset_board.run_if(on_event::<ResetBoard>),
                 toggle_pause,
+                handle_escape_key,
                 update_ai_time_display.run_if(on_event::<UpdateAITimeDisplay>),
                 update_ai_depth_display.run_if(on_event::<UpdateAIDepthDisplay>),
                 handle_game_volume_control,
@@ -671,6 +672,19 @@ pub fn toggle_pause(
             }
             GameStatus::GameOver => GameStatus::GameOver,
         };
+    }
+}
+
+pub fn handle_escape_key(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut app_state: ResMut<NextState<AppState>>,
+    game_status: Res<GameStatus>,
+) {
+    if keyboard_input.just_pressed(KeyCode::Escape) {
+        // Don't allow going back to menu while AI is thinking
+        if *game_status != GameStatus::AIThinking {
+            app_state.set(AppState::Menu);
+        }
     }
 }
 
