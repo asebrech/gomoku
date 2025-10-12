@@ -70,16 +70,11 @@ impl MoveGenerator {
         dy: isize,
         player: Player,
     ) -> Option<(usize, usize)> {
+        const PRIORITY_OFFSETS: &[isize] = &[-1, 1, -2, 2, -3, 3, -4, 4, -5, 5];
 
-        const MAX_SEARCH_DISTANCE: isize = 5;
-
-        for offset in -MAX_SEARCH_DISTANCE..=MAX_SEARCH_DISTANCE {
+        for &offset in PRIORITY_OFFSETS {
             let check_row = row as isize + dx * offset;
             let check_col = col as isize + dy * offset;
-
-            if offset == 0 {
-                continue;
-            }
 
             if PatternAnalyzer::is_valid_empty(board, check_row, check_col) {
                 let pos = (check_row as usize, check_col as usize);
@@ -290,6 +285,10 @@ impl MoveGenerator {
             -Self::calculate_threat_priority(board, mv, player)
         });
 
+        let stone_count = board.count_stones();
+        let max_zone_moves = if stone_count < 10 { 20 } else { 15 };
+        
+        filtered_moves.truncate(max_zone_moves);
         filtered_moves
     }
 

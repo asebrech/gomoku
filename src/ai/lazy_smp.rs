@@ -20,10 +20,10 @@
 //!   redundant work for simpler concurrency.
 
 use crate::core::state::GameState;
-use std::sync::{Arc, Mutex};
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering};
-use std::time::{Duration, Instant};
 use rayon::prelude::*;
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use super::{minimax::mtdf, transposition::TranspositionTable};
 
@@ -57,14 +57,13 @@ impl SharedSearchState {
 
     pub fn update_best(&self, score: i32, mv: Option<(usize, usize)>, depth: i32) -> bool {
         let current_score = self.best_score.load(Ordering::Relaxed);
-        
+
         if score > current_score {
-            if self.best_score.compare_exchange_weak(
-                current_score, 
-                score, 
-                Ordering::Relaxed, 
-                Ordering::Relaxed
-            ).is_ok() {
+            if self
+                .best_score
+                .compare_exchange_weak(current_score, score, Ordering::Relaxed, Ordering::Relaxed)
+                .is_ok()
+            {
                 if let Some(mv) = mv {
                     *self.best_move.lock().unwrap() = Some(mv);
                 }
@@ -97,8 +96,8 @@ fn lazy_smp_worker(
     time_limit: Option<Duration>,
 ) -> (i32, Option<(usize, usize)>, i32, u64) {
     let mut local_state = state.clone();
-    let mut tt = TranspositionTable::new(1_000_000);
-    
+    let mut tt = TranspositionTable::new(2_000_000);
+
     let mut best_move = None;
     let mut best_score = 0;
     let mut depth_reached = 0;
@@ -112,10 +111,12 @@ fn lazy_smp_worker(
         _ => (worker_id as i32 - 2) % 3 - 1,
     };
 
-    let aspiration_offset = match worker_id % 4 {
+    let aspiration_offset = match worker_id % 6 {
         0 => 0,
-        1 => 50,
-        2 => -50,
+        1 => 25,
+        2 => -25,
+        3 => 75,
+        4 => -75,
         _ => 0,
     };
 
@@ -184,7 +185,7 @@ pub fn lazy_smp_search(
 ) -> SearchResult {
     let start_time = Instant::now();
     let time_limit = Duration::from_millis(time_limit_ms);
-    
+
     let threads = num_threads.unwrap_or_else(|| {
         std::thread::available_parallelism()
             .map(|n| n.get())
@@ -204,20 +205,23 @@ pub fn lazy_smp_search(
     }
 
     let shared_state = Arc::new(SharedSearchState::new());
-    
-    let workers: Vec<_> = (0..threads).into_par_iter().map(|worker_id| {
-        let state_clone = state.clone();
-        let shared_state_clone = Arc::clone(&shared_state);
-        
-        lazy_smp_worker(
-            &state_clone,
-            max_depth,
-            shared_state_clone,
-            worker_id,
-            start_time,
-            Some(time_limit),
-        )
-    }).collect();
+
+    let workers: Vec<_> = (0..threads)
+        .into_par_iter()
+        .map(|worker_id| {
+            let state_clone = state.clone();
+            let shared_state_clone = Arc::clone(&shared_state);
+
+            lazy_smp_worker(
+                &state_clone,
+                max_depth,
+                shared_state_clone,
+                worker_id,
+                start_time,
+                Some(time_limit),
+            )
+        })
+        .collect();
 
     let mut best_score = i32::MIN;
     let mut best_move = None;
@@ -233,7 +237,7 @@ pub fn lazy_smp_search(
 
     let shared_score = shared_state.best_score.load(Ordering::Relaxed);
     let shared_move = *shared_state.best_move.lock().unwrap();
-    
+
     if shared_score > best_score && shared_move.is_some() {
         best_score = shared_score;
         best_move = shared_move;
@@ -242,8 +246,12 @@ pub fn lazy_smp_search(
     SearchResult {
         best_move,
         score: best_score,
-        depth_reached: shared_state.depth_reached.load(Ordering::Relaxed).max(max_depth_reached),
+        depth_reached: shared_state
+            .depth_reached
+            .load(Ordering::Relaxed)
+            .max(max_depth_reached),
         nodes_searched: shared_state.nodes_searched.load(Ordering::Relaxed),
         time_elapsed: start_time.elapsed(),
     }
 }
+
