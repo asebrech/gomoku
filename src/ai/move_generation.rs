@@ -159,7 +159,7 @@ impl MoveGenerator {
             .filter(|&(row, col)| !GameRules::creates_double_three(board, row, col, player))
             .collect();
 
-        if filtered_moves.len() > 30 {
+        if filtered_moves.len() > 25 {
             let mut prioritized_moves: Vec<((usize, usize), i32)> = filtered_moves
                 .into_iter()
                 .map(|mv| {
@@ -170,10 +170,19 @@ impl MoveGenerator {
 
             prioritized_moves.sort_by_key(|(_, priority)| -priority);
 
-            prioritized_moves.truncate(30);
+            prioritized_moves.truncate(25);
             prioritized_moves.into_iter().map(|(mv, _)| mv).collect()
         } else {
-            filtered_moves
+            let mut prioritized_moves: Vec<((usize, usize), i32)> = filtered_moves
+                .into_iter()
+                .map(|mv| {
+                    let priority = Self::calculate_threat_priority(board, mv, player);
+                    (mv, priority)
+                })
+                .collect();
+
+            prioritized_moves.sort_by_key(|(_, priority)| -priority);
+            prioritized_moves.into_iter().map(|(mv, _)| mv).collect()
         }
     }
 
@@ -272,10 +281,16 @@ impl MoveGenerator {
             }
         });
 
-        candidates
+        let mut filtered_moves: Vec<(usize, usize)> = candidates
             .into_iter()
             .filter(|&(row, col)| !GameRules::creates_double_three(board, row, col, player))
-            .collect()
+            .collect();
+
+        filtered_moves.sort_by_key(|&mv| {
+            -Self::calculate_threat_priority(board, mv, player)
+        });
+
+        filtered_moves
     }
 
     #[inline]
