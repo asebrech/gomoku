@@ -26,64 +26,6 @@ use super::{
     transposition::{EntryType, TranspositionTable},
 };
 
-fn quiescence_search(
-    state: &mut GameState,
-    mut alpha: i32,
-    beta: i32,
-    _tt: &mut TranspositionTable,
-    start_time: &Instant,
-    time_limit: Option<Duration>,
-    nodes_visited: &mut u64,
-) -> (i32, u64) {
-    *nodes_visited += 1;
-
-    if let Some(limit) = time_limit {
-        if start_time.elapsed() >= limit {
-            return (0, *nodes_visited);
-        }
-    }
-
-    let stand_pat = Heuristic::evaluate(state, 0);
-
-    if stand_pat >= beta {
-        return (beta, *nodes_visited);
-    }
-
-    if stand_pat > alpha {
-        alpha = stand_pat;
-    }
-
-    let moves = state.get_candidate_moves();
-    let threat_moves: Vec<_> = moves.into_iter().take(5).collect();
-
-    let mut best_value = stand_pat;
-
-    for move_ in threat_moves {
-        state.make_move(move_);
-
-        if state.is_terminal() {
-            let eval = Heuristic::evaluate(state, 0);
-            state.undo_move(move_);
-
-            if eval > best_value {
-                best_value = eval;
-            }
-
-            if eval >= beta {
-                return (beta, *nodes_visited);
-            }
-
-            if eval > alpha {
-                alpha = eval;
-            }
-        } else {
-            state.undo_move(move_);
-        }
-    }
-
-    (best_value, *nodes_visited)
-}
-
 /// Alpha-beta search with transposition table (memory) support.
 ///
 /// This function implements a standard minimax search with alpha-beta
@@ -125,21 +67,9 @@ fn alpha_beta_with_memory(
     }
 
     if depth == 0 || state.is_terminal() {
-        if state.is_terminal() {
-            let eval = Heuristic::evaluate(state, depth);
-            tt.store(hash_key, eval, depth, EntryType::Exact, None);
-            return (eval, nodes_visited);
-        }
-
-        return quiescence_search(
-            state,
-            alpha,
-            beta,
-            tt,
-            start_time,
-            time_limit,
-            &mut nodes_visited,
-        );
+        let eval = Heuristic::evaluate(state, depth);
+        tt.store(hash_key, eval, depth, EntryType::Exact, None);
+        return (eval, nodes_visited);
     }
 
     let mut moves = state.get_candidate_moves();
@@ -158,7 +88,7 @@ fn alpha_beta_with_memory(
         for (move_index, move_) in moves.iter().enumerate() {
             state.make_move(*move_);
 
-            let reduction = if move_index >= 4 && depth >= 3 && !state.is_terminal() {
+            let reduction = if move_index >= 6 && depth >= 4 && !state.is_terminal() {
                 1
             } else {
                 0
@@ -194,7 +124,7 @@ fn alpha_beta_with_memory(
         for (move_index, move_) in moves.iter().enumerate() {
             state.make_move(*move_);
 
-            let reduction = if move_index >= 4 && depth >= 3 && !state.is_terminal() {
+            let reduction = if move_index >= 6 && depth >= 4 && !state.is_terminal() {
                 1
             } else {
                 0
