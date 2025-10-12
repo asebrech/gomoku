@@ -155,6 +155,7 @@
             .add_systems(OnEnter(MenuState::Splash), splash_screen_setup)
             .add_systems(OnEnter(MenuState::Main), (main_menu_setup, setup_audio_if_needed))
             .add_systems(OnEnter(MenuState::Settings), (settings_menu_setup, force_settings_display_update))
+            .add_systems(OnEnter(MenuState::GameModeSelect), game_mode_select_setup)
             .add_systems(OnExit(MenuState::Splash), despawn_screen::<OnSplashScreen>)
             .add_systems(OnExit(MenuState::Main), despawn_screen::<OnMainMenuScreen>)
             .add_systems(
@@ -172,6 +173,10 @@
             .add_systems(
                 OnExit(MenuState::SettingsSound),
                 despawn_screen::<OnSoundSettingsMenuScreen>,
+            )
+            .add_systems(
+                OnExit(MenuState::GameModeSelect),
+                despawn_screen::<OnGameModeSelectScreen>,
             )
             .add_systems(
                 Update,
@@ -205,6 +210,7 @@
 		Load,
         SettingsDisplay,
         SettingsSound,
+        GameModeSelect,
         Disabled,
     }
 
@@ -236,12 +242,17 @@
     struct OnSoundSettingsMenuScreen;
 
     #[derive(Component)]
+    struct OnGameModeSelectScreen;
+
+    #[derive(Component)]
     struct SelectedOption;
 
     #[derive(Component)]
     enum MenuButtonAction {
 		Load,
         Play,
+        PlayVsAI,
+        Play1v1,
         HowToPlay,
         Settings,
         SettingsSound,
@@ -1258,8 +1269,8 @@ fn settings_menu_setup(
                                 "GAME",
                                 &[
                                     ("Board Size", SettingType::BoardSize),
-                                    ("Win Condition", SettingType::WinCondition),
-                                    ("Pair Captures", SettingType::PairCaptures),
+                                    // ("Win Condition", SettingType::WinCondition),
+                                    // ("Pair Captures", SettingType::PairCaptures),
                                     ("AI Depth Limit", SettingType::AIMaxDepth),
                                     ("AI Time Limit", SettingType::AITimeLimit),
                                 ],
@@ -1321,6 +1332,222 @@ fn settings_menu_setup(
                                             justify: JustifyText::Center,
                                             linebreak: LineBreak::NoWrap,
                                         },
+                                    ));
+                                });
+                        });
+                });
+        });
+}
+
+fn game_mode_select_setup(
+    mut commands: Commands,
+    config: Res<GameConfig>,
+    asset_server: Res<AssetServer>,
+    video_frames: Option<Res<VideoFrames>>,
+) {
+    let colors = &config.colors;
+    
+    // Get the already loaded video frames for background (or empty if devMode)
+    let video_frame_handles = if config.dev_mode {
+        Vec::new()
+    } else if let Some(frames) = video_frames.as_ref() {
+        frames.frames.clone()
+    } else {
+        // Fallback: load frames if somehow not available
+        let mut frames = Vec::new();
+        for i in 1..=config.assets.animations.main_menu_frames.frame_count {
+            let frame_path = config.get_animation_frame_path(i);
+            frames.push(asset_server.load(frame_path));
+        }
+        frames
+    };
+
+    commands
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                flex_direction: FlexDirection::Column,
+                position_type: PositionType::Relative,
+                ..default()
+            },
+            BackgroundColor(Color::NONE),
+            OnGameModeSelectScreen,
+        ))
+        .with_children(|parent| {
+            // Video background using frame sequence (skip in devMode)
+            if !config.dev_mode && !video_frame_handles.is_empty() {
+                parent.spawn((
+                    Node {
+                        position_type: PositionType::Absolute,
+                        top: Val::Px(0.0),
+                        left: Val::Px(0.0),
+                        width: Val::Percent(100.0),
+                        height: Val::Percent(100.0),
+                        ..default()
+                    },
+                    ImageNode::new(video_frame_handles[0].clone()),
+                    VideoBackground {
+                        current_frame: 0,
+                        timer: Timer::from_seconds(1.0 / 15.0, TimerMode::Repeating),
+                        total_frames: 120,
+                    },
+                ));
+            } else if config.dev_mode {
+                parent.spawn((
+                    Node {
+                        position_type: PositionType::Absolute,
+                        top: Val::Px(0.0),
+                        left: Val::Px(0.0),
+                        width: Val::Percent(100.0),
+                        height: Val::Percent(100.0),
+                        ..default()
+                    },
+                    BackgroundColor(colors.background.clone().into()),
+                ));
+            }
+
+            // Dark overlay for better text readability
+            parent.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    top: Val::Px(0.0),
+                    left: Val::Px(0.0),
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(100.0),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.5)),
+            ));
+
+            // Main container
+            parent
+                .spawn((
+                    Node {
+                        width: Val::Px(600.0),
+                        height: Val::Auto,
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::Center,
+                        justify_content: JustifyContent::Center,
+                        padding: UiRect::all(Val::Px(40.0)),
+                        border: UiRect::all(Val::Px(2.0)),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.8)),
+                    BorderColor(colors.accent.clone().into()),
+                ))
+                .with_children(|parent| {
+                    // Title
+                    parent.spawn((
+                        Text::new("SELECT GAME MODE"),
+                        TextFont {
+                            font_size: config.ui.font_sizes.title,
+                            ..default()
+                        },
+                        TextColor(colors.accent.clone().into()),
+                        Node {
+                            margin: UiRect::bottom(Val::Px(40.0)),
+                            ..default()
+                        },
+                    ));
+
+                    // Button container
+                    parent
+                        .spawn((
+                            Node {
+                                width: Val::Percent(100.0),
+                                flex_direction: FlexDirection::Column,
+                                align_items: AlignItems::Center,
+                                justify_content: JustifyContent::Center,
+                                row_gap: Val::Px(20.0),
+                                ..default()
+                            },
+                        ))
+                        .with_children(|parent| {
+                            // VS AI button (primary)
+                            parent
+                                .spawn((
+                                    Button,
+                                    PlayClickSound,
+                                    Node {
+                                        width: Val::Px(400.0),
+                                        height: Val::Px(80.0),
+                                        justify_content: JustifyContent::Center,
+                                        align_items: AlignItems::Center,
+                                        border: UiRect::all(Val::Px(2.0)),
+                                        ..default()
+                                    },
+                                    BackgroundColor(colors.accent.clone().into()),
+                                    BorderColor(colors.accent.clone().into()),
+                                    MenuButtonAction::PlayVsAI,
+                                ))
+                                .with_children(|parent| {
+                                    parent.spawn((
+                                        Text::new("VS AI"),
+                                        TextFont {
+                                            font_size: 28.0,
+                                            ..default()
+                                        },
+                                        TextColor(colors.text_primary.clone().into()),
+                                    ));
+                                });
+
+                            // 1v1 Local button
+                            parent
+                                .spawn((
+                                    Button,
+                                    PlayClickSound,
+                                    Node {
+                                        width: Val::Px(400.0),
+                                        height: Val::Px(80.0),
+                                        justify_content: JustifyContent::Center,
+                                        align_items: AlignItems::Center,
+                                        border: UiRect::all(Val::Px(2.0)),
+                                        ..default()
+                                    },
+                                    BackgroundColor(colors.button_normal.clone().into()),
+                                    BorderColor(colors.secondary.clone().into()),
+                                    MenuButtonAction::Play1v1,
+                                ))
+                                .with_children(|parent| {
+                                    parent.spawn((
+                                        Text::new("1V1 LOCAL"),
+                                        TextFont {
+                                            font_size: 28.0,
+                                            ..default()
+                                        },
+                                        TextColor(colors.text_primary.clone().into()),
+                                    ));
+                                });
+
+                            // Back button
+                            parent
+                                .spawn((
+                                    Button,
+                                    PlayClickSound,
+                                    Node {
+                                        width: Val::Px(250.0),
+                                        height: Val::Px(50.0),
+                                        justify_content: JustifyContent::Center,
+                                        align_items: AlignItems::Center,
+                                        border: UiRect::all(Val::Px(2.0)),
+                                        margin: UiRect::top(Val::Px(20.0)),
+                                        ..default()
+                                    },
+                                    BackgroundColor(colors.button_normal.clone().into()),
+                                    BorderColor(colors.secondary.clone().into()),
+                                    MenuButtonAction::BackToMainMenu,
+                                ))
+                                .with_children(|parent| {
+                                    parent.spawn((
+                                        Text::new("BACK"),
+                                        TextFont {
+                                            font_size: config.ui.font_sizes.button,
+                                            ..default()
+                                        },
+                                        TextColor(colors.text_primary.clone().into()),
                                     ));
                                 });
                         });
@@ -1429,11 +1656,11 @@ fn create_setting_item(
                 }
                 SettingType::BoardSize => {
                     let (board_size, _, _, _, _) = config.get_game_settings();
-                    create_number_selector(parent, board_size, 15, 19, "BoardSize", colors);
+                    create_number_selector(parent, board_size, 5, 20, "BoardSize", colors);
                 }
-                SettingType::WinCondition => {
-                    let (_, win_condition, _, _, _) = config.get_game_settings();
-                    create_number_selector(parent, win_condition, 4, 6, "WinCondition", colors);
+                // Disabled settings - not currently in use
+                SettingType::WinCondition | SettingType::PairCaptures => {
+                    // Do nothing - these settings are currently disabled
                 }
                 SettingType::AIMaxDepth => {
                     let (_, _, ai_max_depth, _, _) = config.get_game_settings();
@@ -1442,10 +1669,6 @@ fn create_setting_item(
                 SettingType::AITimeLimit => {
                     let (_, _, _, ai_time_limit, _) = config.get_game_settings();
                     create_ai_time_limit_selector(parent, ai_time_limit, colors);
-                }
-                SettingType::PairCaptures => {
-                    let (_, _, _, _, pair_captures) = config.get_game_settings();
-                    create_number_selector(parent, pair_captures, 5, 20, "PairCaptures", colors);
                 }
                 SettingType::Fullscreen => {
                     let (fullscreen, _) = config.get_display_settings();
@@ -1533,6 +1756,7 @@ fn create_menu_button_with_icon(
         mut app_exit_events: EventWriter<AppExit>,
         mut menu_state: ResMut<NextState<MenuState>>,
         mut game_state: ResMut<NextState<AppState>>,
+        mut game_settings: ResMut<GameSettings>,
     ) {
         for (interaction, menu_button_action) in &interaction_query {
             if *interaction == Interaction::Pressed {
@@ -1541,6 +1765,15 @@ fn create_menu_button_with_icon(
                         app_exit_events.write(AppExit::Success);
                     }
                     MenuButtonAction::Play => {
+                        menu_state.set(MenuState::GameModeSelect);
+                    }
+                    MenuButtonAction::PlayVsAI => {
+                        game_settings.versus_ai = true;
+                        game_state.set(AppState::Game);
+                        menu_state.set(MenuState::Disabled);
+                    }
+                    MenuButtonAction::Play1v1 => {
+                        game_settings.versus_ai = false;
                         game_state.set(AppState::Game);
                         menu_state.set(MenuState::Disabled);
                     }
@@ -1573,7 +1806,7 @@ fn create_menu_button_with_icon(
                     // In main menu, quit the app
                     app_exit_events.write(AppExit::Success);
                 }
-                MenuState::Settings | MenuState::SettingsDisplay | MenuState::SettingsSound | MenuState::Load => {
+                MenuState::Settings | MenuState::SettingsDisplay | MenuState::SettingsSound | MenuState::Load | MenuState::GameModeSelect => {
                     // In submenus, go back to main menu
                     next_menu_state.set(MenuState::Main);
                 }
@@ -1832,7 +2065,8 @@ fn create_menu_button_with_icon(
                 match setting_control {
                     SettingControl::BoardSizeInc => {
                         let (current_board_size, win_condition, ai_max_depth, ai_time_limit, pair_captures) = config.get_game_settings();
-                        let new_board_size = if current_board_size < 19 { current_board_size + 1 } else { 19 };
+                        // Increment: 5 -> 6 -> ... -> 20 -> 5 (loop back)
+                        let new_board_size = if current_board_size < 20 { current_board_size + 1 } else { 5 };
                         if let Err(e) = config.save_game_settings(new_board_size, win_condition, ai_max_depth, ai_time_limit, pair_captures) {
                             println!("Failed to save board size: {}", e);
                         } else {
@@ -1841,56 +2075,27 @@ fn create_menu_button_with_icon(
                     }
                     SettingControl::BoardSizeDec => {
                         let (current_board_size, win_condition, ai_max_depth, ai_time_limit, pair_captures) = config.get_game_settings();
-                        let new_board_size = if current_board_size > 15 { current_board_size - 1 } else { 15 };
+                        // Decrement: 5 -> 20 -> 19 -> ... -> 6 (loop back)
+                        let new_board_size = if current_board_size > 5 { current_board_size - 1 } else { 20 };
                         if let Err(e) = config.save_game_settings(new_board_size, win_condition, ai_max_depth, ai_time_limit, pair_captures) {
                             println!("Failed to save board size: {}", e);
                         } else {
                             println!("Board size changed to: {}", new_board_size);
                         }
                     }
-                    SettingControl::WinConditionInc => {
-                        let (board_size, current_win_condition, ai_max_depth, ai_time_limit, pair_captures) = config.get_game_settings();
-                        let new_win_condition = if current_win_condition < 6 { current_win_condition + 1 } else { 6 };
-                        if let Err(e) = config.save_game_settings(board_size, new_win_condition, ai_max_depth, ai_time_limit, pair_captures) {
-                            println!("Failed to save win condition: {}", e);
-                        } else {
-                            println!("Win condition changed to: {}", new_win_condition);
-                        }
+                    // Disabled settings - not currently in use
+                    SettingControl::WinConditionInc | SettingControl::WinConditionDec => {
+                        // Do nothing - WinCondition setting is currently disabled
                     }
-                    SettingControl::WinConditionDec => {
-                        let (board_size, current_win_condition, ai_max_depth, ai_time_limit, pair_captures) = config.get_game_settings();
-                        let new_win_condition = if current_win_condition > 4 { current_win_condition - 1 } else { 4 };
-                        if let Err(e) = config.save_game_settings(board_size, new_win_condition, ai_max_depth, ai_time_limit, pair_captures) {
-                            println!("Failed to save win condition: {}", e);
-                        } else {
-                            println!("Win condition changed to: {}", new_win_condition);
-                        }
-                    }
-                    SettingControl::PairCapturesInc => {
-                        let (board_size, win_condition, ai_max_depth, ai_time_limit, current_pair_captures) = config.get_game_settings();
-                        let new_pair_captures = if current_pair_captures < 20 { current_pair_captures + 1 } else { 20 };
-                        if let Err(e) = config.save_game_settings(board_size, win_condition, ai_max_depth, ai_time_limit, new_pair_captures) {
-                            println!("Failed to save pair captures: {}", e);
-                        } else {
-                            println!("Pair captures to win changed to: {}", new_pair_captures);
-                        }
-                    }
-                    SettingControl::PairCapturesDec => {
-                        let (board_size, win_condition, ai_max_depth, ai_time_limit, current_pair_captures) = config.get_game_settings();
-                        let new_pair_captures = if current_pair_captures > 5 { current_pair_captures - 1 } else { 5 };
-                        if let Err(e) = config.save_game_settings(board_size, win_condition, ai_max_depth, ai_time_limit, new_pair_captures) {
-                            println!("Failed to save pair captures: {}", e);
-                        } else {
-                            println!("Pair captures to win changed to: {}", new_pair_captures);
-                        }
+                    SettingControl::PairCapturesInc | SettingControl::PairCapturesDec => {
+                        // Do nothing - PairCaptures setting is currently disabled
                     }
                     SettingControl::AIMaxDepthInc => {
                         let (board_size, win_condition, current_ai_max_depth, ai_time_limit, pair_captures) = config.get_game_settings();
-                        // Increment: 1 -> 2 -> ... -> 10 -> Unlimited (None)
+                        // Increment: 2 -> 3 -> ... -> 100 -> 2 (loop back)
                         let new_ai_max_depth = match current_ai_max_depth {
-                            Some(depth) if depth < 10 => Some(depth + 1),
-                            Some(_) => None, // 10 -> Unlimited
-                            None => None, // Already at Unlimited, stay there
+                            Some(depth) if depth < 100 => Some(depth + 1),
+                            _ => Some(2), // 100 or None -> 2
                         };
                         if let Err(e) = config.save_game_settings(board_size, win_condition, new_ai_max_depth, ai_time_limit, pair_captures) {
                             println!("Failed to save AI max depth: {}", e);
@@ -1900,11 +2105,10 @@ fn create_menu_button_with_icon(
                     }
                     SettingControl::AIMaxDepthDec => {
                         let (board_size, win_condition, current_ai_max_depth, ai_time_limit, pair_captures) = config.get_game_settings();
-                        // Decrement: Unlimited (None) -> 10 -> 9 -> ... -> 1
+                        // Decrement: 2 -> 100 -> 99 -> ... -> 3 (loop back)
                         let new_ai_max_depth = match current_ai_max_depth {
-                            None => Some(10), // Unlimited -> 10
-                            Some(depth) if depth > 1 => Some(depth - 1),
-                            Some(_) => Some(1), // Already at 1, stay there
+                            Some(depth) if depth > 2 => Some(depth - 1),
+                            _ => Some(100), // 2 or None -> 100
                         };
                         if let Err(e) = config.save_game_settings(board_size, win_condition, new_ai_max_depth, ai_time_limit, pair_captures) {
                             println!("Failed to save AI max depth: {}", e);
@@ -1914,15 +2118,10 @@ fn create_menu_button_with_icon(
                     }
                     SettingControl::AITimeLimitInc => {
                         let (board_size, win_condition, ai_max_depth, current_ai_time_limit, pair_captures) = config.get_game_settings();
-                        // Increment: 100ms -> 300ms -> 500ms -> 1s -> 2s -> 5s -> Unlimited (None)
+                        // Increment: 50ms -> 100ms -> ... -> 5000ms -> 50ms (loop back)
                         let new_ai_time_limit = match current_ai_time_limit {
-                            Some(100) => Some(300),
-                            Some(300) => Some(500),
-                            Some(500) => Some(1000),
-                            Some(1000) => Some(2000),
-                            Some(2000) => Some(5000),
-                            Some(_) => None, // 5s or other -> Unlimited
-                            None => None, // Already Unlimited, stay there
+                            Some(limit) if limit < 5000 => Some(limit + 50),
+                            _ => Some(50), // 5000ms or None -> 50ms
                         };
                         if let Err(e) = config.save_game_settings(board_size, win_condition, ai_max_depth, new_ai_time_limit, pair_captures) {
                             println!("Failed to save AI time limit: {}", e);
@@ -1932,15 +2131,10 @@ fn create_menu_button_with_icon(
                     }
                     SettingControl::AITimeLimitDec => {
                         let (board_size, win_condition, ai_max_depth, current_ai_time_limit, pair_captures) = config.get_game_settings();
-                        // Decrement: Unlimited (None) -> 5s -> 2s -> 1s -> 500ms -> 300ms -> 100ms
+                        // Decrement: 50ms -> 5000ms -> 4950ms -> ... -> 100ms (loop back)
                         let new_ai_time_limit = match current_ai_time_limit {
-                            None => Some(5000), // Unlimited -> 5s
-                            Some(5000) => Some(2000),
-                            Some(2000) => Some(1000),
-                            Some(1000) => Some(500),
-                            Some(500) => Some(300),
-                            Some(300) => Some(100),
-                            Some(_) => Some(100), // 100ms or other -> stay at 100ms
+                            Some(limit) if limit > 50 => Some(limit - 50),
+                            _ => Some(5000), // 50ms or None -> 5000ms
                         };
                         if let Err(e) = config.save_game_settings(board_size, win_condition, ai_max_depth, new_ai_time_limit, pair_captures) {
                             println!("Failed to save AI time limit: {}", e);
@@ -2044,19 +2238,13 @@ fn create_menu_button_with_icon(
                     SettingDisplayType::AIMaxDepthValue => {
                         text.0 = match ai_max_depth {
                             Some(depth) => depth.to_string(),
-                            None => "Unlimited".to_string(),
+                            None => "2".to_string(), // Fallback to 2 if somehow None
                         };
                     }
                     SettingDisplayType::AITimeLimitValue => {
                         text.0 = match ai_time_limit {
-                            Some(100) => "100ms".to_string(),
-                            Some(300) => "300ms".to_string(),
-                            Some(500) => "500ms".to_string(),
-                            Some(1000) => "1s".to_string(),
-                            Some(2000) => "2s".to_string(),
-                            Some(5000) => "5s".to_string(),
                             Some(ms) => format!("{}ms", ms),
-                            None => "Unlimited".to_string(),
+                            None => "50ms".to_string(), // Fallback to 50ms if somehow None
                         };
                     }
                     _ => {}
@@ -2365,7 +2553,7 @@ fn create_menu_button_with_icon(
                 // Value display
                 let value_text = match current_depth {
                     Some(depth) => depth.to_string(),
-                    None => "Unlimited".to_string(),
+                    None => "2".to_string(), // Fallback to 2 if somehow None
                 };
                 parent.spawn((
                     Text::new(value_text),
@@ -2453,14 +2641,8 @@ fn create_menu_button_with_icon(
 
                 // Value display
                 let value_text = match current_time_limit {
-                    Some(100) => "100ms".to_string(),
-                    Some(300) => "300ms".to_string(),
-                    Some(500) => "500ms".to_string(),
-                    Some(1000) => "1s".to_string(),
-                    Some(2000) => "2s".to_string(),
-                    Some(5000) => "5s".to_string(),
                     Some(ms) => format!("{}ms", ms),
-                    None => "Unlimited".to_string(),
+                    None => "50ms".to_string(), // Fallback to 50ms if somehow None
                 };
                 parent.spawn((
                     Text::new(value_text),

@@ -19,23 +19,48 @@ impl BoardUtils {
     /// This ensures the board looks balanced regardless of size
     fn calculate_major_line_spacing(board_size: usize) -> usize {
         match board_size {
-            15 => 5,  // 15x15: major lines every 5 (0, 5, 10, 15)
-            16 => 5,  // 16x16: major lines every 5 (0, 5, 10, 15)
-            17 => 4,  // 17x17: major lines every 4 (0, 4, 8, 12, 16)
-            18 => 6,  // 18x18: major lines every 6 (0, 6, 12, 18)
-            19 => 6,  // 19x19: major lines every 6 (0, 6, 12, 18)
+            5..=7 => 2,    // Small boards: major lines every 2
+            8..=10 => 3,   // Medium-small: major lines every 3
+            11..=14 => 4,  // Medium: major lines every 4
+            15..=17 => 5,  // Medium-large: major lines every 5
+            18..=20 => 6,  // Large: major lines every 6
             _ => {
-                // For other sizes, use a smart algorithm
-                // Aim for 3-4 segments, so divide by 3 or 4
-                if board_size % 3 == 0 {
-                    board_size / 3
+                // For unexpected sizes, use a smart algorithm
+                if board_size <= 4 {
+                    1  // Very small boards: every line is major
+                } else if board_size % 5 == 0 {
+                    5
                 } else if board_size % 4 == 0 {
-                    board_size / 4
+                    4
+                } else if board_size % 3 == 0 {
+                    3
                 } else {
                     // Default to roughly dividing into thirds
                     (board_size + 2) / 3
                 }
             }
+        }
+    }
+
+    fn calculate_major_line_positions(board_size: usize) -> Vec<usize> {
+        match board_size {
+            5 => vec![0, 2, 4],
+            6 => vec![0, 5],
+            7 => vec![0, 3, 6],
+            8 => vec![0, 2, 5, 7],
+            9 => vec![0, 4, 8],
+            10 => vec![0, 3, 6, 9],
+            11 => vec![0, 3, 7, 10],
+            12 => vec![0, 3, 8, 11],
+            13 => vec![0, 4, 8, 12],
+            14 => vec![0, 4, 9, 13],
+            15 => vec![0, 4, 10, 14],
+            16 => vec![0, 5, 10, 15],
+            17 => vec![0, 5, 11, 16],
+            18 => vec![0, 5, 12, 17],
+            19 => vec![0, 6, 12, 18],
+            20 => vec![0, 6, 13, 19],
+            _ => vec![0, board_size - 1],
         }
     }
     
@@ -139,13 +164,14 @@ impl BoardUtils {
     fn draw_board(builder: &mut ChildSpawnerCommands, board_size: usize) {
         info!("Drawing board grid lines...");
         
-        // Calculate dynamic major line spacing based on board size
-        let major_line_spacing = Self::calculate_major_line_spacing(board_size);
-        info!("Using major line spacing of {} for board size {}", major_line_spacing, board_size);
+        // Calculate major line positions for balanced spacing
+        let major_positions = Self::calculate_major_line_positions(board_size);
+        info!("Major line positions for board size {}: {:?}", board_size, major_positions);
         
         // Draw clean vertical lines
         for i in 0..board_size {
-            let is_major_line = i % major_line_spacing == 0 || i == board_size - 1;
+            let is_major_line = major_positions.contains(&i);
+            
             let line_thickness = if is_major_line { 
                 Self::LINE_THICKNESS * 1.5
             } else { 
@@ -190,7 +216,8 @@ impl BoardUtils {
         
         // Draw clean horizontal lines
         for i in 0..board_size {
-            let is_major_line = i % major_line_spacing == 0 || i == board_size - 1;
+            let is_major_line = major_positions.contains(&i);
+            
             let line_thickness = if is_major_line { 
                 Self::LINE_THICKNESS * 1.5
             } else { 
@@ -234,8 +261,8 @@ impl BoardUtils {
         }
         
         // Simplified intersection points - only at major line crossings
-        for y in (0..board_size).step_by(major_line_spacing) {
-            for x in (0..board_size).step_by(major_line_spacing) {
+        for &y in &major_positions {
+            for &x in &major_positions {
                 builder.spawn((
                     Node {
                         position_type: PositionType::Absolute,

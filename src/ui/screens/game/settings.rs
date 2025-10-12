@@ -84,9 +84,6 @@ pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &
                         game_settings.ai_depth.to_string()
                     };
                     spawn_setting_row(builder, "Maximum Depth", &max_depth_display);
-                    
-                    let alpha_beta = if game_settings.alpha_beta_enabled { "Enabled" } else { "Disabled" };
-                    spawn_setting_row(builder, "Alpha-Beta", alpha_beta);
 
                     spawn_timer_row(builder, "AI Time", "");
                     spawn_depth_row(builder, "Depth Reached", "");

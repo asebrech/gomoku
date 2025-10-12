@@ -163,6 +163,9 @@ fn update_game_settings_from_config(
     println!("  Converted ai_depth: {}", ai_depth_value);
     println!("  Converted time_limit: {:?}", time_limit);
     
+    // Preserve the versus_ai setting (set by menu)
+    let current_versus_ai = game_settings.versus_ai;
+    
     // Update GameSettings resource
     *game_settings = GameSettings {
         board_size: board_size as usize,
@@ -170,7 +173,7 @@ fn update_game_settings_from_config(
         minimum_chain_to_win: win_condition as usize,
         ai_depth: ai_depth_value,
         alpha_beta_enabled: true,
-        versus_ai: true,
+        versus_ai: current_versus_ai,  // Preserve menu selection
         time_limit,
     };
     
@@ -547,6 +550,11 @@ fn handle_ai_turn(
     mut update_ai_depth: EventWriter<UpdateAIDepthDisplay>,
     mut ai_frames: ResMut<AIThinkingFrames>,
 ) {
+    // Only run if versus AI is enabled
+    if !settings.versus_ai {
+        return;
+    }
+    
     // Only run if AI is thinking
     if *game_status != GameStatus::AIThinking {
         return;
