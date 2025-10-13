@@ -99,12 +99,14 @@ pub fn game_plugin(app: &mut App) {
     app.init_resource::<GameStatus>()
         .init_resource::<AITimeTaken>()
         .init_resource::<AIDepthReached>()
+        .init_resource::<AINodesSearched>()
         .init_resource::<AIThinkingFrames>()
         .add_event::<GameEnded>()
         .add_event::<StonePlacement>()
         .add_event::<MovePlayed>()
         .add_event::<UpdateAITimeDisplay>()
         .add_event::<UpdateAIDepthDisplay>()
+        .add_event::<UpdateAINodesDisplay>()
         .add_event::<ResetBoard>()
         .add_event::<UpdatePlayerDisplay>()
         .add_systems(OnEnter(AppState::Game), (
@@ -141,6 +143,7 @@ pub fn game_plugin(app: &mut App) {
                 update_ai_time_display.run_if(on_event::<UpdateAITimeDisplay>),
                 update_ai_time_realtime,  // Real-time AI timer update (runs every frame)
                 update_ai_depth_display.run_if(on_event::<UpdateAIDepthDisplay>),
+                update_ai_nodes_display.run_if(on_event::<UpdateAINodesDisplay>),
                 handle_game_volume_control,
                 update_game_volume_display,
                 handle_reset_board_button,
@@ -159,6 +162,7 @@ fn update_game_settings_from_config(
     mut game_status: ResMut<GameStatus>,
     mut ai_time: ResMut<AITimeTaken>,
     mut ai_depth: ResMut<AIDepthReached>,
+    mut ai_nodes: ResMut<AINodesSearched>,
     mut move_played: EventWriter<MovePlayed>,
 ) {
     // Get current settings from config
@@ -208,6 +212,7 @@ fn update_game_settings_from_config(
     *game_status = GameStatus::AwaitingUserInput;
     ai_time.micros = 0;
     ai_depth.depth = 0;
+    ai_nodes.nodes = 0;
     
     println!("\nInitial game state:");
     println!("  Current Player: {:?} (Player::Max = Human/Pink)", game_state.current_player);
@@ -734,8 +739,10 @@ fn poll_ai_computation(
     mut game_status: ResMut<GameStatus>,
     mut ai_time: ResMut<AITimeTaken>,
     mut ai_depth: ResMut<AIDepthReached>,
+    mut ai_nodes: ResMut<AINodesSearched>,
     mut update_ai_time: EventWriter<UpdateAITimeDisplay>,
     mut update_ai_depth: EventWriter<UpdateAIDepthDisplay>,
+    mut update_ai_nodes: EventWriter<UpdateAINodesDisplay>,
     task: Option<ResMut<AIComputeTask>>,
 ) {
     // Only run if we have an active task
@@ -750,8 +757,10 @@ fn poll_ai_computation(
         // Update AI statistics
         ai_time.micros = result.time_elapsed.as_micros();
         ai_depth.depth = result.depth_reached;
+        ai_nodes.nodes = result.nodes_searched;
         update_ai_time.write(UpdateAITimeDisplay);
         update_ai_depth.write(UpdateAIDepthDisplay);
+        update_ai_nodes.write(UpdateAINodesDisplay);
         
         // Handle the result
         if let Some((x, y)) = result.best_move {
@@ -820,6 +829,36 @@ pub fn update_ai_depth_display(
     }
 }
 
+pub fn update_ai_nodes_display(
+    mut query: Query<&mut Text, With<AINodesText>>,
+    ai_nodes: Res<AINodesSearched>,
+    mut events: EventReader<UpdateAINodesDisplay>,
+) {
+    for _ in events.read() {
+        // Format nodes with comma separators for readability
+        let formatted_nodes = format_number_with_commas(ai_nodes.nodes);
+        info!("Updating AI nodes display: {} nodes", formatted_nodes);
+        for mut text in query.iter_mut() {
+            text.0 = formatted_nodes.clone();
+        }
+    }
+}
+
+fn format_number_with_commas(n: u64) -> String {
+    let s = n.to_string();
+    let mut result = String::new();
+    let chars: Vec<char> = s.chars().collect();
+    
+    for (i, ch) in chars.iter().enumerate() {
+        if i > 0 && (chars.len() - i) % 3 == 0 {
+            result.push(',');
+        }
+        result.push(*ch);
+    }
+    
+    result
+}
+
 #[derive(Component)]
 pub struct AITimeText;
 
@@ -838,6 +877,17 @@ pub struct AIDepthText;
 pub struct AIDepthReached {
     pub depth: i32,
 }
+
+#[derive(Component)]
+pub struct AINodesText;
+
+#[derive(Resource, Default)]
+pub struct AINodesSearched {
+    pub nodes: u64,
+}
+
+#[derive(Event)]
+pub struct UpdateAINodesDisplay;
 
 #[derive(Resource, Default)]
 pub struct AIThinkingFrames {

@@ -5,7 +5,7 @@ use crate::{
     ui::{
         app::GameSettings,
         config::GameConfig,
-        screens::game::game::{AITimeText, AIDepthText, RoundNumberText},
+        screens::game::game::{AITimeText, AIDepthText, AINodesText, RoundNumberText},
     }
 };
 
@@ -121,6 +121,7 @@ pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &
 
                     spawn_timer_row(builder, config, "AI Time", "");
                     spawn_depth_row(builder, config, "Depth Reached", "");
+                    spawn_nodes_row(builder, config, "Nodes Searched", "");
                 }
 
                 // Time Limit
@@ -255,6 +256,48 @@ fn spawn_depth_row(builder: &mut ChildSpawnerCommands, config: &GameConfig, labe
                 },
                 TextColor(colors.accent.clone().into()),
                 AIDepthText,
+                Node {
+                    margin: UiRect::top(Val::Px(8.0)),
+                    ..default()
+                },
+            ));
+        });
+}
+
+fn spawn_nodes_row(builder: &mut ChildSpawnerCommands, config: &GameConfig, label: &str, _value: &str) {
+    let colors = &config.colors;
+    builder
+        .spawn((
+            Node {
+                display: Display::Flex,
+                flex_direction: FlexDirection::Row,
+                justify_content: JustifyContent::SpaceBetween,
+                align_items: AlignItems::Center,
+                width: Val::Percent(100.0),
+                padding: UiRect::all(Val::Px(8.0)),
+                ..default()
+            },
+            BackgroundColor(colors.surface.clone().into()),
+            BorderRadius::all(Val::Px(4.0)),
+        ))
+        .with_children(|builder| {
+            builder.spawn((
+                Text::new(label),
+                TextFont {
+                    font_size: 16.0,
+                    ..default()
+                },
+                TextColor(colors.text_primary.clone().into()),
+            ));
+
+            builder.spawn((
+                Text::new("0"),
+                TextFont {
+                    font_size: 16.0,
+                    ..default()
+                },
+                TextColor(colors.accent.clone().into()),
+                AINodesText,
                 Node {
                     margin: UiRect::top(Val::Px(8.0)),
                     ..default()
