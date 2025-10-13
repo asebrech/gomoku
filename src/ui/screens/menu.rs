@@ -31,6 +31,12 @@
     }
 
     #[derive(Resource)]
+    pub struct GameBackgroundFrames {
+        pub frames: Vec<Handle<Image>>,
+        all_loaded: bool,
+    }
+
+    #[derive(Resource)]
     struct PreloadedAssets {
         logo: Handle<Image>,
     }
@@ -574,9 +580,23 @@
             video_frames.push(frame_handle);
         }
         
+        // Load game background animation frames
+        let mut game_bg_frames = Vec::new();
+        let game_bg_config = &config.assets.animations.game_background_frames;
+        for i in 1..=game_bg_config.frame_count {
+            let frame_path = game_bg_config.path_pattern.replace("{:04}", &format!("{:04}", i));
+            let frame_handle = asset_server.load(frame_path);
+            tracked_assets.add_image(frame_handle.clone());
+            game_bg_frames.push(frame_handle);
+        }
+        
         // Store resources
         commands.insert_resource(VideoFrames { 
             frames: video_frames,
+            all_loaded: false,
+        });
+        commands.insert_resource(GameBackgroundFrames {
+            frames: game_bg_frames,
             all_loaded: false,
         });
         commands.insert_resource(PreloadedAssets {

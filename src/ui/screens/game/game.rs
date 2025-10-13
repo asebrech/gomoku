@@ -28,6 +28,13 @@ pub enum GameStatus {
     GameOver,
 }
 
+#[derive(Component)]
+struct GameVideoBackground {
+    current_frame: usize,
+    timer: Timer,
+    total_frames: usize,
+}
+
 #[derive(Component, Clone)]
 pub struct OnGameScreen;
 #[derive(Component)]
@@ -101,6 +108,7 @@ pub fn game_plugin(app: &mut App) {
         .add_systems(OnEnter(AppState::Game), (
             update_game_settings_from_config,
             setup_game_ui,
+            setup_game_background,
         ).chain())
         .add_systems(
             Update,
@@ -121,6 +129,7 @@ pub fn game_plugin(app: &mut App) {
                 reset_board.run_if(on_event::<ResetBoard>),
                 toggle_pause,
                 handle_escape_key,
+                animate_game_background,
             ).run_if(in_state(AppState::Game)),
         )
         .add_systems(
@@ -226,7 +235,7 @@ fn setup_game_ui(
                 column_gap: Val::Px(40.0),
                 ..default()
             },
-            BackgroundColor(Color::srgb(0.1, 0.1, 0.1)),
+            BackgroundColor(Color::NONE), // Transparent to show animated background
             OnGameScreen,
         ))
         .with_children(|builder| {
@@ -1335,5 +1344,89 @@ fn update_captures_display(
     // Update player 2 score
     for mut text in player2_query.iter_mut() {
         text.0 = format!("{}", game_state.min_captures);
+    }
+}
+
+fn setup_game_background(
+    mut commands: Commands,
+    config: Res<GameConfig>,
+    game_bg_frames: Option<Res<crate::ui::screens::menu::GameBackgroundFrames>>,
+) {
+    println!("[GAME BACKGROUND] Setting up game background...");
+    
+    // Skip in devMode
+    if config.dev_mode {
+        println!("[GAME BACKGROUND] Skipping in devMode");
+        return;
+    }
+
+    // Get frames from the loading screen resource
+    let Some(bg_frames) = game_bg_frames else {
+        println!("[GAME BACKGROUND] ERROR: No background frames resource found!");
+        return;
+    };
+
+    println!("[GAME BACKGROUND] Found {} frames", bg_frames.frames.len());
+
+    if bg_frames.frames.is_empty() {
+        println!("[GAME BACKGROUND] ERROR: Frames vector is empty!");
+        return;
+    }
+
+    let animation_config = &config.assets.animations.game_background_frames;
+    let fps = animation_config.fps as f32;
+    let frame_duration = 1.0 / fps;
+
+    println!("[GAME BACKGROUND] Spawning background with {} frames at {} fps", bg_frames.frames.len(), fps);
+
+    // Spawn background as a full-screen image behind everything
+    commands.spawn((
+        Node {
+            position_type: PositionType::Absolute,
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            top: Val::Px(0.0),
+            left: Val::Px(0.0),
+            ..default()
+        },
+        ZIndex(-1000), // Behind everything
+        ImageNode {
+            image: bg_frames.frames[0].clone(),
+            ..default()
+        },
+        GameVideoBackground {
+            current_frame: 0,
+            timer: Timer::from_seconds(frame_duration, TimerMode::Repeating),
+            total_frames: bg_frames.frames.len(),
+        },
+        OnGameScreen,
+    ));
+    
+    println!("[GAME BACKGROUND] Background entity spawned successfully!");
+}
+
+fn animate_game_background(
+    time: Res<Time>,
+    mut video_backgrounds: Query<(&mut GameVideoBackground, &mut ImageNode)>,
+    game_bg_frames: Option<Res<crate::ui::screens::menu::GameBackgroundFrames>>,
+    config: Res<GameConfig>,
+) {
+    // Skip animation in devMode
+    if config.dev_mode {
+        return;
+    }
+
+    if let Some(frames) = game_bg_frames {
+        for (mut video_bg, mut image_node) in video_backgrounds.iter_mut() {
+            video_bg.timer.tick(time.delta());
+
+            if video_bg.timer.just_finished() {
+                video_bg.current_frame = (video_bg.current_frame + 1) % video_bg.total_frames;
+
+                if video_bg.current_frame < frames.frames.len() {
+                    image_node.image = frames.frames[video_bg.current_frame].clone();
+                }
+            }
+        }
     }
 }

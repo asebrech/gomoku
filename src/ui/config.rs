@@ -54,6 +54,7 @@ pub struct SoundAssets {
 pub struct AnimationAssets {
     pub main_menu_frames: FrameAnimation,
     pub transition_frames: FrameAnimation,
+    pub game_background_frames: FrameAnimation,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -361,6 +362,11 @@ impl GameConfig {
                     transition_frames: FrameAnimation {
                         path_pattern: "transitions/frames/frame_{:04}.png".to_string(),
                         frame_count: 300,
+                        fps: 30,
+                    },
+                    game_background_frames: FrameAnimation {
+                        path_pattern: "backgrounds/ingame-background/frame_{:04}.jpg".to_string(),
+                        frame_count: 600,
                         fps: 30,
                     },
                 },
