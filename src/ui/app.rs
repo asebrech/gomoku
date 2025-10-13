@@ -118,7 +118,7 @@ impl GomokuApp {
                     prevent_default_event_handling: false,
                     window_theme: Some(WindowTheme::Dark),
                     enabled_buttons: bevy::window::EnabledButtons {
-                        maximize: false,
+                        maximize: true,
                         ..Default::default()
                     },
                     visible: false,
