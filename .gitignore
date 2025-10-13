@@ -1,1 +1,7 @@
 /target
+
+# Ignore extracted background images (keep only zip files)
+assets/backgrounds/ingame-background/*.png
+assets/backgrounds/ingame-background/*.jpg
+assets/backgrounds/dolphin/*.png
+assets/backgrounds/dolphin/*.jpg
