@@ -1,11 +1,42 @@
+//! Minimax search with alpha-beta pruning and MTDF driver.
+//!
+//! This module contains an alpha-beta implementation augmented with a
+//! transposition table (memory) and an MTDF driver. The implementation is
+//! intentionally small and focused on clarity rather than squeezing every
+//! last micro-optimization.
+//!
+//! Key algorithms explained:
+//! - Alpha-Beta pruning: standard minimax pruning to reduce the number of
+//!   nodes visited. (<https://en.wikipedia.org/wiki/Alpha%E2%80%93beta_pruning>)
+//! - Transposition table: stores previously computed results keyed by a
+//!   Zobrist hash to avoid re-searching identical positions.
+//! - MTDF: a memory-enhanced driver around zero-window alpha-beta calls to
+//!   converge quickly to the minimax value. See: <https://www.researchgate.net/publication/220728459_MTD-f_A_New_Optimal_Minimax_Search_Algorithm>
+//!
+//! Notes on integration:
+//! - The transposition table returns either exact values or bounds which are
+//!   used to cut off search early where possible.
+
 use crate::core::state::GameState;
 use std::cmp::{max, min};
 use std::time::{Duration, Instant};
 
-use super::{heuristic::Heuristic, move_ordering::MoveOrdering, transposition::{TranspositionTable, EntryType}};
+use super::{heuristic::Heuristic, transposition::{TranspositionTable, EntryType}};
 
-/// Zero-window alpha-beta search with memory (transposition table)
-/// This is the core search function used by MTD(f)
+/// Alpha-beta search with transposition table (memory) support.
+///
+/// This function implements a standard minimax search with alpha-beta
+/// pruning. It also probes a transposition table (TT) to find cached
+/// results and stores the final value back into the TT. The returned
+/// tuple is (value, nodes_visited).
+///
+/// Important behaviour:
+/// - If the TT contains a cutoff (exact value or an applicable bound)
+///   the function returns immediately without expanding children.
+/// - At leaf nodes the heuristic is used and the value is stored as
+///   an Exact entry in the TT.
+///
+/// See: https://en.wikipedia.org/wiki/Alpha%E2%80%93beta_pruning
 fn alpha_beta_with_memory(
     state: &mut GameState,
     depth: i32,
@@ -21,31 +52,25 @@ fn alpha_beta_with_memory(
     let hash_key = state.hash();
     let mut nodes_visited = 1u64;
     
-    // Time check
     if let Some(limit) = time_limit {
         if start_time.elapsed() >= limit {
             return (0, nodes_visited);
         }
     }
     
-    // Transposition table lookup
     let tt_result = tt.probe(hash_key, depth, alpha, beta);
     if tt_result.cutoff {
         return (tt_result.value.unwrap(), nodes_visited);
     }
 
-    // Terminal node or leaf node
     if depth == 0 || state.is_terminal() {
         let eval = Heuristic::evaluate(state, depth);
         tt.store(hash_key, eval, depth, EntryType::Exact, None);
         return (eval, nodes_visited);
     }
 
-    // Get and order moves
-    let mut moves = state.get_possible_moves();
-    MoveOrdering::order_moves(state, &mut moves);
+    let mut moves = state.get_candidate_moves();
     
-    // Use TT best move first
     if let Some(best_move) = tt_result.best_move {
         if let Some(pos) = moves.iter().position(|&m| m == best_move) {
             moves.swap(0, pos);
@@ -70,7 +95,6 @@ fn alpha_beta_with_memory(
                 best_move = Some(move_);
             }
             
-            // Beta cutoff
             if value >= beta {
                 break;
             }
@@ -91,7 +115,6 @@ fn alpha_beta_with_memory(
                 best_move = Some(move_);
             }
             
-            // Alpha cutoff
             if value <= alpha {
                 break;
             }
@@ -99,7 +122,6 @@ fn alpha_beta_with_memory(
         }
     }
 
-    // Store in transposition table with appropriate bound type
     let entry_type = if value <= original_alpha {
         EntryType::UpperBound
     } else if value >= original_beta {
@@ -112,19 +134,14 @@ fn alpha_beta_with_memory(
     (value, nodes_visited)
 }
 
-/// MTD(f) - Memory-enhanced Test Driver
-/// Performs a series of zero-window searches to converge on the minimax value
-/// 
-/// # Arguments
-/// * `state` - The current game state
-/// * `first_guess` - Initial guess for the minimax value (from previous iteration)
-/// * `depth` - Search depth
-/// * `tt` - Transposition table
-/// * `start_time` - Search start time for time management
-/// * `time_limit` - Optional time limit for the search
-/// 
-/// # Returns
-/// * Tuple of (minimax value, nodes searched, best move)
+/// MTDF driver around zero-window alpha-beta searches.
+///
+/// MTDF repeatedly calls a zero-width alpha-beta (beta-1, beta) to
+/// converge on the minimax value using bounds. It requires a
+/// transposition table to be efficient since it relies heavily on
+/// stored information to avoid re-searching.
+///
+/// Reference: "MTD(f) - A New Optimal Minimax Search Algorithm".
 pub fn mtdf(
     state: &mut GameState,
     first_guess: i32,
@@ -139,21 +156,15 @@ pub fn mtdf(
     let mut total_nodes = 0u64;
     let is_maximizing = state.current_player == crate::core::board::Player::Max;
     
-    // Iteratively narrow the search window until bounds converge
     while lower_bound < upper_bound {
-        // Check time limit
         if let Some(limit) = time_limit {
             if start_time.elapsed() >= limit {
                 break;
             }
         }
         
-        // Set beta for zero-window search
-        // If g == lower_bound, we need to search with beta = g + 1
-        // Otherwise, we can use beta = g
         let beta = if g == lower_bound { g + 1 } else { g };
         
-        // Perform zero-window search
         let (value, nodes) = alpha_beta_with_memory(
             state,
             depth,
@@ -167,23 +178,18 @@ pub fn mtdf(
         
         total_nodes += nodes;
         
-        // Update bounds based on search result
         if value < beta {
-            // Failed low - value is an upper bound
             upper_bound = value;
         } else {
-            // Failed high - value is a lower bound
             lower_bound = value;
         }
         
         g = value;
     }
     
-    // Get the best move from the transposition table
     let hash_key = state.hash();
     let best_move = tt.get_best_move(hash_key);
     
     (g, total_nodes, best_move)
 }
-
 

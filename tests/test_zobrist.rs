@@ -1,4 +1,4 @@
-use gomoku::ai::zobrist::ZobristHash;
+use gomoku::core::zobrist::ZobristHash;
 use gomoku::core::board::Player;
 use gomoku::core::state::GameState;
 use std::collections::HashSet;

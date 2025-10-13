@@ -1,4 +1,15 @@
 
+//! Zobrist hashing utilities.
+//!
+//! Zobrist hashing assigns a random 64-bit key to each (position, player)
+//! pair and combines them with XOR to form a compact hash of a position.
+//! This hash is cheap to update incrementally (XOR-in / XOR-out) when moves
+//! are made or undone, and is commonly used as a key for transposition
+//! tables.
+//!
+//! References:
+//! - <https://en.wikipedia.org/wiki/Zobrist_hashing>
+
 use crate::core::board::Player;
 use rand::Rng;
 use rand_chacha::{ChaCha8Rng, rand_core::SeedableRng};
@@ -48,6 +59,9 @@ impl ZobristHash {
     }
     
     pub fn compute_hash(&self, state: &crate::core::state::GameState) -> u64 {
+        // Compute full Zobrist hash from scratch for a given GameState.
+        // This is used during initialization; incremental updates should
+        // be performed with `update_hash_*` methods for speed.
         let mut hash = 0u64;
         
         for u64_idx in 0..state.board.u64_count {
@@ -86,6 +100,8 @@ impl ZobristHash {
         let pos_idx = self.position_index(row, col);
         let player_idx = Self::player_index(player);
         
+        // XOR the position/player key and flip the player bit to keep the
+        // hash consistent with the implementation used in `compute_hash`.
         current_hash ^ self.position_keys[pos_idx][player_idx] ^ self.player_key
     }
     

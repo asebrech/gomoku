@@ -1,9 +1,21 @@
-use crate::ai::zobrist::ZobristHash;
+//! GameState holds the full mutable game representation used by the engine.
+//!
+//! Responsibilities:
+//! - Maintain the `Board` and player to move.
+//! - Track captures, history and a running Zobrist hash for fast TT lookups.
+//! - Provide helper methods used by search (make_move, undo_move,
+//!   get_candidate_moves, is_terminal, ...).
+//!
+//! Important invariants:
+//! - `current_hash` must reflect the board and current player and is updated
+//!   on every make/undo move path.
+//!
+use crate::core::zobrist::ZobristHash;
 use crate::ai::pattern_history::PatternHistoryAnalyzer;
+use crate::ai::move_generation::MoveGenerator;
 use crate::core::board::{Board, Player};
 use crate::core::captures::CaptureHandler;
-use crate::core::moves::MoveHandler;
-use crate::core::rules::WinChecker;
+use crate::core::rules::GameRules;
 use bevy::prelude::*;
 use std::hash::Hash;
 
@@ -54,8 +66,8 @@ impl GameState {
         state
     }
 
-    pub fn get_possible_moves(&self) -> Vec<(usize, usize)> {
-        MoveHandler::get_possible_moves(&self.board, self.current_player)
+    pub fn get_candidate_moves(&self) -> Vec<(usize, usize)> {
+        MoveGenerator::get_candidate_moves(&self.board, self.current_player)
     }
 
     pub fn make_move(&mut self, mv: (usize, usize)) {
@@ -84,10 +96,10 @@ impl GameState {
         self.move_history.push(mv);
         self.check_for_wins(mv);
         self.switch_player();
-        self.update_pattern_analysis(mv);
+        self.update_pattern_analysis();
     }
 
-    fn update_pattern_analysis(&mut self, last_move: (usize, usize)) {
+    fn update_pattern_analysis(&mut self) {
         let current_player = self.current_player;
         let capture_history_len = self.capture_history.len();
         let last_captures = if capture_history_len > 0 {
@@ -99,7 +111,7 @@ impl GameState {
         let move_player = current_player.opponent();
         let captures_made = last_captures.len() / 2;
         
-        self.pattern_analyzer.analyze_move_simple(last_move, move_player, captures_made);
+        self.pattern_analyzer.analyze_move(move_player, captures_made);
     }
 
     pub fn undo_move(&mut self, move_: (usize, usize)) {
@@ -130,7 +142,6 @@ impl GameState {
         if let Some(last_move) = self.move_history.last() {
             if *last_move == move_ {
                 self.move_history.pop();
-                self.pattern_analyzer.undo_last_move();
             }
         }
 
@@ -138,7 +149,7 @@ impl GameState {
     }
 
     pub fn is_terminal(&self) -> bool {
-        self.winner.is_some() || self.get_possible_moves().is_empty()
+        self.winner.is_some() || self.get_candidate_moves().is_empty()
     }
 
     pub fn check_winner(&self) -> Option<Player> {
@@ -197,18 +208,11 @@ impl GameState {
         if let Some(last_captures) = self.capture_history.pop() {
             if !last_captures.is_empty() {
                 let opponent = self.current_player.opponent();
-                let size = self.board.size;
-
-                let opponent_bits = match opponent {
-                    Player::Max => &mut self.board.max_bits,
-                    Player::Min => &mut self.board.min_bits,
-                };
 
                 for &(row, col) in &last_captures {
-                    if row < size && col < size {
-                        let idx = row * size + col;
-                        Board::set_bit(opponent_bits, idx);
-                        Board::set_bit(&mut self.board.occupied, idx);
+                    if row < self.board.size && col < self.board.size {
+
+                        self.board.place_stone(row, col, opponent);
                     }
                 }
 
@@ -230,10 +234,10 @@ impl GameState {
     }
 
     fn check_win_around(&self, mv: (usize, usize)) -> bool {
-        WinChecker::check_win_around(&self.board, mv.0, mv.1, self.win_condition)
+        GameRules::check_win_around(&self.board, mv.0, mv.1, self.win_condition)
     }
 
     pub fn check_capture_win(&self) -> Option<Player> {
-        WinChecker::check_capture_win(self.max_captures, self.min_captures, self.capture_to_win)
+        GameRules::check_capture_win(self.max_captures, self.min_captures, self.capture_to_win)
     }
 }

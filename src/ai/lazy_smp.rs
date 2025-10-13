@@ -1,3 +1,24 @@
+//! Parallel search orchestration using a Lazy-SMP like approach.
+//!
+//! This file implements a simple parallel search driver inspired by the
+//! Lazy-SMP technique. Each worker runs an independent MTDF search with its
+//! own transposition table and occasional cooperation through an atomic
+//! shared state. The goal is to diversify search attempts (different depth
+//! offsets and aspiration windows) while sharing best-move/score results so
+//! workers can benefit from each other's discoveries.
+//!
+//! References:
+//! - Lazy SMP: "Lazy SMP - Parallelizing Alpha-Beta Search" (conceptual)
+//! - MTDF: As described in Sean E. Anderson's notes and other AI resources.
+//! - Rayon: data-parallel execution used here to run workers in parallel
+//!   (<https://docs.rs/rayon>).
+//!
+//! Design notes:
+//! - Each worker keeps a local transposition table to avoid synchronization
+//!   costs. Shared state only contains the current best move/score and
+//!   statistics. This mirrors the common Lazy-SMP trade-off of slightly
+//!   redundant work for simpler concurrency.
+
 use crate::core::state::GameState;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering};
@@ -6,7 +27,6 @@ use rayon::prelude::*;
 
 use super::{minimax::mtdf, transposition::TranspositionTable};
 
-/// Search result structure
 #[derive(Debug)]
 pub struct SearchResult {
     pub best_move: Option<(usize, usize)>,
@@ -16,7 +36,6 @@ pub struct SearchResult {
     pub time_elapsed: Duration,
 }
 
-/// Shared search state for Lazy SMP
 pub struct SharedSearchState {
     pub best_move: Mutex<Option<(usize, usize)>>,
     pub best_score: AtomicI32,
@@ -39,7 +58,6 @@ impl SharedSearchState {
     pub fn update_best(&self, score: i32, mv: Option<(usize, usize)>, depth: i32) -> bool {
         let current_score = self.best_score.load(Ordering::Relaxed);
         
-        // Try to update if this is a better score
         if score > current_score {
             if self.best_score.compare_exchange_weak(
                 current_score, 
@@ -70,7 +88,6 @@ impl SharedSearchState {
     }
 }
 
-/// Lazy SMP worker that runs MTD(f) with slightly different parameters
 fn lazy_smp_worker(
     state: &GameState,
     max_depth: i32,
@@ -80,23 +97,21 @@ fn lazy_smp_worker(
     time_limit: Option<Duration>,
 ) -> (i32, Option<(usize, usize)>, i32, u64) {
     let mut local_state = state.clone();
-    let mut tt = TranspositionTable::new(1_000_000); // Each worker gets its own TT
+    let mut tt = TranspositionTable::new(1_000_000);
     
     let mut best_move = None;
     let mut best_score = 0;
     let mut depth_reached = 0;
     let mut total_nodes = 0;
 
-    // Lazy SMP parameters: different workers use slightly different search parameters
     let depth_offset = match worker_id {
-        0 => 0,  // Main worker searches at requested depth
-        1 => -1, // Worker 1 searches one depth shallower
-        2 => 1,  // Worker 2 searches one depth deeper
-        3 => -2, // Worker 3 searches two depths shallower
-        _ => (worker_id as i32 - 2) % 3 - 1, // Other workers vary between -1, 0, 1
+        0 => 0,
+        1 => -1,
+        2 => 1,
+        3 => -2,
+        _ => (worker_id as i32 - 2) % 3 - 1,
     };
 
-    // Different aspiration window sizes
     let aspiration_offset = match worker_id % 4 {
         0 => 0,
         1 => 50,
@@ -116,10 +131,8 @@ fn lazy_smp_worker(
             }
         }
 
-        // Apply depth offset for this worker
-        let search_depth = (depth + depth_offset).max(1);
+        let search_depth = (depth + depth_offset).max(1).min(max_depth);
 
-        // Use shared best score as first guess, with aspiration offset
         let first_guess = shared_state.best_score.load(Ordering::Relaxed) + aspiration_offset;
 
         let (score, nodes, mv) = mtdf(
@@ -139,17 +152,14 @@ fn lazy_smp_worker(
             best_score = score;
             depth_reached = search_depth;
 
-            // Try to update shared state
             shared_state.update_best(score, mv, search_depth);
 
-            // Stop if we found a winning position
             if score.abs() >= 1_000_000 {
                 shared_state.signal_stop();
                 break;
             }
         }
 
-        // Check if another worker found a better result
         if shared_state.should_stop() {
             break;
         }
@@ -158,24 +168,31 @@ fn lazy_smp_worker(
     (best_score, best_move, depth_reached, total_nodes)
 }
 
-/// Parallel search using Lazy SMP
+/// Run a parallel Lazy-SMP style search.
+///
+/// - `time_limit_ms` limits the search wall-clock time.
+/// - `max_depth` limits per-worker depth.
+/// - `num_threads` optionally overrides the number of workers.
+///
+/// Returns a `SearchResult` with the best move and statistics gathered
+/// by the workers.
 pub fn lazy_smp_search(
     state: &mut GameState,
+    time_limit_ms: u64,
     max_depth: i32,
-    time_limit: Option<Duration>,
     num_threads: Option<usize>,
 ) -> SearchResult {
     let start_time = Instant::now();
+    let time_limit = Duration::from_millis(time_limit_ms);
     
-    // Use number of CPU cores if not specified
     let threads = num_threads.unwrap_or_else(|| {
         std::thread::available_parallelism()
             .map(|n| n.get())
             .unwrap_or(4)
-            .min(8) // Cap at 8 threads for diminishing returns
+            .min(8)
     });
 
-    let initial_moves = state.get_possible_moves();
+    let initial_moves = state.get_candidate_moves();
     if initial_moves.is_empty() {
         return SearchResult {
             best_move: None,
@@ -188,7 +205,6 @@ pub fn lazy_smp_search(
 
     let shared_state = Arc::new(SharedSearchState::new());
     
-    // Launch worker threads
     let workers: Vec<_> = (0..threads).into_par_iter().map(|worker_id| {
         let state_clone = state.clone();
         let shared_state_clone = Arc::clone(&shared_state);
@@ -199,11 +215,10 @@ pub fn lazy_smp_search(
             shared_state_clone,
             worker_id,
             start_time,
-            time_limit,
+            Some(time_limit),
         )
     }).collect();
 
-    // Wait for all workers to complete and get the best result
     let mut best_score = i32::MIN;
     let mut best_move = None;
     let mut max_depth_reached = 0;
@@ -216,7 +231,6 @@ pub fn lazy_smp_search(
         max_depth_reached = max_depth_reached.max(depth);
     }
 
-    // Use shared state results if they're better
     let shared_score = shared_state.best_score.load(Ordering::Relaxed);
     let shared_move = *shared_state.best_move.lock().unwrap();
     

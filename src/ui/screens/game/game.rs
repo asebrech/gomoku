@@ -1,4 +1,4 @@
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use bevy::prelude::*;
 use bevy::tasks::{Task, AsyncComputeTaskPool};
@@ -6,7 +6,7 @@ use futures_lite::future;
 use crate::{
     ai::lazy_smp::{lazy_smp_search, SearchResult},
     audio::{PlayStonePlacementSound, PlayWinSound, PlayLoseSound},
-    core::{board::Player, moves::RuleValidator, state::GameState}, 
+    core::{board::Player, rules::GameRules, state::GameState}, 
     ui::{
         app::{AppState, GameSettings}, 
         config::GameConfig,
@@ -449,7 +449,7 @@ pub fn update_available_placement(
     for (entity, children, cell) in parents.iter() {
         // Check if position is empty and doesn't create double-three
         let is_valid = game_state.board.is_empty_position(cell.x, cell.y)
-            && !RuleValidator::creates_double_three(&game_state.board, cell.x, cell.y, game_state.current_player);
+            && !GameRules::creates_double_three(&game_state.board, cell.x, cell.y, game_state.current_player);
         
         if is_valid {
             for &child in children {
@@ -712,19 +712,14 @@ fn start_ai_computation(
     // Clone the data we need for the task
     let game_state_clone = game_state.clone();
     let ai_depth = settings.ai_depth;
-    let time_limit = settings.time_limit.map(|ms| Duration::from_millis(ms as u64));
+    let time_limit_ms = settings.time_limit.unwrap_or(500); // Default 500ms if not set
     
     // Spawn the AI computation on the async compute thread pool
     let thread_pool = AsyncComputeTaskPool::get();
     let task = thread_pool.spawn(async move {
         let mut state = game_state_clone;
-        if let Some(time_limit) = time_limit {
-            info!("AI using Lazy SMP search with time limit");
-            lazy_smp_search(&mut state, ai_depth, Some(time_limit), None)
-        } else {
-            info!("AI using Lazy SMP search to depth {}", ai_depth);
-            lazy_smp_search(&mut state, ai_depth, None, None)
-        }
+        info!("AI using Lazy SMP search with {}ms time limit (will search as deep as possible)", time_limit_ms);
+        lazy_smp_search(&mut state, time_limit_ms as u64, 100, None)
     });
     
     // Store the task as a resource

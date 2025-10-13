@@ -1,5 +1,30 @@
+//! Heuristic evaluation functions and utilities.
+//!
+//! This module contains the board pattern analysis and a heuristic evaluator
+//! used by search routines to estimate a GameState's value when a terminal
+//! state or full search depth hasn't been reached.
+//!
+//! The evaluator looks for common Gomoku patterns (five-in-a-row, live four,
+//! half-free four, live three, etc.) and combines pattern counts with
+//! capture information and a lightweight historical bonus to produce a single
+//! score for the current position.
+//!
+//! Relevant concepts and further reading:
+//! - Pattern-based heuristics: <https://en.wikipedia.org/wiki/Gomoku>
+//! - Common pattern types and their evaluation in board games: <https://www.chessprogramming.org/Threats>
+//!
+//! Notes on scoring:
+//! - Scores are chosen to (a) prefer immediate wins over long-term potential,
+//!   (b) make captures meaningful, and (c) keep values within i32 range.
+//! - Values are ordinal (relative) rather than absolute probabilities.
+//!
+//! The rest of the file contains helpers to scan and classify line patterns on
+//! the board. These helpers are intentionally small and focused to make the
+//! heuristic fast and easy to test.
+
 use crate::core::board::{Board, Player};
 use crate::core::state::GameState;
+use crate::core::patterns::{PatternAnalyzer, PatternFreedom, DIRECTIONS};
 
 pub struct Heuristic;
 
@@ -16,15 +41,6 @@ const DEAD_THREE_SCORE: i32 = 100;
 const LIVE_TWO_SCORE: i32 = 50;
 const HALF_FREE_TWO_SCORE: i32 = 20;
 const CAPTURE_BONUS_MULTIPLIER: i32 = 1_000;
-
-const DIRECTIONS: [(isize, isize); 4] = [(1, 0), (0, 1), (1, 1), (1, -1)];
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum PatternFreedom {
-    Free,
-    HalfFree,
-    Flanked,
-}
 
 #[derive(Debug, Clone, Copy)]
 struct PatternCounts {
@@ -62,6 +78,19 @@ struct PatternInfo {
 }
 
 impl Heuristic {
+    /// Evaluate a GameState and return an integer score.
+    ///
+    /// Positive values favour Player::Max, negative values favour
+    /// Player::Min. The `depth` parameter is used to prefer faster
+    /// wins/losses (a common technique: WIN_SCORE +/- depth).
+    ///
+    /// The evaluator combines:
+    /// - Terminal checks (wins/losses/draws)
+    /// - Pattern counts (five, live four, live three, ...)
+    /// - Capture-based bonuses
+    /// - A small historical bias from `PatternHistoryAnalyzer`.
+    ///
+    /// See also: pattern-based heuristics and Gomoku evaluation notes.
     pub fn evaluate(state: &GameState, depth: i32) -> i32 {
         if let Some(winner) = state.check_winner() {
             return match winner {
@@ -100,7 +129,9 @@ impl Heuristic {
     }
 
     fn calculate_historical_bonus(state: &GameState) -> i32 {
-        state.pattern_analyzer.calculate_historical_bonus(state)
+        let max_bonus = state.pattern_analyzer.calculate_historical_bonus(Player::Max);
+        let min_bonus = state.pattern_analyzer.calculate_historical_bonus(Player::Min);
+        max_bonus - min_bonus
     }
 
     fn analyze_both_players(board: &Board, win_condition: usize) -> (PatternCounts, PatternCounts) {
@@ -171,8 +202,10 @@ impl Heuristic {
             return None;
         }
 
-        let length =
-            Self::count_consecutive(board, pattern_start_row, pattern_start_col, dx, dy, player);
+        let consecutive_after_start =
+            PatternAnalyzer::count_consecutive(board, pattern_start_row, pattern_start_col, dx, dy, player);
+
+        let length = consecutive_after_start + 1;
 
         if length < 2 {
             return None;
@@ -180,27 +213,16 @@ impl Heuristic {
 
         let length = length.min(win_condition);
         
-        // Check if this pattern has sufficient space to develop into a winning line
-        if !Self::has_sufficient_space(
+        let total_available_space = Self::count_total_space(
             board,
             pattern_start_row,
             pattern_start_col,
             dx,
             dy,
             length,
-            player,
-            win_condition,
-        ) {
-            // Mark as analyzed but don't score it
-            Self::mark_pattern_analyzed(
-                pattern_start_row,
-                pattern_start_col,
-                dx,
-                dy,
-                length,
-                analyzed,
-                bit_mask,
-            );
+        );
+        
+        if total_available_space < win_condition {
             return None;
         }
         
@@ -218,192 +240,6 @@ impl Heuristic {
         );
 
         Some(PatternInfo { length, freedom })
-    }
-
-    fn count_consecutive(
-        board: &Board,
-        row: usize,
-        col: usize,
-        dx: isize,
-        dy: isize,
-        player: Player,
-    ) -> usize {
-        let player_bits = match player {
-            Player::Max => &board.max_bits,
-            Player::Min => &board.min_bits,
-        };
-        let mut count = 0;
-        let mut current_row = row as isize;
-        let mut current_col = col as isize;
-
-        while current_row >= 0
-            && current_row < board.size as isize
-            && current_col >= 0
-            && current_col < board.size as isize
-        {
-            let idx = board.index(current_row as usize, current_col as usize);
-            if Board::is_bit_set(player_bits, idx) {
-                count += 1;
-                current_row += dx;
-                current_col += dy;
-            } else {
-                break;
-            }
-        }
-        count
-    }
-
-    fn find_pattern_start(
-        board: &Board,
-        row: usize,
-        col: usize,
-        dx: isize,
-        dy: isize,
-        player: Player,
-    ) -> (usize, usize) {
-        let player_bits = match player {
-            Player::Max => &board.max_bits,
-            Player::Min => &board.min_bits,
-        };
-        let mut current_row = row as isize;
-        let mut current_col = col as isize;
-
-        loop {
-            let prev_row = current_row - dx;
-            let prev_col = current_col - dy;
-
-            if prev_row >= 0
-                && prev_row < board.size as isize
-                && prev_col >= 0
-                && prev_col < board.size as isize
-            {
-                let idx = board.index(prev_row as usize, prev_col as usize);
-                if Board::is_bit_set(player_bits, idx) {
-                    current_row = prev_row;
-                    current_col = prev_col;
-                } else {
-                    break;
-                }
-            } else {
-                break;
-            }
-        }
-
-        (current_row as usize, current_col as usize)
-    }
-
-    fn analyze_pattern_freedom(
-        board: &Board,
-        start_row: usize,
-        start_col: usize,
-        dx: isize,
-        dy: isize,
-        length: usize,
-    ) -> PatternFreedom {
-        let before_row = start_row as isize - dx;
-        let before_col = start_col as isize - dy;
-        let start_open = Self::is_position_empty(board, before_row, before_col);
-
-        let end_row = start_row as isize + (length as isize * dx);
-        let end_col = start_col as isize + (length as isize * dy);
-        let end_open = Self::is_position_empty(board, end_row, end_col);
-
-        match (start_open, end_open) {
-            (true, true) => PatternFreedom::Free,
-            (true, false) | (false, true) => PatternFreedom::HalfFree,
-            (false, false) => PatternFreedom::Flanked,
-        }
-    }
-
-    #[inline(always)]
-    fn is_position_empty(board: &Board, row: isize, col: isize) -> bool {
-        if row < 0 || col < 0 || row >= board.size as isize || col >= board.size as isize {
-            return false;
-        }
-        let idx = board.index(row as usize, col as usize);
-        !Board::is_bit_set(&board.occupied, idx)
-    }
-
-    fn has_sufficient_space(
-        board: &Board,
-        start_row: usize,
-        start_col: usize,
-        dx: isize,
-        dy: isize,
-        length: usize,
-        player: Player,
-        win_condition: usize,
-    ) -> bool {
-        let player_bits = match player {
-            Player::Max => &board.max_bits,
-            Player::Min => &board.min_bits,
-        };
-        let opponent_bits = match player {
-            Player::Max => &board.min_bits,
-            Player::Min => &board.max_bits,
-        };
-
-        // Count total available space in both directions from the pattern
-        let mut total_space = length; // Current pattern length
-        
-        // Count backwards from pattern start
-        let mut pos_row = start_row as isize - dx;
-        let mut pos_col = start_col as isize - dy;
-        let mut backward_space = 0;
-        
-        while pos_row >= 0 
-            && pos_row < board.size as isize 
-            && pos_col >= 0 
-            && pos_col < board.size as isize 
-            && backward_space < win_condition
-        {
-            let idx = board.index(pos_row as usize, pos_col as usize);
-            
-            // Stop if we hit an opponent stone
-            if Board::is_bit_set(opponent_bits, idx) {
-                break;
-            }
-            
-            // Count empty spaces and our own stones
-            if !Board::is_bit_set(&board.occupied, idx) || Board::is_bit_set(player_bits, idx) {
-                backward_space += 1;
-                pos_row -= dx;
-                pos_col -= dy;
-            } else {
-                break;
-            }
-        }
-        
-        // Count forwards from pattern end
-        let mut pos_row = start_row as isize + (length as isize * dx);
-        let mut pos_col = start_col as isize + (length as isize * dy);
-        let mut forward_space = 0;
-        
-        while pos_row >= 0 
-            && pos_row < board.size as isize 
-            && pos_col >= 0 
-            && pos_col < board.size as isize 
-            && forward_space < win_condition
-        {
-            let idx = board.index(pos_row as usize, pos_col as usize);
-            
-            // Stop if we hit an opponent stone
-            if Board::is_bit_set(opponent_bits, idx) {
-                break;
-            }
-            
-            // Count empty spaces and our own stones
-            if !Board::is_bit_set(&board.occupied, idx) || Board::is_bit_set(player_bits, idx) {
-                forward_space += 1;
-                pos_row += dx;
-                pos_col += dy;
-            } else {
-                break;
-            }
-        }
-        
-        total_space += backward_space + forward_space;
-        total_space >= win_condition
     }
 
     fn mark_pattern_analyzed(
@@ -424,6 +260,50 @@ impl Heuristic {
         }
     }
 
+    fn count_total_space(
+        board: &Board,
+        start_row: usize,
+        start_col: usize,
+        dx: isize,
+        dy: isize,
+        pattern_length: usize,
+    ) -> usize {
+        let mut space = pattern_length;
+        
+        space += Self::count_empty_in_direction(board, start_row as isize - dx, start_col as isize - dy, -dx, -dy);
+        
+        let end_row = start_row as isize + (pattern_length - 1) as isize * dx;
+        let end_col = start_col as isize + (pattern_length - 1) as isize * dy;
+        space += Self::count_empty_in_direction(board, end_row + dx, end_col + dy, dx, dy);
+        
+        space
+    }
+
+    fn count_empty_in_direction(
+        board: &Board,
+        start_row: isize,
+        start_col: isize,
+        dx: isize,
+        dy: isize,
+    ) -> usize {
+        let mut count = 0;
+        let mut current_row = start_row;
+        let mut current_col = start_col;
+        
+        while PatternAnalyzer::is_in_bounds(board, current_row, current_col) {
+            let idx = board.index(current_row as usize, current_col as usize);
+            if !Board::is_bit_set(&board.occupied, idx) {
+                count += 1;
+                current_row += dx;
+                current_col += dy;
+            } else {
+                break;
+            }
+        }
+        
+        count
+    }
+
     fn update_counts(counts: &mut PatternCounts, pattern: PatternInfo) {
         match pattern.length {
             5 => counts.five_in_row += 1,
@@ -440,7 +320,7 @@ impl Heuristic {
             2 => match pattern.freedom {
                 PatternFreedom::Free => counts.live_two += 1,
                 PatternFreedom::HalfFree => counts.half_free_two += 1,
-                PatternFreedom::Flanked => {}, // Don't count flanked twos
+                PatternFreedom::Flanked => {},
             },
             _ => {}
         }
@@ -480,6 +360,78 @@ impl Heuristic {
     }
 
     fn calculate_capture_bonus(state: &GameState) -> i32 {
-        (state.max_captures as i32 - state.min_captures as i32) * CAPTURE_BONUS_MULTIPLIER
+        let max_bonus = if state.max_captures > 0 {
+            (CAPTURE_BONUS_MULTIPLIER as f32 * (state.max_captures as f32).sqrt()) as i32
+        } else {
+            0
+        };
+        
+        let min_bonus = if state.min_captures > 0 {
+            (CAPTURE_BONUS_MULTIPLIER as f32 * (state.min_captures as f32).sqrt()) as i32
+        } else {
+            0
+        };
+        
+        max_bonus - min_bonus
+    }
+
+    fn find_pattern_start(
+        board: &Board,
+        row: usize,
+        col: usize,
+        dx: isize,
+        dy: isize,
+        player: Player,
+    ) -> (usize, usize) {
+        let player_bits = board.get_player_bits(player);
+        
+        let mut current_row = row as isize;
+        let mut current_col = col as isize;
+
+        loop {
+            let prev_row = current_row - dx;
+            let prev_col = current_col - dy;
+
+            if prev_row >= 0
+                && prev_row < board.size as isize
+                && prev_col >= 0
+                && prev_col < board.size as isize
+            {
+                let idx = board.index(prev_row as usize, prev_col as usize);
+                if Board::is_bit_set(player_bits, idx) {
+                    current_row = prev_row;
+                    current_col = prev_col;
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+
+        (current_row as usize, current_col as usize)
+    }
+
+    fn analyze_pattern_freedom(
+        board: &Board,
+        start_row: usize,
+        start_col: usize,
+        dx: isize,
+        dy: isize,
+        length: usize,
+    ) -> PatternFreedom {
+        let before_row = start_row as isize - dx;
+        let before_col = start_col as isize - dy;
+        let start_open = PatternAnalyzer::is_valid_empty(board, before_row, before_col);
+
+        let end_row = start_row as isize + (length as isize * dx);
+        let end_col = start_col as isize + (length as isize * dy);
+        let end_open = PatternAnalyzer::is_valid_empty(board, end_row, end_col);
+
+        match (start_open, end_open) {
+            (true, true) => PatternFreedom::Free,
+            (true, false) | (false, true) => PatternFreedom::HalfFree,
+            (false, false) => PatternFreedom::Flanked,
+        }
     }
 }

@@ -1,0 +1,76 @@
+//! Pattern detection helpers used by the heuristic and move generator.
+//!
+//! This module exposes small utilities to count consecutive stones, check
+//! in-bounds coordinates and determine whether an empty square is valid for
+//! move consideration. These functions are intentionally generic and used in
+//! several higher-level heuristics and rule checks.
+
+use crate::core::board::{Board, Player};
+
+pub const DIRECTIONS: [(isize, isize); 4] = [(1, 0), (0, 1), (1, 1), (1, -1)];
+
+pub const ALL_DIRECTIONS: [(isize, isize); 8] = [
+    (-1, -1), (-1, 0), (-1, 1), (0, -1),
+    (0, 1), (1, -1), (1, 0), (1, 1),
+];
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum PatternFreedom {
+    Free,
+    HalfFree,
+    Flanked,
+}
+
+pub struct PatternAnalyzer;
+
+impl PatternAnalyzer {
+    #[inline]
+    pub fn count_consecutive(
+        board: &Board,
+        row: usize,
+        col: usize,
+        dx: isize,
+        dy: isize,
+        player: Player,
+    ) -> usize {
+        let player_bits = board.get_player_bits(player);
+        
+        let mut count = 0;
+        let mut current_row = row as isize + dx;
+        let mut current_col = col as isize + dy;
+
+        while current_row >= 0
+            && current_row < board.size as isize
+            && current_col >= 0
+            && current_col < board.size as isize
+        {
+            let idx = board.index(current_row as usize, current_col as usize);
+            if Board::is_bit_set(player_bits, idx) {
+                count += 1;
+                current_row += dx;
+                current_col += dy;
+            } else {
+                break;
+            }
+        }
+        
+        count
+    }
+
+    #[inline]
+    pub fn is_in_bounds(board: &Board, row: isize, col: isize) -> bool {
+        row >= 0 && col >= 0 && row < board.size as isize && col < board.size as isize
+    }
+
+    #[inline]
+    pub fn is_valid_empty(board: &Board, row: isize, col: isize) -> bool {
+        Self::is_in_bounds(board, row, col)
+            && !Board::is_bit_set(&board.occupied, board.index(row as usize, col as usize))
+    }
+
+    #[inline]
+    pub fn is_valid_occupied(board: &Board, row: isize, col: isize) -> bool {
+        Self::is_in_bounds(board, row, col)
+            && Board::is_bit_set(&board.occupied, board.index(row as usize, col as usize))
+    }
+}
