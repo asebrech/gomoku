@@ -1,8 +1,10 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use bevy::prelude::*;
+use bevy::tasks::{Task, AsyncComputeTaskPool};
+use futures_lite::future;
 use crate::{
-    ai::lazy_smp::lazy_smp_search,
+    ai::lazy_smp::{lazy_smp_search, SearchResult},
     audio::{PlayStonePlacementSound, PlayWinSound, PlayLoseSound},
     core::{board::Player, moves::RuleValidator, state::GameState}, 
     ui::{
@@ -117,7 +119,8 @@ pub fn game_plugin(app: &mut App) {
                 handle_player_placement,
                 place_stone.run_if(on_event::<StonePlacement>),
                 process_next_round.run_if(on_event::<MovePlayed>),
-                handle_ai_turn,  // New system to handle AI thinking
+                start_ai_computation,  // Start async AI computation
+                poll_ai_computation,   // Poll for AI computation results
                 update_available_placement.run_if(on_event::<MovePlayed>),
                 update_current_player_display.run_if(
                     resource_changed::<GameState>
@@ -136,6 +139,7 @@ pub fn game_plugin(app: &mut App) {
             Update,
             (
                 update_ai_time_display.run_if(on_event::<UpdateAITimeDisplay>),
+                update_ai_time_realtime,  // Real-time AI timer update (runs every frame)
                 update_ai_depth_display.run_if(on_event::<UpdateAIDepthDisplay>),
                 handle_game_volume_control,
                 update_game_volume_display,
@@ -651,18 +655,15 @@ pub fn process_next_round(
     }
 }
 
-// New system: Handles the actual AI computation after ensuring at least one frame has rendered
-fn handle_ai_turn(
-    mut stone_placement: EventWriter<StonePlacement>,
-    mut game_event: EventWriter<GameEnded>,
+// New system: Start AI computation as an async task
+fn start_ai_computation(
+    mut commands: Commands,
     settings: Res<GameSettings>,
-    mut game_state: ResMut<GameState>,
-    mut game_status: ResMut<GameStatus>,
-    mut ai_time: ResMut<AITimeTaken>,
-    mut ai_depth: ResMut<AIDepthReached>,
-    mut update_ai_time: EventWriter<UpdateAITimeDisplay>,
-    mut update_ai_depth: EventWriter<UpdateAIDepthDisplay>,
+    game_state: Res<GameState>,
+    game_status: Res<GameStatus>,
     mut ai_frames: ResMut<AIThinkingFrames>,
+    existing_task: Option<Res<AIComputeTask>>,
+    mut query: Query<&mut Text, With<CurrentPlayerText>>,
 ) {
     // Only run if versus AI is enabled
     if !settings.versus_ai {
@@ -671,6 +672,11 @@ fn handle_ai_turn(
     
     // Only run if AI is thinking
     if *game_status != GameStatus::AIThinking {
+        return;
+    }
+    
+    // Don't start a new task if one is already running
+    if existing_task.is_some() {
         return;
     }
     
@@ -688,34 +694,80 @@ fn handle_ai_turn(
     // Reset frame counter for next time
     ai_frames.frames_waited = 0;
     
-    info!("AI computation starting (after {} frames)...", ai_frames.frames_waited);
+    info!("Starting async AI computation...");
     
-    if !game_state.is_terminal() {
-        let placement = if let Some(time_limit_ms) = settings.time_limit {
-            let time_limit = Duration::from_millis(time_limit_ms as u64);
-            info!("AI using Lazy SMP search with {}ms limit", time_limit_ms);
-            lazy_smp_search(&mut game_state, settings.ai_depth, Some(time_limit), None)
+    // Update display immediately to show AI is thinking
+    for mut text in query.iter_mut() {
+        text.0 = "AI is thinking...".to_string();
+    }
+    
+    // Record the start time for real-time timer updates
+    commands.insert_resource(AIThinkingStartTime(Instant::now()));
+    
+    // Clone the data we need for the task
+    let game_state_clone = game_state.clone();
+    let ai_depth = settings.ai_depth;
+    let time_limit = settings.time_limit.map(|ms| Duration::from_millis(ms as u64));
+    
+    // Spawn the AI computation on the async compute thread pool
+    let thread_pool = AsyncComputeTaskPool::get();
+    let task = thread_pool.spawn(async move {
+        let mut state = game_state_clone;
+        if let Some(time_limit) = time_limit {
+            info!("AI using Lazy SMP search with time limit");
+            lazy_smp_search(&mut state, ai_depth, Some(time_limit), None)
         } else {
-            info!("AI using Lazy SMP search to depth {}", settings.ai_depth);
-            lazy_smp_search(&mut game_state, settings.ai_depth, None, None)
-        };
+            info!("AI using Lazy SMP search to depth {}", ai_depth);
+            lazy_smp_search(&mut state, ai_depth, None, None)
+        }
+    });
+    
+    // Store the task as a resource
+    commands.insert_resource(AIComputeTask(task));
+}
+
+// New system: Poll the AI computation task for results
+fn poll_ai_computation(
+    mut commands: Commands,
+    mut stone_placement: EventWriter<StonePlacement>,
+    mut game_event: EventWriter<GameEnded>,
+    mut game_status: ResMut<GameStatus>,
+    mut ai_time: ResMut<AITimeTaken>,
+    mut ai_depth: ResMut<AIDepthReached>,
+    mut update_ai_time: EventWriter<UpdateAITimeDisplay>,
+    mut update_ai_depth: EventWriter<UpdateAIDepthDisplay>,
+    task: Option<ResMut<AIComputeTask>>,
+) {
+    // Only run if we have an active task
+    let Some(mut task_res) = task else {
+        return;
+    };
+    
+    // Poll the task to see if it's complete
+    if let Some(result) = future::block_on(future::poll_once(&mut task_res.0)) {
+        info!("AI computation complete!");
         
-        ai_time.micros = placement.time_elapsed.as_micros();
-        ai_depth.depth = placement.depth_reached;
+        // Update AI statistics
+        ai_time.micros = result.time_elapsed.as_micros();
+        ai_depth.depth = result.depth_reached;
         update_ai_time.write(UpdateAITimeDisplay);
         update_ai_depth.write(UpdateAIDepthDisplay);
-
-        if let Some((x, y)) = placement.best_move {
+        
+        // Handle the result
+        if let Some((x, y)) = result.best_move {
             info!("AI chose move: ({}, {})", x, y);
             stone_placement.write(StonePlacement { x, y });
             *game_status = GameStatus::AwaitingUserInput;
         } else {
             // AI has no moves but game isn't terminal - this shouldn't happen
-            // But if it does, it means the game is likely a draw
             println!("AI has no valid moves available");
             game_event.write(GameEnded { winner: None });
             *game_status = GameStatus::GameOver;
         }
+        
+        // Remove the task resource now that it's complete
+        commands.remove_resource::<AIComputeTask>();
+        commands.remove_resource::<AIThinkingStartTime>();
     }
 }
 
@@ -729,6 +781,28 @@ pub fn update_ai_time_display(
         info!("Updating AI time display: {:.1}ms", time_ms);
         for mut text in query.iter_mut() {
 			text.0 = format!("{:.1}ms", time_ms);
+        }
+    }
+}
+
+/// Update AI time display in real-time while AI is thinking (runs every frame)
+pub fn update_ai_time_realtime(
+    mut query: Query<&mut Text, With<AITimeText>>,
+    start_time: Option<Res<AIThinkingStartTime>>,
+    game_status: Res<GameStatus>,
+) {
+    // Only update while AI is actively thinking
+    if *game_status != GameStatus::AIThinking {
+        return;
+    }
+    
+    // Only update if we have a start time
+    if let Some(start) = start_time {
+        let elapsed = start.0.elapsed();
+        let time_ms = elapsed.as_secs_f64() * 1000.0;
+        
+        for mut text in query.iter_mut() {
+            text.0 = format!("{:.1}ms", time_ms);
         }
     }
 }
@@ -769,6 +843,14 @@ pub struct AIDepthReached {
 pub struct AIThinkingFrames {
     pub frames_waited: u32,
 }
+
+/// Resource to hold the async AI computation task
+#[derive(Resource)]
+pub struct AIComputeTask(Task<SearchResult>);
+
+/// Resource to track when AI started thinking (for real-time timer)
+#[derive(Resource)]
+pub struct AIThinkingStartTime(Instant);
 
 #[derive(Event)]
 pub struct UpdateAIDepthDisplay;

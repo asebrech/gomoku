@@ -19,14 +19,25 @@
 
     #[derive(Component)]
     struct VideoBackground {
-        current_frame: usize,
         timer: Timer,
         total_frames: usize,
     }
 
+    /// Global resource to track the current frame across all screens
     #[derive(Resource)]
-    struct VideoFrames {
-        frames: Vec<Handle<Image>>,
+    pub struct GlobalVideoBackgroundState {
+        pub current_frame: usize,
+    }
+
+    impl Default for GlobalVideoBackgroundState {
+        fn default() -> Self {
+            Self { current_frame: 0 }
+        }
+    }
+
+    #[derive(Resource)]
+    pub struct VideoFrames {
+        pub frames: Vec<Handle<Image>>,
         all_loaded: bool,
     }
 
@@ -161,6 +172,7 @@
             .init_state::<MenuState>()
             .init_resource::<MenuInitialized>()
             .init_resource::<LoadingProgress>()
+            .init_resource::<GlobalVideoBackgroundState>()
             .add_systems(OnEnter(AppState::Menu), (init_dev_mode_resources, menu_setup).chain())
             .add_systems(OnEnter(MenuState::Splash), splash_screen_setup)
             .add_systems(OnEnter(MenuState::Main), (main_menu_setup, setup_audio_if_needed))
@@ -761,6 +773,7 @@ fn main_menu_setup(
     config: Res<GameConfig>, 
     asset_server: Res<AssetServer>, 
     video_frames: Option<Res<VideoFrames>>,
+    global_bg_state: Res<GlobalVideoBackgroundState>,
     preloaded_assets: Option<Res<PreloadedAssets>>,
 ) {
     let colors = &config.colors;
@@ -825,6 +838,8 @@ fn main_menu_setup(
         .with_children(|parent| {
             // Video background using frame sequence (skip in devMode)
             if !config.dev_mode && !video_frame_handles.is_empty() {
+                // Use current global frame to maintain continuity
+                let current_frame = global_bg_state.current_frame.min(video_frame_handles.len() - 1);
                 parent.spawn((
                     Node {
                         position_type: PositionType::Absolute,
@@ -834,9 +849,8 @@ fn main_menu_setup(
                         height: Val::Percent(100.0),
                         ..default()
                     },
-                    ImageNode::new(video_frame_handles[0].clone()),
+                    ImageNode::new(video_frame_handles[current_frame].clone()),
                     VideoBackground {
-                        current_frame: 0,
                         timer: Timer::from_seconds(1.0 / 15.0, TimerMode::Repeating), // 15 FPS
                         total_frames: 120,
                     },
@@ -1155,8 +1169,9 @@ fn settings_menu_setup(
     config: Res<GameConfig>,
     asset_server: Res<AssetServer>,
     video_frames: Option<Res<VideoFrames>>,
+    global_bg_state: Res<GlobalVideoBackgroundState>,
 ) {
-    settings_menu_setup_internal(&mut commands, &config, &asset_server, video_frames.as_deref());
+    settings_menu_setup_internal(&mut commands, &config, &asset_server, video_frames.as_deref(), &global_bg_state);
 }
 
 fn settings_menu_setup_internal(
@@ -1164,6 +1179,7 @@ fn settings_menu_setup_internal(
     config: &GameConfig,
     asset_server: &AssetServer,
     video_frames: Option<&VideoFrames>,
+    global_bg_state: &GlobalVideoBackgroundState,
 ) {
     let colors = &config.colors;
     
@@ -1199,6 +1215,8 @@ fn settings_menu_setup_internal(
         .with_children(|parent| {
             // Video background using frame sequence (skip in devMode)
             if !config.dev_mode && !video_frame_handles.is_empty() {
+                // Use current global frame to maintain continuity
+                let current_frame = global_bg_state.current_frame.min(video_frame_handles.len() - 1);
                 parent.spawn((
                     Node {
                         position_type: PositionType::Absolute,
@@ -1208,9 +1226,8 @@ fn settings_menu_setup_internal(
                         height: Val::Percent(100.0),
                         ..default()
                     },
-                    ImageNode::new(video_frame_handles[0].clone()),
+                    ImageNode::new(video_frame_handles[current_frame].clone()),
                     VideoBackground {
-                        current_frame: 0,
                         timer: Timer::from_seconds(1.0 / 15.0, TimerMode::Repeating),
                         total_frames: 120,
                     },
@@ -1380,6 +1397,7 @@ fn game_mode_select_setup(
     config: Res<GameConfig>,
     asset_server: Res<AssetServer>,
     video_frames: Option<Res<VideoFrames>>,
+    global_bg_state: Res<GlobalVideoBackgroundState>,
 ) {
     let colors = &config.colors;
     
@@ -1415,6 +1433,8 @@ fn game_mode_select_setup(
         .with_children(|parent| {
             // Video background using frame sequence (skip in devMode)
             if !config.dev_mode && !video_frame_handles.is_empty() {
+                // Use current global frame to maintain continuity
+                let current_frame = global_bg_state.current_frame.min(video_frame_handles.len() - 1);
                 parent.spawn((
                     Node {
                         position_type: PositionType::Absolute,
@@ -1424,9 +1444,8 @@ fn game_mode_select_setup(
                         height: Val::Percent(100.0),
                         ..default()
                     },
-                    ImageNode::new(video_frame_handles[0].clone()),
+                    ImageNode::new(video_frame_handles[current_frame].clone()),
                     VideoBackground {
-                        current_frame: 0,
                         timer: Timer::from_seconds(1.0 / 15.0, TimerMode::Repeating),
                         total_frames: 120,
                     },
@@ -1865,6 +1884,7 @@ fn create_menu_button_with_icon(
         time: Res<Time>,
         mut video_backgrounds: Query<(&mut VideoBackground, &mut ImageNode)>,
         video_frames: Option<Res<VideoFrames>>,
+        mut global_state: ResMut<GlobalVideoBackgroundState>,
         config: Res<GameConfig>,
     ) {
         // Skip animation in devMode
@@ -1878,10 +1898,11 @@ fn create_menu_button_with_icon(
                 video_bg.timer.tick(time.delta());
                 
                 if video_bg.timer.just_finished() {
-                    video_bg.current_frame = (video_bg.current_frame + 1) % video_bg.total_frames;
+                    // Update global frame counter
+                    global_state.current_frame = (global_state.current_frame + 1) % video_bg.total_frames;
                     
-                    if video_bg.current_frame < frames.frames.len() {
-                        image_node.image = frames.frames[video_bg.current_frame].clone();
+                    if global_state.current_frame < frames.frames.len() {
+                        image_node.image = frames.frames[global_state.current_frame].clone();
                     }
                 }
             }
@@ -2387,6 +2408,7 @@ fn create_menu_button_with_icon(
         config: Res<GameConfig>,
         asset_server: Res<AssetServer>,
         video_frames: Option<Res<VideoFrames>>,
+        global_bg_state: Res<GlobalVideoBackgroundState>,
         menu_state: Res<State<MenuState>>,
         settings_screen_query: Query<Entity, With<OnSettingsMenuScreen>>,
     ) {
@@ -2398,7 +2420,7 @@ fn create_menu_button_with_icon(
             }
             
             // Rebuild settings screen
-            settings_menu_setup_internal(&mut commands, &config, &asset_server, video_frames.as_deref());
+            settings_menu_setup_internal(&mut commands, &config, &asset_server, video_frames.as_deref(), &global_bg_state);
         }
     }
 
