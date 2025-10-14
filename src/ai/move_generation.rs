@@ -70,16 +70,11 @@ impl MoveGenerator {
         dy: isize,
         player: Player,
     ) -> Option<(usize, usize)> {
+        const PRIORITY_OFFSETS: &[isize] = &[-1, 1, -2, 2, -3, 3, -4, 4, -5, 5];
 
-        const MAX_SEARCH_DISTANCE: isize = 5;
-
-        for offset in -MAX_SEARCH_DISTANCE..=MAX_SEARCH_DISTANCE {
+        for &offset in PRIORITY_OFFSETS {
             let check_row = row as isize + dx * offset;
             let check_col = col as isize + dy * offset;
-
-            if offset == 0 {
-                continue;
-            }
 
             if PatternAnalyzer::is_valid_empty(board, check_row, check_col) {
                 let pos = (check_row as usize, check_col as usize);
@@ -159,7 +154,7 @@ impl MoveGenerator {
             .filter(|&(row, col)| !GameRules::creates_double_three(board, row, col, player))
             .collect();
 
-        if filtered_moves.len() > 30 {
+        if filtered_moves.len() > 25 {
             let mut prioritized_moves: Vec<((usize, usize), i32)> = filtered_moves
                 .into_iter()
                 .map(|mv| {
@@ -170,10 +165,19 @@ impl MoveGenerator {
 
             prioritized_moves.sort_by_key(|(_, priority)| -priority);
 
-            prioritized_moves.truncate(30);
+            prioritized_moves.truncate(25);
             prioritized_moves.into_iter().map(|(mv, _)| mv).collect()
         } else {
-            filtered_moves
+            let mut prioritized_moves: Vec<((usize, usize), i32)> = filtered_moves
+                .into_iter()
+                .map(|mv| {
+                    let priority = Self::calculate_threat_priority(board, mv, player);
+                    (mv, priority)
+                })
+                .collect();
+
+            prioritized_moves.sort_by_key(|(_, priority)| -priority);
+            prioritized_moves.into_iter().map(|(mv, _)| mv).collect()
         }
     }
 
@@ -272,10 +276,20 @@ impl MoveGenerator {
             }
         });
 
-        candidates
+        let mut filtered_moves: Vec<(usize, usize)> = candidates
             .into_iter()
             .filter(|&(row, col)| !GameRules::creates_double_three(board, row, col, player))
-            .collect()
+            .collect();
+
+        filtered_moves.sort_by_key(|&mv| {
+            -Self::calculate_threat_priority(board, mv, player)
+        });
+
+        let stone_count = board.count_stones();
+        let max_zone_moves = if stone_count < 10 { 20 } else { 15 };
+        
+        filtered_moves.truncate(max_zone_moves);
+        filtered_moves
     }
 
     #[inline]
