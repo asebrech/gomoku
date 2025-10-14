@@ -138,13 +138,13 @@
     ],
     "loading_messages": {
       "0-10": "Initializing...",
-      "41-60": "Using Minimax Algorithm...",
       "96-99": "Changing headers names...",
-      "61-80": "Importing neo-cat...",
       "26-40": "Cloning heuristic...",
-      "81-95": "Renaming variables...",
+      "100": "Complete!",
       "11-25": "Loading songs...",
-      "100": "Complete!"
+      "41-60": "Using Minimax Algorithm...",
+      "61-80": "Importing neo-cat...",
+      "81-95": "Renaming variables..."
     },
     "font_sizes": {
       "title": 32.0,
@@ -163,8 +163,8 @@
   },
   "settings": {
     "audio": {
-      "volume": 0.0,
-      "muted": true
+      "volume": 0.1,
+      "muted": false
     },
     "display": {
       "fullscreen": false,
