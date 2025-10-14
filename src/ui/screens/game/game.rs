@@ -40,7 +40,7 @@ struct GameVideoBackground {
 #[derive(Component, Clone)]
 pub struct OnGameScreen;
 #[derive(Component)]
-pub struct Stone(Player);
+pub struct Stone(#[allow(dead_code)] Player);
 #[derive(Component)]
 pub struct AvailableArea;
 #[derive(Event)]
@@ -486,7 +486,7 @@ pub fn place_stone(
         info!("Stone placed at x: {}, y: {}", ev.x, ev.y);
         
         // Play stone placement sound (randomized)
-        stone_sound.send(PlayStonePlacementSound);
+        stone_sound.write(PlayStonePlacementSound);
         
         // Get the player BEFORE making the move (they're the one placing the stone)
         let player = game_state.current_player;
@@ -612,14 +612,14 @@ pub fn process_next_round(
                         // In vs AI mode, check if human won or lost
                         if player == Player::Max {
                             // Human won (Player::Max)
-                            win_sound.send(PlayWinSound);
+                            win_sound.write(PlayWinSound);
                         } else {
                             // AI won (Player::Min)
-                            lose_sound.send(PlayLoseSound);
+                            lose_sound.write(PlayLoseSound);
                         }
                     } else {
                         // In multiplayer mode, always play win sound
-                        win_sound.send(PlayWinSound);
+                        win_sound.write(PlayWinSound);
                     }
                 }
                 None => {

@@ -79,7 +79,7 @@ impl GomokuApp {
 		// Get a random window title
 		use rand::Rng;
 		let window_title = if !config.ui.window_titles.is_empty() {
-			let idx = rand::rng().gen_range(0..config.ui.window_titles.len());
+			let idx = rand::rng().random_range(0..config.ui.window_titles.len());
 			config.ui.window_titles[idx].clone()
 		} else {
 			"Gomoku".to_string()

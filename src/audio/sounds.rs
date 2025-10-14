@@ -75,8 +75,8 @@ fn handle_stone_placement_sounds(
 ) {
     for _event in events.read() {
         // Randomly choose between stone_one and stone_two
-        let mut rng = rand::thread_rng();
-        let sound = if rng.gen_bool(0.5) {
+        let mut rng = rand::rng();
+        let sound = if rng.random_bool(0.5) {
             audio.stone_one.clone()
         } else {
             audio.stone_two.clone()

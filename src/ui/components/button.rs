@@ -262,7 +262,7 @@ pub fn spawn_toggle_button<T: Component>(
     marker: T,
     colors: &ColorConfig,
 ) {
-    let (width, height) = ButtonSize::Full.to_size();
+    let (width, _height) = ButtonSize::Full.to_size();
     let bg_color = if enabled {
         colors.accent.clone()
     } else {

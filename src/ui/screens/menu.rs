@@ -38,12 +38,14 @@
     #[derive(Resource)]
     pub struct VideoFrames {
         pub frames: Vec<Handle<Image>>,
+        #[allow(dead_code)]
         all_loaded: bool,
     }
 
     #[derive(Resource)]
     pub struct GameBackgroundFrames {
         pub frames: Vec<Handle<Image>>,
+        #[allow(dead_code)]
         all_loaded: bool,
     }
 
@@ -144,6 +146,7 @@
         PairCapturesInc,
         PairCapturesDec,
         Fullscreen,
+        #[allow(dead_code)]
         VolumeControl,
         AudioMute,
         ThemePrev,
@@ -273,12 +276,14 @@
 
     #[derive(Component)]
     enum MenuButtonAction {
+        #[allow(dead_code)]
 		Load,
         Play,
         PlayVsAI,
         Play1v1,
         HowToPlay,
         Settings,
+        #[allow(dead_code)]
         SettingsSound,
         BackToMainMenu,
         Quit,
@@ -293,7 +298,7 @@
     ) {
         let colors = &config.colors;
         
-        for (interaction, mut background_color, mut border_color, selected, setting_control, setting_display) in &mut interaction_query {
+        for (interaction, mut background_color, mut border_color, selected, setting_control, _setting_display) in &mut interaction_query {
             // Handle settings controls with special hover behavior
             if let Some(setting_control) = setting_control {
                 match *interaction {
@@ -1615,9 +1620,11 @@ enum SettingType {
     VolumeSlider,
     AudioMute,
     BoardSize,
+    #[allow(dead_code)]
     WinCondition,
     AIMaxDepth,
     AITimeLimit,
+    #[allow(dead_code)]
     PairCaptures,
     Fullscreen,
     Theme,
@@ -1950,6 +1957,7 @@ fn create_menu_button_with_icon(
         }
     }
 
+    #[allow(dead_code)]
     fn setup_audio(
         mut commands: Commands,
         asset_server: Res<AssetServer>,

@@ -41,75 +41,75 @@
   },
   "colors": {
     "primary": {
-      "r": 1.0,
-      "g": 0.0,
-      "b": 1.0,
+      "r": 0.9,
+      "g": 0.9,
+      "b": 0.9,
       "a": 1.0
     },
     "secondary": {
-      "r": 0.0,
-      "g": 1.0,
-      "b": 1.0,
+      "r": 0.8,
+      "g": 0.8,
+      "b": 0.8,
       "a": 1.0
     },
     "accent": {
       "r": 1.0,
-      "g": 0.2,
-      "b": 0.8,
+      "g": 1.0,
+      "b": 1.0,
       "a": 1.0
     },
     "background": {
-      "r": 0.05,
+      "r": 0.0,
       "g": 0.0,
-      "b": 0.15,
+      "b": 0.0,
       "a": 1.0
     },
     "surface": {
       "r": 0.1,
-      "g": 0.0,
-      "b": 0.2,
+      "g": 0.1,
+      "b": 0.1,
       "a": 1.0
     },
     "text_primary": {
-      "r": 0.0,
+      "r": 1.0,
       "g": 1.0,
       "b": 1.0,
       "a": 1.0
     },
     "text_secondary": {
-      "r": 1.0,
-      "g": 0.0,
-      "b": 1.0,
+      "r": 0.8,
+      "g": 0.8,
+      "b": 0.8,
       "a": 1.0
     },
     "button_normal": {
       "r": 0.2,
-      "g": 0.0,
-      "b": 0.4,
+      "g": 0.2,
+      "b": 0.2,
       "a": 1.0
     },
     "button_hovered": {
       "r": 0.4,
-      "g": 0.0,
-      "b": 0.6,
+      "g": 0.4,
+      "b": 0.4,
       "a": 1.0
     },
     "button_pressed": {
-      "r": 1.0,
-      "g": 0.2,
-      "b": 0.8,
+      "r": 0.6,
+      "g": 0.6,
+      "b": 0.6,
       "a": 1.0
     },
     "stone_player1": {
       "r": 1.0,
-      "g": 0.4,
-      "b": 0.7,
+      "g": 1.0,
+      "b": 1.0,
       "a": 1.0
     },
     "stone_player2": {
       "r": 0.2,
-      "g": 0.6,
-      "b": 1.0,
+      "g": 0.2,
+      "b": 0.2,
       "a": 1.0
     }
   },
@@ -138,13 +138,13 @@
     ],
     "loading_messages": {
       "0-10": "Initializing...",
-      "96-99": "Changing headers names...",
-      "26-40": "Cloning heuristic...",
-      "100": "Complete!",
-      "11-25": "Loading songs...",
       "41-60": "Using Minimax Algorithm...",
+      "81-95": "Renaming variables...",
       "61-80": "Importing neo-cat...",
-      "81-95": "Renaming variables..."
+      "96-99": "Changing headers names...",
+      "11-25": "Loading songs...",
+      "100": "Complete!",
+      "26-40": "Cloning heuristic..."
     },
     "font_sizes": {
       "title": 32.0,
@@ -157,7 +157,7 @@
   "game": {
     "board_size": 19,
     "win_condition": 5,
-    "ai_max_depth": 9,
+    "ai_max_depth": 21,
     "ai_time_limit": 500,
     "pair_captures_to_win": 20
   },
@@ -167,7 +167,7 @@
       "muted": false
     },
     "display": {
-      "fullscreen": false,
+      "fullscreen": true,
       "vsync": false
     },
     "gameplay": {
@@ -176,7 +176,7 @@
       "auto_save": true
     },
     "theme": {
-      "current_theme": "Synthwave"
+      "current_theme": "Black & White"
     }
   }
 }

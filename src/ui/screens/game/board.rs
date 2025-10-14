@@ -15,33 +15,6 @@ impl BoardUtils {
     pub const STONE_SIZE: f32 = 26.0; // Slightly smaller circular stones
     pub const PREVIEW_SIZE: f32 = 8.0; // Reduced from 16.0 to 8.0 - much smaller available spots
     
-    /// Calculate the spacing between major grid lines based on board size
-    /// This ensures the board looks balanced regardless of size
-    fn calculate_major_line_spacing(board_size: usize) -> usize {
-        match board_size {
-            5..=7 => 2,    // Small boards: major lines every 2
-            8..=10 => 3,   // Medium-small: major lines every 3
-            11..=14 => 4,  // Medium: major lines every 4
-            15..=17 => 5,  // Medium-large: major lines every 5
-            18..=20 => 6,  // Large: major lines every 6
-            _ => {
-                // For unexpected sizes, use a smart algorithm
-                if board_size <= 4 {
-                    1  // Very small boards: every line is major
-                } else if board_size % 5 == 0 {
-                    5
-                } else if board_size % 4 == 0 {
-                    4
-                } else if board_size % 3 == 0 {
-                    3
-                } else {
-                    // Default to roughly dividing into thirds
-                    (board_size + 2) / 3
-                }
-            }
-        }
-    }
-
     fn calculate_major_line_positions(board_size: usize) -> Vec<usize> {
         match board_size {
             5 => vec![0, 2, 4],
