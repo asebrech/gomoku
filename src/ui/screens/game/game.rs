@@ -637,13 +637,9 @@ pub fn process_next_round(
             // Update display to show it's the player's turn
             for mut text in player_text_query.iter_mut() {
                 if settings.versus_ai {
-                    text.0 = "Your Turn (Pink)".to_string();
+                    text.0 = "Your Turn".to_string();
                 } else {
-                    text.0 = if game_state.current_player == Player::Max {
-                        "Player 1's Turn (Pink)".to_string()
-                    } else {
-                        "Player 2's Turn (Blue)".to_string()
-                    };
+                    text.0 = "Turn".to_string();
                 }
             }
         } else if settings.versus_ai {
