@@ -104,10 +104,6 @@ pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &
 
                 spawn_setting_row(builder, config, "Board Size", &format!("{}x{}", game_settings.board_size, game_settings.board_size));
 
-                spawn_setting_row(builder, config, "Chain to Win", &game_settings.minimum_chain_to_win.to_string());
-
-                spawn_setting_row(builder, config, "Captures to Win", &game_settings.total_capture_to_win.to_string());
-
                 let game_mode = if game_settings.versus_ai { "vs AI" } else { "Multiplayer" };
                 spawn_setting_row(builder, config, "Game Mode", game_mode);
 
@@ -126,7 +122,7 @@ pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &
 
                 // Time Limit
                 let time_limit = match game_settings.time_limit {
-                    Some(seconds) => format!("{}s", seconds),
+                    Some(ms) => format!("{}ms", ms),
                     None => "Unlimited".to_string(),
                 };
                 spawn_setting_row(builder, config, "Time Limit", &time_limit);
