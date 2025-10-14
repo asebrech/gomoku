@@ -43,7 +43,8 @@ pub struct GameState {
 }
 
 impl GameState {
-    pub fn new(board_size: usize, win_condition: usize, capture_to_win: usize) -> Self {
+    /// Creates a new GameState with all parameters
+    pub fn new(board_size: usize, win_condition: usize) -> Self {
         let zobrist_hash = ZobristHash::new(board_size);
         let board = Board::new(board_size);
         let current_player = Player::Max;
@@ -51,7 +52,7 @@ impl GameState {
             board,
             current_player,
             win_condition,
-            capture_to_win,
+            capture_to_win: 5,
             winner: None,
             win_reason: None,
             max_captures: 0,
@@ -64,6 +65,11 @@ impl GameState {
         };
         state.current_hash = zobrist_hash.compute_hash(&state);
         state
+    }
+
+    /// Creates a new GameState with default capture_to_win (5 pairs)
+    pub fn with_defaults(board_size: usize, win_condition: usize) -> Self {
+        Self::new(board_size, win_condition)
     }
 
     pub fn get_candidate_moves(&self) -> Vec<(usize, usize)> {

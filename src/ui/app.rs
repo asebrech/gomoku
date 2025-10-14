@@ -163,7 +163,7 @@ impl GomokuApp {
 		config.sync_colors_from_theme(&theme_manager.current_theme.colors);
 		
 		self.app
-		.insert_resource(GameState::new(settings.board_size, settings.minimum_chain_to_win, settings.total_capture_to_win))
+		.insert_resource(GameState::new(settings.board_size, settings.minimum_chain_to_win))
         .insert_resource(settings)
         .insert_resource(config)
         .insert_resource(theme_manager)

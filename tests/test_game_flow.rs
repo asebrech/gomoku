@@ -5,7 +5,7 @@ use gomoku::ai::lazy_smp::lazy_smp_search;
 
 #[test]
 fn test_full_game_flow_simple() {
-    let mut state = GameState::new(19, 5, 5);
+    let mut state = GameState::new(19, 5);
 
     // Play a simple game sequence
     let moves = vec![
@@ -39,7 +39,7 @@ fn test_full_game_flow_simple() {
 
 #[test]
 fn test_full_game_with_captures() {
-    let mut state = GameState::new(19, 5, 5);
+    let mut state = GameState::new(19, 5);
 
     // Create a capture scenario step by step
     // Move 1-2: Set up initial positions
@@ -82,7 +82,7 @@ fn test_full_game_with_captures() {
 
 #[test]
 fn test_ai_vs_ai_game() {
-    let mut state = GameState::new(13, 5, 5); // Smaller board for faster test
+    let mut state = GameState::new(13, 5); // Smaller board for faster test
     let max_moves = 50;
     let mut move_count = 0;
     
@@ -109,7 +109,7 @@ fn test_ai_vs_ai_game() {
 
 #[test]
 fn test_game_ending_conditions() {
-    let mut state = GameState::new(19, 5, 5);
+    let mut state = GameState::new(19, 5);
 
     for i in 0..4 {
         state.board.place_stone(9, 5 + i, Player::Max);
@@ -124,7 +124,7 @@ fn test_game_ending_conditions() {
 
 #[test]
 fn test_capture_win_condition() {
-    let mut state = GameState::new(19, 5, 5);
+    let mut state = GameState::new(19, 5);
 
     // Set up capture win
     state.max_captures = 5;
@@ -138,7 +138,7 @@ fn test_capture_win_condition() {
 
 #[test]
 fn test_undo_redo_sequence() {
-    let mut state = GameState::new(19, 5, 5);
+    let mut state = GameState::new(19, 5);
 
     // Make some moves
     let moves = vec![(9, 9), (9, 10), (9, 8), (10, 9)];
@@ -162,7 +162,7 @@ fn test_undo_redo_sequence() {
 
 #[test]
 fn test_complex_capture_scenario() {
-    let mut state = GameState::new(19, 5, 5);
+    let mut state = GameState::new(19, 5);
 
     // Set up complex capture scenario using proper move mechanics
     state.make_move((9, 9)); // Max
@@ -186,7 +186,7 @@ fn test_complex_capture_scenario() {
 
 #[test]
 fn test_game_state_consistency() {
-    let mut state = GameState::new(19, 5, 5);
+    let mut state = GameState::new(19, 5);
 
     // Make random moves and verify consistency
     let moves = vec![
@@ -222,7 +222,7 @@ fn test_game_state_consistency() {
 
 #[test]
 fn test_ai_decision_quality() {
-    let mut state = GameState::new(19, 5, 5);
+    let mut state = GameState::new(19, 5);
 
     // Create a position where AI should block
     state.board.place_stone(9, 9, Player::Min);
@@ -270,7 +270,7 @@ fn test_ai_decision_quality() {
 
 #[test]
 fn test_performance_constraints() {
-    let mut state = GameState::new(19, 5, 5);
+    let mut state = GameState::new(19, 5);
 
     // Create a position with many moves
     state.board.place_stone(9, 9, Player::Max);
@@ -292,7 +292,7 @@ fn test_performance_constraints() {
 
 #[test]
 fn test_edge_case_board_full() {
-    let mut state = GameState::new(5, 5, 5);
+    let mut state = GameState::new(5, 5);
 
     // Fill most positions
     for i in 0..5 {
@@ -315,7 +315,7 @@ fn test_edge_case_board_full() {
 
 #[test]
 fn test_simultaneous_threats() {
-    let mut state = GameState::new(19, 5, 5);
+    let mut state = GameState::new(19, 5);
 
     // Create multiple threats that Min should try to block
     state.board.place_stone(9, 9, Player::Max);

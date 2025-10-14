@@ -206,7 +206,7 @@ fn update_game_settings_from_config(
     };
     
     // Create a new GameState with updated settings
-    *game_state = GameState::new(game_settings.board_size, game_settings.minimum_chain_to_win, game_settings.total_capture_to_win);
+    *game_state = GameState::new(game_settings.board_size, game_settings.minimum_chain_to_win);
     
     // RESET ALL GAME RESOURCES TO INITIAL STATE
     *game_status = GameStatus::AwaitingUserInput;
@@ -1093,8 +1093,7 @@ fn reset_board(
     // Reset the game state
     *game_state = GameState::new(
         game_settings.board_size,
-        game_settings.minimum_chain_to_win,
-        game_settings.total_capture_to_win,
+        game_settings.minimum_chain_to_win
     );
     
     // Reset game status
