@@ -713,15 +713,13 @@ fn start_ai_computation(
     let game_state_clone = game_state.clone();
     let ai_depth = settings.ai_depth;
     let time_limit_ms = settings.time_limit.unwrap_or(500); // Default 500ms if not set
-    // Reduce actual time given to AI by 25ms to ensure it stays within limit
-    let actual_time_ms = time_limit_ms.saturating_sub(25);
     
     // Spawn the AI computation on the async compute thread pool
     let thread_pool = AsyncComputeTaskPool::get();
     let task = thread_pool.spawn(async move {
         let mut state = game_state_clone;
-        info!("AI using Lazy SMP search with {}ms time limit (actual: {}ms) and max depth {}", time_limit_ms, actual_time_ms, ai_depth);
-        lazy_smp_search(&mut state, actual_time_ms as u64, ai_depth, None)
+        info!("AI using Lazy SMP search with {}ms time limit and max depth {}", time_limit_ms, ai_depth);
+        lazy_smp_search(&mut state, time_limit_ms as u64, ai_depth, None)
     });
     
     // Store the task as a resource
