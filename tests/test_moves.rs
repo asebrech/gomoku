@@ -30,12 +30,12 @@ fn test_adjacent_moves_only() {
 
     let moves = MoveGenerator::get_candidate_moves(&board, Player::Min);
 
-    // Should include moves within zone (radius 2 in early game, < 10 stones)
+    // Should include moves within zone (radius 3 in early game, < 10 stones)
     assert!(moves.len() > 0);
     for &(row, col) in &moves {
-        // Check that move is within zone radius of 2 from (9,9)
+        // Check that move is within zone radius of 3 from (9,9)
         let distance = ((row as isize - 9).abs().max((col as isize - 9).abs())) as usize;
-        assert!(distance <= 2, "Move ({}, {}) is too far from (9, 9)", row, col);
+        assert!(distance <= 3, "Move ({}, {}) is too far from (9, 9)", row, col);
         assert!(board.is_empty_position(row, col));
     }
 

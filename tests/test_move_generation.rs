@@ -144,11 +144,11 @@ fn test_zone_based_moves_early_game() {
     assert!(!moves.is_empty());
     
     // All moves should be nearby (within zone radius)
-    // Early game uses radius 2, which means Manhattan distance up to 2
+    // Early game uses radius 3, which means Manhattan distance up to 3
     for &(row, col) in &moves {
         let dr = (row as isize - 9).abs();
         let dc = (col as isize - 9).abs();
         // Check that it's within the square radius (not Manhattan)
-        assert!(dr <= 2 && dc <= 2, "Move ({}, {}) is too far from center (dr={}, dc={})", row, col, dr, dc);
+        assert!(dr <= 3 && dc <= 3, "Move ({}, {}) is too far from center (dr={}, dc={})", row, col, dr, dc);
     }
 }
