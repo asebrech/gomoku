@@ -23,8 +23,8 @@
 //! heuristic fast and easy to test.
 
 use crate::core::board::{Board, Player};
+use crate::core::patterns::{DIRECTIONS, PatternAnalyzer, PatternFreedom};
 use crate::core::state::GameState;
-use crate::core::patterns::{PatternAnalyzer, PatternFreedom, DIRECTIONS};
 
 pub struct Heuristic;
 
@@ -40,7 +40,7 @@ const HALF_FREE_THREE_SCORE: i32 = 200;
 const DEAD_THREE_SCORE: i32 = 100;
 const LIVE_TWO_SCORE: i32 = 50;
 const HALF_FREE_TWO_SCORE: i32 = 20;
-const CAPTURE_BONUS_MULTIPLIER: i32 = 1_000;
+const CAPTURE_BONUS_MULTIPLIER: i32 = 5_000;
 
 #[derive(Debug, Clone, Copy)]
 struct PatternCounts {
@@ -129,8 +129,12 @@ impl Heuristic {
     }
 
     fn calculate_historical_bonus(state: &GameState) -> i32 {
-        let max_bonus = state.pattern_analyzer.calculate_historical_bonus(Player::Max);
-        let min_bonus = state.pattern_analyzer.calculate_historical_bonus(Player::Min);
+        let max_bonus = state
+            .pattern_analyzer
+            .calculate_historical_bonus(Player::Max);
+        let min_bonus = state
+            .pattern_analyzer
+            .calculate_historical_bonus(Player::Min);
         max_bonus - min_bonus
     }
 
@@ -145,13 +149,13 @@ impl Heuristic {
                 if !Board::is_bit_set(&board.occupied, idx) {
                     continue;
                 }
-                
+
                 let player = if Board::is_bit_set(&board.max_bits, idx) {
                     Player::Max
                 } else {
                     Player::Min
                 };
-                
+
                 for (dir_idx, &(dx, dy)) in DIRECTIONS.iter().enumerate() {
                     let bit_mask = 1u8 << dir_idx;
 
@@ -168,12 +172,8 @@ impl Heuristic {
                             bit_mask,
                         ) {
                             match player {
-                                Player::Max => {
-                                    Self::update_counts(&mut max_counts, pattern_info)
-                                }
-                                Player::Min => {
-                                    Self::update_counts(&mut min_counts, pattern_info)
-                                }
+                                Player::Max => Self::update_counts(&mut max_counts, pattern_info),
+                                Player::Min => Self::update_counts(&mut min_counts, pattern_info),
                             }
                         }
                     }
@@ -202,8 +202,14 @@ impl Heuristic {
             return None;
         }
 
-        let consecutive_after_start =
-            PatternAnalyzer::count_consecutive(board, pattern_start_row, pattern_start_col, dx, dy, player);
+        let consecutive_after_start = PatternAnalyzer::count_consecutive(
+            board,
+            pattern_start_row,
+            pattern_start_col,
+            dx,
+            dy,
+            player,
+        );
 
         let length = consecutive_after_start + 1;
 
@@ -212,8 +218,15 @@ impl Heuristic {
         }
 
         let length = length.min(win_condition);
-        
-        let total_available_space = Self::count_total_space(
+
+        let total_available_space =
+            Self::count_total_space(board, pattern_start_row, pattern_start_col, dx, dy, length);
+
+        if total_available_space < win_condition {
+            return None;
+        }
+
+        let freedom = Self::analyze_pattern_freedom(
             board,
             pattern_start_row,
             pattern_start_col,
@@ -221,13 +234,6 @@ impl Heuristic {
             dy,
             length,
         );
-        
-        if total_available_space < win_condition {
-            return None;
-        }
-        
-        let freedom =
-            Self::analyze_pattern_freedom(board, pattern_start_row, pattern_start_col, dx, dy, length);
 
         Self::mark_pattern_analyzed(
             pattern_start_row,
@@ -269,13 +275,19 @@ impl Heuristic {
         pattern_length: usize,
     ) -> usize {
         let mut space = pattern_length;
-        
-        space += Self::count_empty_in_direction(board, start_row as isize - dx, start_col as isize - dy, -dx, -dy);
-        
+
+        space += Self::count_empty_in_direction(
+            board,
+            start_row as isize - dx,
+            start_col as isize - dy,
+            -dx,
+            -dy,
+        );
+
         let end_row = start_row as isize + (pattern_length - 1) as isize * dx;
         let end_col = start_col as isize + (pattern_length - 1) as isize * dy;
         space += Self::count_empty_in_direction(board, end_row + dx, end_col + dy, dx, dy);
-        
+
         space
     }
 
@@ -289,7 +301,7 @@ impl Heuristic {
         let mut count = 0;
         let mut current_row = start_row;
         let mut current_col = start_col;
-        
+
         while PatternAnalyzer::is_in_bounds(board, current_row, current_col) {
             let idx = board.index(current_row as usize, current_col as usize);
             if !Board::is_bit_set(&board.occupied, idx) {
@@ -300,7 +312,7 @@ impl Heuristic {
                 break;
             }
         }
-        
+
         count
     }
 
@@ -320,7 +332,7 @@ impl Heuristic {
             2 => match pattern.freedom {
                 PatternFreedom::Free => counts.live_two += 1,
                 PatternFreedom::HalfFree => counts.half_free_two += 1,
-                PatternFreedom::Flanked => {},
+                PatternFreedom::Flanked => {}
             },
             _ => {}
         }
@@ -365,13 +377,13 @@ impl Heuristic {
         } else {
             0
         };
-        
+
         let min_bonus = if state.min_captures > 0 {
             (CAPTURE_BONUS_MULTIPLIER as f32 * (state.min_captures as f32).sqrt()) as i32
         } else {
             0
         };
-        
+
         max_bonus - min_bonus
     }
 
@@ -384,7 +396,7 @@ impl Heuristic {
         player: Player,
     ) -> (usize, usize) {
         let player_bits = board.get_player_bits(player);
-        
+
         let mut current_row = row as isize;
         let mut current_col = col as isize;
 
