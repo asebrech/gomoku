@@ -14,11 +14,7 @@ use crate::{
 #[derive(Component)]
 struct OnTutorialScreen;
 
-#[derive(Component)]
-struct TutorialVideoBackground {
-    timer: Timer,
-    total_frames: usize,
-}
+
 
 #[derive(States, Debug, Clone, Copy, Eq, PartialEq, Hash, Default)]
 pub enum TutorialState {
@@ -30,7 +26,7 @@ pub enum TutorialState {
 pub fn tutorial_plugin(app: &mut App) {
     app
         .init_state::<TutorialState>()
-        .add_systems(OnEnter(AppState::HowToPlay), (reset_tutorial_state, setup_tutorial_background, setup_tutorial).chain())
+        .add_systems(OnEnter(AppState::HowToPlay), (reset_tutorial_state, setup_tutorial).chain())
         .add_systems(
             Update,
             (
@@ -38,7 +34,6 @@ pub fn tutorial_plugin(app: &mut App) {
                 handle_tutorial_navigation,
                 update_tutorial_content,
                 handle_escape_key,
-                animate_tutorial_background,
             ).run_if(in_state(AppState::HowToPlay)),
         )
         .add_systems(OnExit(AppState::HowToPlay), despawn_screen::<OnTutorialScreen>);
@@ -488,91 +483,4 @@ fn create_capture_pattern() -> Vec<(usize, usize, StoneType)> {
     ]
 }
 
-fn setup_tutorial_background(
-    mut commands: Commands,
-    config: Res<GameConfig>,
-    video_frames: Option<Res<crate::ui::screens::menu::VideoFrames>>,
-    global_bg_state: Res<crate::ui::screens::menu::GlobalVideoBackgroundState>,
-) {
-    println!("[TUTORIAL BACKGROUND] Setting up tutorial background...");
-    
-    // Skip in devMode
-    if config.dev_mode {
-        println!("[TUTORIAL BACKGROUND] Skipping in devMode");
-        return;
-    }
 
-    // Get frames from the dolphin menu background resource
-    let Some(bg_frames) = video_frames else {
-        println!("[TUTORIAL BACKGROUND] ERROR: No background frames resource found!");
-        return;
-    };
-
-    println!("[TUTORIAL BACKGROUND] Found {} frames", bg_frames.frames.len());
-
-    if bg_frames.frames.is_empty() {
-        println!("[TUTORIAL BACKGROUND] ERROR: Frames vector is empty!");
-        return;
-    }
-
-    // Use 15 FPS like the menu background
-    let fps = 15.0;
-    let frame_duration = 1.0 / fps;
-
-    println!("[TUTORIAL BACKGROUND] Spawning background with {} frames at {} fps", bg_frames.frames.len(), fps);
-
-    // Use current global frame to maintain continuity with menu
-    let current_frame = global_bg_state.current_frame.min(bg_frames.frames.len() - 1);
-
-    // Spawn background as a full-screen image behind everything
-    commands.spawn((
-        Node {
-            position_type: PositionType::Absolute,
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
-            top: Val::Px(0.0),
-            left: Val::Px(0.0),
-            ..default()
-        },
-        ZIndex(-1000), // Behind everything
-        ImageNode {
-            image: bg_frames.frames[current_frame].clone(),
-            ..default()
-        },
-        TutorialVideoBackground {
-            timer: Timer::from_seconds(frame_duration, TimerMode::Repeating),
-            total_frames: bg_frames.frames.len(),
-        },
-        OnTutorialScreen,
-    ));
-    
-    println!("[TUTORIAL BACKGROUND] Background entity spawned successfully!");
-}
-
-fn animate_tutorial_background(
-    time: Res<Time>,
-    mut video_backgrounds: Query<(&mut TutorialVideoBackground, &mut ImageNode)>,
-    video_frames: Option<Res<crate::ui::screens::menu::VideoFrames>>,
-    mut global_state: ResMut<crate::ui::screens::menu::GlobalVideoBackgroundState>,
-    config: Res<GameConfig>,
-) {
-    // Skip animation in devMode
-    if config.dev_mode {
-        return;
-    }
-
-    if let Some(frames) = video_frames {
-        for (mut video_bg, mut image_node) in video_backgrounds.iter_mut() {
-            video_bg.timer.tick(time.delta());
-
-            if video_bg.timer.just_finished() {
-                // Update global frame counter to stay in sync with menu
-                global_state.current_frame = (global_state.current_frame + 1) % video_bg.total_frames;
-
-                if global_state.current_frame < frames.frames.len() {
-                    image_node.image = frames.frames[global_state.current_frame].clone();
-                }
-            }
-        }
-    }
-}

@@ -6,6 +6,14 @@
         prelude::*,
         window::{WindowMode, MonitorSelection},
     };
+    use bevy_gstreamer::camera::BackgroundImageMarker;
+    use std::sync::{Arc, Mutex};
+    use gstreamer::prelude::*;
+    use gstreamer::{Element, State as GstState};
+    use gstreamer_app::{AppSink, AppSinkCallbacks};
+    use gstreamer_video;
+    use image::ImageBuffer;
+    use image::Rgb;
 
     use crate::{
         audio::PlayClickSound,
@@ -21,6 +29,49 @@
     struct VideoBackground {
         timer: Timer,
         total_frames: usize,
+    }
+
+    #[derive(Component)]
+    struct GStreamerVideoBackground {
+        pub video_path: String,
+    }
+
+    #[derive(Component)]
+    struct VideoFilePlayer {
+        pipeline: Option<Element>,
+        app_sink: Option<AppSink>,
+        image_handle: Option<Handle<Image>>,
+        initialized: bool,
+        frame_timer: f32,
+        frame_buffer: std::collections::VecDeque<Vec<u8>>,
+        video_width: u32,
+        video_height: u32,
+    }
+
+    impl Default for VideoFilePlayer {
+        fn default() -> Self {
+            Self {
+                pipeline: None,
+                app_sink: None,
+                image_handle: None,
+                initialized: false,
+                frame_timer: 0.0,
+                frame_buffer: std::collections::VecDeque::with_capacity(3),
+                video_width: 0,
+                video_height: 0,
+            }
+        }
+    }
+
+    impl Drop for VideoFilePlayer {
+        fn drop(&mut self) {
+            if let Some(ref pipeline) = self.pipeline {
+                println!("VideoFilePlayer being dropped - stopping pipeline");
+                if let Err(e) = pipeline.set_state(gstreamer::State::Null) {
+                    eprintln!("Failed to stop pipeline in Drop: {}", e);
+                }
+            }
+        }
     }
 
     /// Global resource to track the current frame across all screens
@@ -53,6 +104,9 @@
     struct PreloadedAssets {
         logo: Handle<Image>,
     }
+
+    #[derive(Component)]
+    pub struct PersistentVideoBackground;
 
     #[derive(Resource)]
     struct TrackedAssets {
@@ -176,7 +230,8 @@
             .init_resource::<MenuInitialized>()
             .init_resource::<LoadingProgress>()
             .init_resource::<GlobalVideoBackgroundState>()
-            .add_systems(OnEnter(AppState::Menu), (init_dev_mode_resources, menu_setup).chain())
+            .add_systems(OnEnter(AppState::Menu), (init_dev_mode_resources, menu_setup, setup_persistent_video_background).chain())
+            .add_systems(OnEnter(AppState::HowToPlay), setup_persistent_video_background)
             .add_systems(OnEnter(MenuState::Splash), splash_screen_setup)
             .add_systems(OnEnter(MenuState::Main), (main_menu_setup, setup_audio_if_needed))
             .add_systems(OnEnter(MenuState::Settings), (settings_menu_setup, force_settings_display_update))
@@ -203,6 +258,9 @@
                 OnExit(MenuState::GameModeSelect),
                 despawn_screen::<OnGameModeSelectScreen>,
             )
+            .add_systems(OnEnter(AppState::GameOptions), cleanup_persistent_video_background)
+            .add_systems(OnEnter(AppState::Credit), cleanup_persistent_video_background)
+            .add_systems(OnEnter(AppState::Splash), cleanup_persistent_video_background)
             .add_systems(
                 Update,
                 (
@@ -216,10 +274,27 @@
                 (
                     menu_action, 
                     button_system, 
-                    animate_video_background, 
+                    animate_video_background,
                     handle_volume_control, 
                     update_volume_display,
                     handle_settings_controls,
+                ).run_if(in_state(AppState::Menu).and(not(in_state(MenuState::Splash)))),
+            )
+            .add_systems(
+                Update,
+                (
+                    initialize_video_players,
+                    update_video_players,
+                    handle_video_looping,
+                ).run_if(in_state(AppState::Menu).or(in_state(AppState::HowToPlay))),
+            )
+            .add_systems(
+                Update,
+                hide_persistent_video_in_game.run_if(in_state(AppState::Game)),
+            )
+            .add_systems(
+                Update,
+                (
                     update_settings_display,
                     update_theme_elements,
                     rebuild_settings_on_config_change,
@@ -587,25 +662,11 @@
         let background_music: Handle<AudioSource> = asset_server.load(&config.assets.sounds.menu_theme);
         tracked_assets.add_audio(background_music);
         
-        // Load all video frames (these can load in background)
-        let mut video_frames = Vec::new();
-        let animation_config = &config.assets.animations.main_menu_frames;
-        for i in 1..=animation_config.frame_count {
-            let frame_path = config.get_animation_frame_path(i);
-            let frame_handle = asset_server.load(frame_path);
-            tracked_assets.add_image(frame_handle.clone());
-            video_frames.push(frame_handle);
-        }
+        // Skip loading video frames since we're using GStreamer for video playback
+        let video_frames = Vec::new();
         
-        // Load game background animation frames
-        let mut game_bg_frames = Vec::new();
-        let game_bg_config = &config.assets.animations.game_background_frames;
-        for i in 1..=game_bg_config.frame_count {
-            let frame_path = game_bg_config.path_pattern.replace("{:04}", &format!("{:04}", i));
-            let frame_handle = asset_server.load(frame_path);
-            tracked_assets.add_image(frame_handle.clone());
-            game_bg_frames.push(frame_handle);
-        }
+        // Skip loading game background frames since we're using GStreamer for video playback
+        let game_bg_frames = Vec::new();
         
         // Store resources
         commands.insert_resource(VideoFrames { 
@@ -778,29 +839,14 @@ fn main_menu_setup(
     config: Res<GameConfig>, 
     asset_server: Res<AssetServer>, 
     video_frames: Option<Res<VideoFrames>>,
-    global_bg_state: Res<GlobalVideoBackgroundState>,
+    _global_bg_state: Res<GlobalVideoBackgroundState>,
     preloaded_assets: Option<Res<PreloadedAssets>>,
 ) {
+    println!("Setting up main menu");
     let colors = &config.colors;
     
-    // Get the already loaded video frames (or empty if devMode)
-    let video_frame_handles = if config.dev_mode {
-        Vec::new()
-    } else if let Some(frames) = video_frames.as_ref() {
-        frames.frames.clone()
-    } else {
-        // Fallback: load frames if somehow not available
-        let mut frames = Vec::new();
-        for i in 1..=config.assets.animations.main_menu_frames.frame_count {
-            let frame_path = config.get_animation_frame_path(i);
-            frames.push(asset_server.load(frame_path));
-        }
-        commands.insert_resource(VideoFrames { 
-            frames: frames.clone(),
-            all_loaded: true,
-        });
-        frames
-    };
+    // Skip loading old video frames since we're using GStreamer now
+    let _video_frame_handles: Vec<Handle<Image>> = Vec::new();
     
     // Common style for all buttons on the screen
     let button_node = Node {
@@ -818,10 +864,10 @@ fn main_menu_setup(
         ..default()
     };
 
-    // Store frames for the animation system
+    // Store empty frames since we're using GStreamer for video playback
     if video_frames.is_none() {
         commands.insert_resource(VideoFrames { 
-            frames: video_frame_handles.clone(),
+            frames: Vec::new(),
             all_loaded: true,
         });
     }
@@ -841,39 +887,7 @@ fn main_menu_setup(
             OnMainMenuScreen,
         ))
         .with_children(|parent| {
-            // Video background using frame sequence (skip in devMode)
-            if !config.dev_mode && !video_frame_handles.is_empty() {
-                // Use current global frame to maintain continuity
-                let current_frame = global_bg_state.current_frame.min(video_frame_handles.len() - 1);
-                parent.spawn((
-                    Node {
-                        position_type: PositionType::Absolute,
-                        top: Val::Px(0.0),
-                        left: Val::Px(0.0),
-                        width: Val::Percent(100.0),
-                        height: Val::Percent(100.0),
-                        ..default()
-                    },
-                    ImageNode::new(video_frame_handles[current_frame].clone()),
-                    VideoBackground {
-                        timer: Timer::from_seconds(1.0 / 15.0, TimerMode::Repeating), // 15 FPS
-                        total_frames: 120,
-                    },
-                ));
-            } else if config.dev_mode {
-                // In devMode, show a simple colored background
-                parent.spawn((
-                    Node {
-                        position_type: PositionType::Absolute,
-                        top: Val::Px(0.0),
-                        left: Val::Px(0.0),
-                        width: Val::Percent(100.0),
-                        height: Val::Percent(100.0),
-                        ..default()
-                    },
-                    BackgroundColor(colors.background.clone().into()),
-                ));
-            }
+            // Video background is now handled at the menu level, not per-screen
 
             // Dark overlay for better text readability
             parent.spawn((
@@ -2921,4 +2935,321 @@ fn create_menu_button_with_icon(
                 });
             });
     }
+
+    fn initialize_video_players(
+        mut commands: Commands,
+        mut video_players: Query<(Entity, &mut VideoFilePlayer, &GStreamerVideoBackground), Without<BackgroundImageMarker>>,
+    ) {
+        let player_count = video_players.iter().len();
+        if player_count > 0 {
+            println!("Found {} video players to initialize", player_count);
+        }
+        
+        for (entity, mut player, video_bg) in video_players.iter_mut() {
+            println!("Initializing video player for entity {:?}", entity);
+            if !player.initialized {
+                if let Err(e) = gstreamer::init() {
+                    println!("Failed to initialize GStreamer: {}", e);
+                    continue;
+                }
+                
+                // Create file playback pipeline
+                let video_file_path = format!("assets/{}", video_bg.video_path);
+                println!("Attempting to load video file: {}", video_file_path);
+                
+                // Use a more robust pipeline with proper frame rate control and scaling
+                let pipeline_description = format!(
+                    "uridecodebin uri=file://{} ! videoconvert ! videoscale ! videorate ! video/x-raw,format=RGB,framerate=30/1 ! appsink name=appsink sync=true drop=false max-buffers=3",
+                    std::path::Path::new(&video_file_path).canonicalize().unwrap_or_else(|_| std::path::PathBuf::from(&video_file_path)).display()
+                );
+                
+                println!("GStreamer pipeline: {}", pipeline_description);
+                
+                match gstreamer::parse::launch(&pipeline_description) {
+                    Ok(pipeline) => {
+                        println!("Pipeline created successfully");
+                        if let Some(sink_element) = pipeline
+                            .clone()
+                            .dynamic_cast::<gstreamer::Bin>()
+                            .unwrap()
+                            .by_name("appsink")
+                        {
+                            if let Ok(appsink) = sink_element.dynamic_cast::<AppSink>() {
+                                println!("AppSink found and configured");
+                                
+                                player.pipeline = Some(pipeline);
+                                player.app_sink = Some(appsink);
+                                player.image_handle = None; // Will be created in update system
+                                player.initialized = true;
+                            
+                            // Start playback
+                            if let Some(ref pipeline) = player.pipeline {
+                                match pipeline.set_state(GstState::Playing) {
+                                    Ok(_) => println!("Video playback started successfully"),
+                                    Err(e) => println!("Failed to start video playback: {}", e),
+                                }
+                            }
+                            
+                            // Add BackgroundImageMarker to enable background rendering
+                            commands.entity(entity).insert(BackgroundImageMarker);
+                            } else {
+                                println!("Failed to cast sink element to AppSink");
+                            }
+                        } else {
+                            println!("AppSink element not found in pipeline");
+                        }
+                    }
+                    Err(e) => {
+                        println!("Failed to create GStreamer pipeline: {}", e);
+                    }
+                }
+            }
+        }
+    }
+
+    fn update_video_players(
+        mut video_players: Query<(&mut VideoFilePlayer, &mut ImageNode), With<BackgroundImageMarker>>,
+        mut images: ResMut<Assets<Image>>,
+        time: Res<Time>,
+    ) {
+        for (mut player, mut image_node) in video_players.iter_mut() {
+            if !player.initialized {
+                continue;
+            }
+            
+            // Stream new frames into buffer (but don't overwhelm it)
+            if let Some(app_sink) = player.app_sink.as_ref().cloned() {
+                // Fill buffer with available frames (max 3 frames)
+                while player.frame_buffer.len() < 3 {
+                    if let Some(sample) = app_sink.try_pull_sample(gstreamer::ClockTime::from_mseconds(0)) {
+                        if let (Some(buffer), Some(caps)) = (sample.buffer(), sample.caps()) {
+                            if let Ok(map) = buffer.map_readable() {
+                                let data = map.as_slice();
+                                let structure = caps.structure(0).unwrap();
+                                let width = structure.get::<i32>("width").unwrap() as u32;
+                                let height = structure.get::<i32>("height").unwrap() as u32;
+                                
+                                // Store video dimensions on first frame
+                                if player.video_width == 0 {
+                                    player.video_width = width;
+                                    player.video_height = height;
+                                }
+                                
+                                // Convert RGB to RGBA and buffer it
+                                let rgba_data: Vec<u8> = data.chunks(3)
+                                    .flat_map(|chunk| {
+                                        if chunk.len() == 3 {
+                                            [chunk[0], chunk[1], chunk[2], 255u8]
+                                        } else {
+                                            [0, 0, 0, 255u8]
+                                        }
+                                    })
+                                    .collect();
+                                
+                                player.frame_buffer.push_back(rgba_data);
+                            }
+                        }
+                    } else {
+                        break; // No more frames available
+                    }
+                }
+            }
+            
+            // Display frames at 15fps
+            player.frame_timer += time.delta_secs();
+            if player.frame_timer >= 0.067 && !player.frame_buffer.is_empty() { // ~15 FPS
+                player.frame_timer = 0.0;
+                
+                // Get next frame from buffer
+                if let Some(rgba_data) = player.frame_buffer.pop_front() {
+                    if player.image_handle.is_none() {
+                        // Create texture for the first time
+                        let bevy_image = Image::new_fill(
+                            bevy::render::render_resource::Extent3d {
+                                width: player.video_width,
+                                height: player.video_height,
+                                depth_or_array_layers: 1,
+                            },
+                            bevy::render::render_resource::TextureDimension::D2,
+                            &rgba_data,
+                            bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
+                            bevy::asset::RenderAssetUsages::all(),
+                        );
+                        
+                        let image_handle = images.add(bevy_image);
+                        player.image_handle = Some(image_handle.clone());
+                        image_node.image = image_handle;
+                        println!("Video streaming started with buffered frames!");
+                    } else {
+                        // Update texture with buffered frame data
+                        if let Some(ref handle) = player.image_handle {
+                            let updated_image = Image::new_fill(
+                                bevy::render::render_resource::Extent3d {
+                                    width: player.video_width,
+                                    height: player.video_height,
+                                    depth_or_array_layers: 1,
+                                },
+                                bevy::render::render_resource::TextureDimension::D2,
+                                &rgba_data,
+                                bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
+                                bevy::asset::RenderAssetUsages::all(),
+                            );
+                            
+                            images.insert(handle, updated_image);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn handle_video_looping(
+        mut video_players: Query<&mut VideoFilePlayer, With<BackgroundImageMarker>>,
+    ) {
+        use gstreamer::{MessageView, ClockTime};
+        
+        for player in video_players.iter_mut() {
+            if let Some(ref pipeline) = player.pipeline {
+                if let Some(bus) = pipeline.bus() {
+                    while let Some(message) = bus.timed_pop(ClockTime::from_seconds(0)) {
+                        match message.view() {
+                            MessageView::Eos(..) => {
+                                println!("Video reached end, seeking back to start for loop");
+                                // Use seek with proper flags for smooth looping
+                                if let Err(e) = pipeline.seek_simple(
+                                    gstreamer::SeekFlags::FLUSH | gstreamer::SeekFlags::KEY_UNIT,
+                                    ClockTime::from_seconds(0)
+                                ) {
+                                    println!("Failed to seek to start: {}", e);
+                                    // Fallback: restart the pipeline
+                                    let _ = pipeline.set_state(GstState::Ready);
+                                    let _ = pipeline.set_state(GstState::Playing);
+                                }
+                            }
+                            MessageView::Error(err) => {
+                                println!("GStreamer error: {}", err.error());
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Setup persistent video background that stays across all menu screens
+    fn setup_persistent_video_background(
+        mut commands: Commands,
+        config: Res<GameConfig>,
+        theme_manager: Res<ThemeManager>,
+        existing_bg_query: Query<Entity, With<PersistentVideoBackground>>,
+    ) {
+        let colors = &theme_manager.current_theme.colors;
+        
+        // Check if video background already exists
+        if !existing_bg_query.is_empty() {
+            println!("Persistent video background already exists, skipping setup");
+            return;
+        }
+        
+        if !config.dev_mode {
+            println!("Setting up persistent GStreamer video background");
+            // Spawn a GStreamer video background at menu level (not tied to specific screen)
+            commands.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    top: Val::Px(0.0),
+                    left: Val::Px(0.0),
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(100.0),
+                    ..default()
+                },
+                ZIndex(-10), // Put video behind everything including overlays
+                ImageNode::default(), // Will be updated by the video player
+                GStreamerVideoBackground {
+                    video_path: "backgrounds/dolphin/dolphin.webm".to_string(),
+                },
+                VideoFilePlayer::default(),
+                PersistentVideoBackground, // Mark as persistent
+            ));
+        } else {
+            // In devMode, show a simple colored background
+            commands.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    top: Val::Px(0.0),
+                    left: Val::Px(0.0),
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(100.0),
+                    ..default()
+                },
+                BackgroundColor(colors.background.clone().into()),
+                PersistentVideoBackground, // Mark as persistent
+            ));
+        }
+    }
+
+    /// Cleanup persistent video background when leaving the menu system
+    fn cleanup_persistent_video_background(
+        mut commands: Commands,
+        mut video_query: Query<(Entity, &mut VideoFilePlayer), With<PersistentVideoBackground>>,
+    ) {
+        println!("Cleaning up persistent video background");
+        
+        for (entity, mut player) in video_query.iter_mut() {
+            // Properly stop and dispose of GStreamer pipeline
+            if let Some(ref pipeline) = player.pipeline {
+                // First set to PAUSED, then to NULL for proper shutdown
+                if let Err(e) = pipeline.set_state(gstreamer::State::Paused) {
+                    eprintln!("Failed to set pipeline to Paused state: {}", e);
+                } else {
+                    // Wait for the state change to complete
+                    let (result, current_state, _pending_state) = pipeline.state(Some(gstreamer::ClockTime::from_seconds(1)));
+                    match (result, current_state) {
+                        (Ok(_), gstreamer::State::Paused) => {
+                            println!("Menu pipeline paused successfully");
+                        }
+                        _ => {
+                            println!("Warning: Menu pipeline pause may not have completed");
+                        }
+                    }
+                    
+                    // Now set to NULL
+                    if let Err(e) = pipeline.set_state(gstreamer::State::Null) {
+                        eprintln!("Failed to set pipeline to Null state: {}", e);
+                    } else {
+                        // Wait for the NULL state change to complete
+                        let (result, current_state, _pending_state) = pipeline.state(Some(gstreamer::ClockTime::from_seconds(1)));
+                        match (result, current_state) {
+                            (Ok(_), gstreamer::State::Null) => {
+                                println!("Menu GStreamer pipeline stopped successfully");
+                            }
+                            _ => {
+                                println!("Warning: Menu pipeline stop may not have completed");
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Clear the pipeline reference
+            player.pipeline = None;
+            player.app_sink = None;
+            player.initialized = false;
+            
+            // Despawn the entity
+            commands.entity(entity).despawn();
+        }
+    }
+
+    /// Hide persistent video background when in game state
+    fn hide_persistent_video_in_game(
+        mut video_query: Query<&mut Visibility, With<PersistentVideoBackground>>,
+    ) {
+        for mut visibility in video_query.iter_mut() {
+            *visibility = Visibility::Hidden;
+        }
+    }
+
+
 
