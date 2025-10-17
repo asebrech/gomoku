@@ -442,14 +442,38 @@ pub fn update_available_placement(
     parents: Query<(Entity, &Children, &GridCell), With<GridCell>>,
     mut dots: Query<(&mut BackgroundColor, &mut Visibility), With<PreviewDot>>,
 ) {
-    // Consume events
     for _ in ev_board_update.read() {}
 
     info!("Updating stone preview...");
+    
+    let breaking_moves: Option<std::collections::HashSet<(usize, usize)>> = 
+        if let Some(player_in_check) = game_state.player_in_check {
+            if player_in_check == game_state.current_player.opponent() {
+                if let Some(check_pos) = game_state.check_position {
+                    let moves = GameRules::get_breaking_capture_moves(
+                        &game_state.board, 
+                        check_pos.0, 
+                        check_pos.1, 
+                        player_in_check
+                    );
+                    Some(moves.into_iter().collect())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+    
     for (entity, children, cell) in parents.iter() {
-        // Check if position is empty and doesn't create double-three
-        let is_valid = game_state.board.is_empty_position(cell.x, cell.y)
-            && !GameRules::creates_double_three(&game_state.board, cell.x, cell.y, game_state.current_player);
+        let is_valid = if let Some(ref breaking_set) = breaking_moves {
+            breaking_set.contains(&(cell.x, cell.y))
+        } else {
+            game_state.board.is_empty_position(cell.x, cell.y)
+                && !GameRules::creates_double_three(&game_state.board, cell.x, cell.y, game_state.current_player)
+        };
         
         if is_valid {
             for &child in children {
@@ -579,10 +603,14 @@ pub fn handle_player_placement(
             if *interaction == Interaction::Pressed
                 && game_state.board.get_player(cell.x, cell.y).is_none()
             {
-                stone_placement.write(StonePlacement {
-                    x: cell.x,
-                    y: cell.y,
-                });
+                if game_state.is_move_legal((cell.x, cell.y)) {
+                    stone_placement.write(StonePlacement {
+                        x: cell.x,
+                        y: cell.y,
+                    });
+                } else {
+                    info!("Illegal move attempted at ({}, {})", cell.x, cell.y);
+                }
             }
         }
     }
