@@ -42,6 +42,9 @@ struct GameGStreamerVideoBackground {
 }
 
 #[derive(Component)]
+pub struct PersistentGameVideoBackground;
+
+#[derive(Component)]
 struct GameVideoFilePlayer {
     pipeline: Option<Element>,
     app_sink: Option<AppSink>,
@@ -154,11 +157,10 @@ pub fn game_plugin(app: &mut App) {
         .add_event::<ResetBoard>()
         .add_event::<UpdatePlayerDisplay>()
         .add_systems(OnEnter(AppState::Game), (
-            log_entering_game_state,
             update_game_settings_from_config,
             setup_game_ui,
             setup_game_background,
-            log_game_setup_complete,
+            show_persistent_game_video_background,
         ).chain())
         .add_systems(
             Update,
@@ -180,14 +182,16 @@ pub fn game_plugin(app: &mut App) {
                 reset_board.run_if(on_event::<ResetBoard>),
                 toggle_pause,
                 handle_escape_key,
-                (
-                    check_video_components_exist,
-                    log_video_system_execution,
-                    initialize_game_video_players,
-                    update_game_video_players,
-                    handle_game_video_looping,
-                ).chain().run_if(any_with_component::<GameVideoFilePlayer>),
             ).run_if(in_state(AppState::Game)),
+        )
+        .add_systems(
+            Update,
+            (
+                // These video systems run always to keep persistent video working
+                initialize_game_video_players,
+                update_game_video_players,
+                handle_game_video_looping,
+            ).chain().run_if(any_with_component::<GameVideoFilePlayer>),
         )
         .add_systems(
             Update,
@@ -204,7 +208,9 @@ pub fn game_plugin(app: &mut App) {
                 handle_game_over_actions,
             ).run_if(in_state(AppState::Game)),
         )
-        .add_systems(OnExit(AppState::Game), (cleanup_game_video_background, despawn_screen::<OnGameScreen>));
+        .add_systems(OnExit(AppState::Game), (hide_persistent_game_video_background, despawn_screen::<OnGameScreen>))
+        .add_systems(OnEnter(AppState::Menu), hide_persistent_game_video_background)
+        .add_systems(OnEnter(AppState::HowToPlay), hide_persistent_game_video_background);
 }
 
 fn update_game_settings_from_config(
@@ -1521,73 +1527,20 @@ fn update_captures_display(
     }
 }
 
-static FRAME_COUNT: AtomicU64 = AtomicU64::new(0);
-static LAST_LOG_TIME: Mutex<f64> = Mutex::new(0.0);
 
-fn log_entering_game_state() {
-    println!("******************************************");
-    println!("*** ENTERING GAME STATE ***");
-    println!("*** App state transition to Game ***");
-    println!("******************************************");
-}
 
-fn log_game_setup_complete() {
-    println!("******************************************");
-    println!("*** GAME SETUP COMPLETE ***");
-    println!("*** All OnEnter systems finished ***");
-    println!("*** GAME VIDEO SYSTEMS SHOULD START RUNNING NOW ***");
-    println!("******************************************");
-}
 
-fn check_video_components_exist(
-    video_players: Query<(Entity, &GameVideoFilePlayer, &GameGStreamerVideoBackground)>,
-    video_backgrounds: Query<Entity, With<GameGStreamerVideoBackground>>,
-) {
-    println!("[COMPONENT CHECK] ===== CHECKING VIDEO COMPONENTS =====");
-    println!("[COMPONENT CHECK] GameVideoFilePlayer entities: {}", video_players.iter().count());
-    println!("[COMPONENT CHECK] GameGStreamerVideoBackground entities: {}", video_backgrounds.iter().count());
-    
-    for (entity, player, bg) in video_players.iter() {
-        println!("[COMPONENT CHECK] Entity {:?}: initialized={}, video_path={}", 
-                 entity, player.initialized, bg.video_path);
-    }
-}
-
-fn log_video_system_execution(
-    video_players: Query<&GameVideoFilePlayer>,
-    time: Res<Time>,
-) {
-    let frame_count = FRAME_COUNT.fetch_add(1, Ordering::Relaxed);
-    let current_time = time.elapsed_secs_f64();
-    
-    if let Ok(mut last_time) = LAST_LOG_TIME.try_lock() {
-        // Log every second
-        if current_time - *last_time >= 1.0 {
-            println!("[GAME VIDEO SYSTEMS] ===== FRAME {} ===== Time: {:.2}s", frame_count, current_time);
-            println!("[GAME VIDEO SYSTEMS] Video players count: {}", video_players.iter().count());
-            
-            for (i, player) in video_players.iter().enumerate() {
-                println!("[GAME VIDEO SYSTEMS] Player {}: initialized={}, buffer_size={}, dimensions={}x{}", 
-                         i, player.initialized, player.frame_buffer.len(), player.video_width, player.video_height);
-            }
-            
-            *last_time = current_time;
-        }
-    }
-}
 
 fn setup_game_background(
     mut commands: Commands,
     config: Res<GameConfig>,
+    existing_bg_query: Query<Entity, With<PersistentGameVideoBackground>>,
+    mut existing_visibility_query: Query<&mut Visibility, With<PersistentGameVideoBackground>>,
 ) {
-    println!("[GAME BACKGROUND] =======================================");
-    println!("[GAME BACKGROUND] SETTING UP GAME BACKGROUND");
-    println!("[GAME BACKGROUND] Dev mode: {}", config.dev_mode);
-    println!("[GAME BACKGROUND] =======================================");
+
     
     // Skip in devMode
     if config.dev_mode {
-        println!("[GAME BACKGROUND] DEV MODE: Skipping video - using solid background");
         // Spawn a solid color background in dev mode
         commands.spawn((
             Node {
@@ -1602,14 +1555,16 @@ fn setup_game_background(
             BackgroundColor(config.colors.background.clone().into()),
             OnGameScreen,
         ));
-        println!("[GAME BACKGROUND] DEV MODE: Solid background spawned");
         return;
     }
 
-    println!("[GAME BACKGROUND] PRODUCTION MODE: Spawning GStreamer video background");
-    println!("[GAME BACKGROUND] Video path: backgrounds/ingame-background/in-game.webm");
+    // Check if we already have a persistent game video background
+    if let Ok(mut visibility) = existing_visibility_query.single_mut() {
+        *visibility = Visibility::Visible;
+        return;
+    }
     
-    // Spawn a GStreamer video background for the game
+    // Spawn a persistent GStreamer video background for the game
     let entity = commands.spawn((
         Node {
             position_type: PositionType::Absolute,
@@ -1621,56 +1576,54 @@ fn setup_game_background(
         },
         ZIndex(-2000), // Behind everything including the game board
         BackgroundColor(Color::srgb(1.0, 0.0, 0.0)), // Temporary red background for debugging
-        ImageNode::default(), // Will be updated by the video player
+        ImageNode {
+            image_mode: NodeImageMode::Stretch,
+            ..default()
+        }, // Will be updated by the video player
         GameGStreamerVideoBackground {
             video_path: "backgrounds/ingame-background/in-game.webm".to_string(),
         },
         GameVideoFilePlayer::default(),
-        OnGameScreen,
+        PersistentGameVideoBackground, // Mark as persistent
+        Visibility::Visible, // Initially visible
     ));
-    
-    println!("[GAME BACKGROUND] Game video background entity spawned: {:?}", entity.id());
-    println!("[GAME BACKGROUND] Components added: GameGStreamerVideoBackground, GameVideoFilePlayer, OnGameScreen");
-    println!("[GAME BACKGROUND] SETUP COMPLETE!");
 }
 
 fn initialize_game_video_players(
-    mut video_players: Query<(Entity, &mut GameVideoFilePlayer, &GameGStreamerVideoBackground), Without<BackgroundImageMarker>>,
+    mut video_players: Query<(Entity, &mut GameVideoFilePlayer, &GameGStreamerVideoBackground), (With<PersistentGameVideoBackground>, Without<BackgroundImageMarker>)>,
 ) {
-    println!("[GAME VIDEO INIT] Starting initialize_game_video_players - {} players found", video_players.iter().count());
+    // Early return if no uninitialized players
+    let has_uninitialized = video_players.iter().any(|(_, player, _)| !player.initialized);
+    if !has_uninitialized {
+        return;
+    }
+    
+    // Try to initialize GStreamer if not already done - this is safe to call multiple times
+    if let Err(_) = gstreamer::init() {
+        return;
+    }
     
     for (entity, mut player, video_bg) in video_players.iter_mut() {
-        println!("[GAME VIDEO INIT] Processing entity {:?}, initialized: {}", entity, player.initialized);
-        
         if player.initialized {
-            println!("[GAME VIDEO INIT] Player already initialized, skipping");
             continue;
         }
-
-        println!("[GAME VIDEO INIT] Initializing game video player for entity {:?}", entity);
-        println!("[GAME VIDEO INIT] Attempting to load game video file: assets/{}", video_bg.video_path);
 
         let video_path = format!("assets/{}", video_bg.video_path);
         let file_path = std::path::Path::new(&video_path);
         
         if !file_path.exists() {
-            println!("ERROR: Game video file does not exist: {}", video_path);
             continue;
         }
 
         let uri = format!("file://{}", file_path.canonicalize().unwrap().to_string_lossy());
         
         let pipeline_description = format!(
-            "uridecodebin uri={} ! videoconvert ! videoscale ! videorate ! video/x-raw,format=RGB,framerate=15/1 ! appsink name=appsink sync=true drop=false max-buffers=1",
+            "uridecodebin uri={} ! videoconvert ! videoscale method=lanczos add-borders=false ! videorate ! video/x-raw,format=RGBA,framerate=30/1 ! appsink name=appsink sync=true drop=false max-buffers=1",
             uri
         );
 
-        println!("GStreamer game pipeline: {}", pipeline_description);
-
         match gstreamer::parse::launch(&pipeline_description) {
             Ok(pipeline) => {
-                println!("Game pipeline created successfully");
-                
                 let appsink = pipeline
                     .clone()
                     .downcast::<gstreamer::Pipeline>()
@@ -1680,126 +1633,71 @@ fn initialize_game_video_players(
                     .downcast::<AppSink>()
                     .unwrap();
 
-                println!("Game AppSink found and configured");
-
                 player.pipeline = Some(pipeline.clone());
                 player.app_sink = Some(appsink);
                 player.initialized = true;
 
-                if let Err(e) = pipeline.set_state(gstreamer::State::Playing) {
-                    println!("Failed to set game pipeline to Playing state: {}", e);
-                } else {
-                    println!("Game video playback started successfully");
-                }
+                let _ = pipeline.set_state(gstreamer::State::Playing);
             }
-            Err(e) => {
-                println!("Failed to create game pipeline: {}", e);
+            Err(_) => {
+                // Failed to create pipeline
             }
         }
     }
 }
 
 fn update_game_video_players(
-    mut video_players: Query<(Entity, &mut GameVideoFilePlayer, &mut ImageNode), (With<GameGStreamerVideoBackground>, Without<BackgroundImageMarker>)>,
+    mut video_players: Query<(Entity, &mut GameVideoFilePlayer, &mut ImageNode), (With<GameGStreamerVideoBackground>, With<PersistentGameVideoBackground>, Without<BackgroundImageMarker>)>,
     mut images: ResMut<Assets<Image>>,
     time: Res<Time>,
 ) {
-    println!("[GAME VIDEO] Starting update_game_video_players - {} players found", video_players.iter().count());
-    
     for (entity, mut player, mut image_node) in video_players.iter_mut() {
-        println!("[GAME VIDEO] Processing entity {:?}, initialized: {}", entity, player.initialized);
-        
         if !player.initialized {
-            println!("[GAME VIDEO] Player not initialized, skipping");
             continue;
         }
 
-        println!("[GAME VIDEO] Buffer size: {}, frame_timer: {:.4}", player.frame_buffer.len(), player.frame_timer);
-
         // Stream new frames into buffer (but don't overwhelm it)
         if let Some(app_sink) = player.app_sink.as_ref().cloned() {
-            println!("[GAME VIDEO] AppSink available, trying to pull samples");
             // Fill buffer with available frames (max 3 frames)
-            let mut samples_pulled = 0;
             while player.frame_buffer.len() < 3 {
-                println!("[GAME VIDEO] Trying to pull sample {} (buffer size: {})", samples_pulled, player.frame_buffer.len());
-                
                 if let Some(sample) = app_sink.try_pull_sample(gstreamer::ClockTime::from_mseconds(0)) {
-                    samples_pulled += 1;
-                    println!("[GAME VIDEO] SUCCESS: Pulled sample {}", samples_pulled);
                     
                     if let (Some(buffer), Some(caps)) = (sample.buffer(), sample.caps()) {
-                        println!("[GAME VIDEO] Buffer and caps available");
-                        
                         if let Ok(map) = buffer.map_readable() {
                             let data = map.as_slice();
                             let structure = caps.structure(0).unwrap();
                             let width = structure.get::<i32>("width").unwrap() as u32;
                             let height = structure.get::<i32>("height").unwrap() as u32;
                             
-                            println!("[GAME VIDEO] Frame data - width: {}, height: {}, data_len: {}", width, height, data.len());
-                            
                             // Store video dimensions on first frame
                             if player.video_width == 0 {
                                 player.video_width = width;
                                 player.video_height = height;
-                                println!("[GAME VIDEO] FIRST FRAME: Set dimensions {}x{}", width, height);
                             }
                             
-                            // Convert RGB to RGBA and buffer it
-                            let start_time = std::time::Instant::now();
-                            let rgba_data: Vec<u8> = data.chunks(3)
-                                .flat_map(|chunk| {
-                                    if chunk.len() == 3 {
-                                        [chunk[0], chunk[1], chunk[2], 255u8]
-                                    } else {
-                                        [0, 0, 0, 255u8]
-                                    }
-                                })
-                                .collect();
-                            let conversion_time = start_time.elapsed();
-                            
-                            println!("[GAME VIDEO] RGB->RGBA conversion took {:?}, rgba_data_len: {}", conversion_time, rgba_data.len());
-                            
-                            player.frame_buffer.push_back(rgba_data);
-                            println!("[GAME VIDEO] Frame buffered! New buffer size: {}", player.frame_buffer.len());
-                        } else {
-                            println!("[GAME VIDEO] FAILED to map buffer readable");
+                            // Data is already RGBA from the pipeline
+                            player.frame_buffer.push_back(data.to_vec());
                         }
-                    } else {
-                        println!("[GAME VIDEO] MISSING buffer or caps in sample");
                     }
                 } else {
-                    println!("[GAME VIDEO] No more samples available, breaking (pulled {} samples)", samples_pulled);
                     break; // No more frames available
                 }
             }
-            println!("[GAME VIDEO] Frame pulling complete - total samples pulled: {}", samples_pulled);
-        } else {
-            println!("[GAME VIDEO] NO AppSink available");
         }
         
-        // EXPERIMENT: Try updating every frame to see if frame rate limiting is the issue
+        // OPTIMIZED: Restore frame rate limiting - now we know the real issue was texture operations
         player.frame_timer += time.delta_secs();
-        let should_update_frame = !player.frame_buffer.is_empty(); // Remove frame rate limiting temporarily
-        // let should_update_frame = player.frame_timer >= 0.067 && !player.frame_buffer.is_empty(); // Original 15fps limit
+        let should_update_frame = player.frame_timer >= 0.033 && !player.frame_buffer.is_empty(); // 30 FPS limit for smooth video
         
-        println!("[GAME VIDEO] Frame timing - delta: {:.4}, timer: {:.4}, should_update: {}, buffer_empty: {}", 
-                 time.delta_secs(), player.frame_timer, should_update_frame, player.frame_buffer.is_empty());
+        if should_update_frame {
+            player.frame_timer = 0.0; // Reset timer when updating
+        }
         
-        if should_update_frame { // EXPERIMENT: Every frame update
-            let frame_update_start = std::time::Instant::now();
-            println!("[GAME VIDEO] *** UPDATING FRAME *** buffer size: {}", player.frame_buffer.len());
-            // player.frame_timer = 0.0; // Commented out since we're not using frame limiting
+        if should_update_frame { // 30 FPS updates
             
             // Get next frame from buffer
             if let Some(rgba_data) = player.frame_buffer.pop_front() {
-                println!("[GAME VIDEO] Popped frame from buffer, remaining: {}, data_len: {}", 
-                         player.frame_buffer.len(), rgba_data.len());
                 if player.image_handle.is_none() {
-                    println!("[GAME VIDEO] CREATING FIRST TEXTURE - dimensions: {}x{}", player.video_width, player.video_height);
-                    
-                    let start_time = std::time::Instant::now();
                     // Create texture for the first time
                     let bevy_image = Image::new_fill(
                         bevy::render::render_resource::Extent3d {
@@ -1812,137 +1710,134 @@ fn update_game_video_players(
                         bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
                         bevy::render::render_asset::RenderAssetUsages::MAIN_WORLD | bevy::render::render_asset::RenderAssetUsages::RENDER_WORLD,
                     );
-                    let image_create_time = start_time.elapsed();
                     
-                    let add_start = std::time::Instant::now();
                     let new_handle = images.add(bevy_image);
-                    let add_time = add_start.elapsed();
-                    
                     player.image_handle = Some(new_handle.clone());
                     image_node.image = new_handle;
-                    
-                    println!("[GAME VIDEO] FIRST TEXTURE COMPLETE - image_create: {:?}, images.add: {:?}", 
-                             image_create_time, add_time);
                 } else {
-                    println!("[GAME VIDEO] UPDATING EXISTING TEXTURE - dimensions: {}x{}", player.video_width, player.video_height);
-                    
                     // Update texture with buffered frame data
                     if let Some(ref handle) = player.image_handle {
-                        let start_time = std::time::Instant::now();
+                        let updated_image = Image::new_fill(
+                            bevy::render::render_resource::Extent3d {
+                                width: player.video_width,
+                                height: player.video_height,
+                                depth_or_array_layers: 1,
+                            },
+                            bevy::render::render_resource::TextureDimension::D2,
+                            &rgba_data,
+                            bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
+                            bevy::render::render_asset::RenderAssetUsages::MAIN_WORLD | bevy::render::render_asset::RenderAssetUsages::RENDER_WORLD,
+                        );
                         
-                        // EXPERIMENT: Also skip the expensive Image::new_fill to test if this is part of the bottleneck
-                        println!("[GAME VIDEO] *** SKIPPING Image::new_fill() - TESTING BOTTLENECK ***");
-                        // let updated_image = Image::new_fill(...);  // DISABLED FOR TESTING
-                        let image_create_time = std::time::Duration::from_nanos(0); // Fake timing
-                        
-                        // EXPERIMENT: Disable the expensive images.insert() call to test if this is the bottleneck
-                        println!("[GAME VIDEO] *** SKIPPING images.insert() - TESTING BOTTLENECK ***");
-                        // images.insert(handle, updated_image);  // DISABLED FOR TESTING
-                        let insert_time = std::time::Duration::from_nanos(0); // Fake timing
-                        
-                        println!("[GAME VIDEO] TEXTURE UPDATE (SKIPPED) - image_create: {:?}, images.insert: SKIPPED", 
-                                 image_create_time);
-                    } else {
-                        println!("[GAME VIDEO] ERROR: handle is None but should exist!");
+                        images.insert(handle, updated_image);
                     }
                 }
-                
-                let total_frame_time = frame_update_start.elapsed();
-                println!("[GAME VIDEO] *** TOTAL FRAME UPDATE TIME: {:?} ***", total_frame_time);
-            } else {
-                println!("[GAME VIDEO] ERROR: No frame in buffer despite should_update_frame being true!");
             }
-        } else {
-            println!("[GAME VIDEO] Skipping frame update - timer: {:.4}, buffer_size: {}", player.frame_timer, player.frame_buffer.len());
         }
-        
-        println!("[GAME VIDEO] Finished processing entity {:?}", entity);
     }
-    
-    println!("[GAME VIDEO] update_game_video_players COMPLETE");
 }
 
 fn handle_game_video_looping(
-    mut video_players: Query<&mut GameVideoFilePlayer, With<GameGStreamerVideoBackground>>,
+    mut video_players: Query<&mut GameVideoFilePlayer, (With<GameGStreamerVideoBackground>, With<PersistentGameVideoBackground>)>,
 ) {
-    println!("[GAME VIDEO LOOP] Starting handle_game_video_looping - {} players", video_players.iter().count());
-    
     for player in video_players.iter_mut() {
-        println!("[GAME VIDEO LOOP] Processing player, initialized: {}", player.initialized);
-        
         if !player.initialized {
-            println!("[GAME VIDEO LOOP] Player not initialized, skipping");
             continue;
         }
 
         let Some(ref pipeline) = player.pipeline else {
-            println!("[GAME VIDEO LOOP] No pipeline available, skipping");
             continue;
         };
-
-        println!("[GAME VIDEO LOOP] Pipeline available, checking bus messages");
         
         // Check if the pipeline has reached the end
         if let Some(bus) = pipeline.bus() {
-            let mut message_count = 0;
             while let Some(msg) = bus.timed_pop(gstreamer::ClockTime::from_mseconds(0)) {
-                message_count += 1;
-                println!("[GAME VIDEO LOOP] Processing message #{}: {:?}", message_count, msg.type_());
-                
                 match msg.view() {
                     gstreamer::MessageView::Eos(_) => {
-                        println!("[GAME VIDEO LOOP] *** EOS MESSAGE *** Game video reached end, restarting...");
+                        println!("[GAME VIDEO] Video reached end, restarting...");
                         if let Err(e) = pipeline.seek_simple(
                             gstreamer::SeekFlags::FLUSH | gstreamer::SeekFlags::KEY_UNIT,
                             gstreamer::ClockTime::ZERO,
                         ) {
-                            println!("[GAME VIDEO LOOP] FAILED to seek game video to beginning: {}", e);
-                        } else {
-                            println!("[GAME VIDEO LOOP] Successfully seeked to beginning");
+                            println!("[GAME VIDEO] Failed to seek to beginning: {}", e);
                         }
                     }
                     gstreamer::MessageView::Error(err) => {
-                        println!("[GAME VIDEO LOOP] *** ERROR MESSAGE *** Game video pipeline error: {}", err.error());
+                        println!("[GAME VIDEO] Pipeline error: {}", err.error());
                     }
-                    _ => {
-                        println!("[GAME VIDEO LOOP] Other message type: {:?}", msg.type_());
-                    }
+                    _ => {}
                 }
             }
-            if message_count > 0 {
-                println!("[GAME VIDEO LOOP] Processed {} messages total", message_count);
-            } else {
-                println!("[GAME VIDEO LOOP] No messages in bus");
-            }
-        } else {
-            println!("[GAME VIDEO LOOP] No bus available on pipeline");
         }
     }
+}
+
+/// Hide persistent game video background when exiting the game state
+fn hide_persistent_game_video_background(
+    mut video_query: Query<&mut Visibility, With<PersistentGameVideoBackground>>,
+) {
+    for mut visibility in video_query.iter_mut() {
+        *visibility = Visibility::Hidden;
+    }
+}
+
+fn show_persistent_game_video_background(
+    mut video_query: Query<&mut Visibility, With<PersistentGameVideoBackground>>,
+) {
+    for mut visibility in video_query.iter_mut() {
+        *visibility = Visibility::Visible;
+    }
+}
+
+/// Preload game video background during menu to avoid flash screens
+pub fn preload_game_video_background(
+    mut commands: Commands,
+    config: Res<GameConfig>,
+    existing_bg_query: Query<Entity, With<PersistentGameVideoBackground>>,
+) {
+    // Skip in devMode or if already exists
+    if config.dev_mode || !existing_bg_query.is_empty() {
+        return;
+    }
     
-    println!("[GAME VIDEO LOOP] handle_game_video_looping COMPLETE");
+    // Spawn a hidden persistent GStreamer video background for the game
+    let entity = commands.spawn((
+        Node {
+            position_type: PositionType::Absolute,
+            top: Val::Px(0.0),
+            left: Val::Px(0.0),
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            ..default()
+        },
+        ZIndex(-2000), // Behind everything including the game board
+        BackgroundColor(Color::srgb(1.0, 0.0, 0.0)), // Temporary red background for debugging
+        ImageNode {
+            image_mode: NodeImageMode::Stretch,
+            ..default()
+        }, // Will be updated by the video player
+        GameGStreamerVideoBackground {
+            video_path: "backgrounds/ingame-background/in-game.webm".to_string(),
+        },
+        GameVideoFilePlayer::default(),
+        PersistentGameVideoBackground, // Mark as persistent
+        Visibility::Hidden, // Initially hidden
+    ));
 }
 
 /// Cleanup game video background when exiting the game state
 fn cleanup_game_video_background(
-    mut video_players: Query<&mut GameVideoFilePlayer>,
+    mut video_players: Query<&mut GameVideoFilePlayer, Without<PersistentGameVideoBackground>>,
 ) {
-    println!("Cleaning up game video background - found {} players", video_players.iter().count());
     
     for mut player in video_players.iter_mut() {
         // Properly stop and dispose of GStreamer pipeline
         if let Some(pipeline) = player.pipeline.take() {
-            println!("Stopping game GStreamer pipeline...");
-            
             // Immediate stop - don't wait for state changes
-            if let Err(e) = pipeline.set_state(gstreamer::State::Null) {
-                eprintln!("Failed to set game pipeline to Null state: {}", e);
-            } else {
-                println!("Game GStreamer pipeline set to NULL");
-            }
+            let _ = pipeline.set_state(gstreamer::State::Null);
             
             // Force drop the pipeline reference
             drop(pipeline);
-            println!("Game pipeline dropped");
         }
         
         // Clear all references immediately

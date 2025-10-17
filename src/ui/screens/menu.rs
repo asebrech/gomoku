@@ -19,7 +19,7 @@
         audio::PlayClickSound,
         ui::{
             app::{AppState, GameSettings}, 
-            screens::{utils::despawn_screen, splash::PreloadedStones},
+            screens::{utils::despawn_screen, splash::PreloadedStones, game::game::preload_game_video_background},
             config::GameConfig,
             theme::{ThemeManager, update_theme_elements},
         }
@@ -230,7 +230,7 @@
             .init_resource::<MenuInitialized>()
             .init_resource::<LoadingProgress>()
             .init_resource::<GlobalVideoBackgroundState>()
-            .add_systems(OnEnter(AppState::Menu), (init_dev_mode_resources, menu_setup, setup_persistent_video_background).chain())
+            .add_systems(OnEnter(AppState::Menu), (init_dev_mode_resources, menu_setup, setup_persistent_video_background, preload_game_video_background).chain())
             .add_systems(OnEnter(AppState::HowToPlay), setup_persistent_video_background)
             .add_systems(OnEnter(MenuState::Splash), splash_screen_setup)
             .add_systems(OnEnter(MenuState::Main), (main_menu_setup, setup_audio_if_needed))
@@ -261,6 +261,9 @@
             .add_systems(OnEnter(AppState::GameOptions), cleanup_persistent_video_background)
             .add_systems(OnEnter(AppState::Credit), cleanup_persistent_video_background)
             .add_systems(OnEnter(AppState::Splash), cleanup_persistent_video_background)
+            .add_systems(OnEnter(AppState::Game), hide_persistent_video_in_game)
+            .add_systems(OnEnter(AppState::Menu), show_persistent_video_background)
+            .add_systems(OnEnter(AppState::HowToPlay), show_persistent_video_background)
             .add_systems(
                 Update,
                 (
@@ -3055,9 +3058,9 @@ fn create_menu_button_with_icon(
                 }
             }
             
-            // Display frames at 15fps
+            // OPTIMIZED: Display frames at 30fps for smoother playback
             player.frame_timer += time.delta_secs();
-            if player.frame_timer >= 0.067 && !player.frame_buffer.is_empty() { // ~15 FPS
+            if player.frame_timer >= 0.033 && !player.frame_buffer.is_empty() { // ~30 FPS
                 player.frame_timer = 0.0;
                 
                 // Get next frame from buffer
@@ -3081,21 +3084,28 @@ fn create_menu_button_with_icon(
                         image_node.image = image_handle;
                         println!("Video streaming started with buffered frames!");
                     } else {
-                        // Update texture with buffered frame data
+                        // OPTIMIZED: Reduce frequency of expensive texture operations
                         if let Some(ref handle) = player.image_handle {
-                            let updated_image = Image::new_fill(
-                                bevy::render::render_resource::Extent3d {
-                                    width: player.video_width,
-                                    height: player.video_height,
-                                    depth_or_array_layers: 1,
-                                },
-                                bevy::render::render_resource::TextureDimension::D2,
-                                &rgba_data,
-                                bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
-                                bevy::asset::RenderAssetUsages::all(),
-                            );
+                            // Only update texture every few frames to reduce GPU load
+                            static MENU_FRAME_COUNTER: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+                            let frame_count = MENU_FRAME_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                             
-                            images.insert(handle, updated_image);
+                            // Update every 2nd frame instead of every frame (reduces load by 50%)
+                            if frame_count % 2 == 0 {
+                                let updated_image = Image::new_fill(
+                                    bevy::render::render_resource::Extent3d {
+                                        width: player.video_width,
+                                        height: player.video_height,
+                                        depth_or_array_layers: 1,
+                                    },
+                                    bevy::render::render_resource::TextureDimension::D2,
+                                    &rgba_data,
+                                    bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
+                                    bevy::asset::RenderAssetUsages::all(),
+                                );
+                                
+                                images.insert(handle, updated_image);
+                            }
                         }
                     }
                 }
@@ -3143,12 +3153,16 @@ fn create_menu_button_with_icon(
         config: Res<GameConfig>,
         theme_manager: Res<ThemeManager>,
         existing_bg_query: Query<Entity, With<PersistentVideoBackground>>,
+        mut existing_visibility_query: Query<&mut Visibility, With<PersistentVideoBackground>>,
     ) {
         let colors = &theme_manager.current_theme.colors;
         
-        // Check if video background already exists
+        // If video background already exists, just make sure it's visible
         if !existing_bg_query.is_empty() {
-            println!("Persistent video background already exists, skipping setup");
+            println!("Persistent video background already exists, ensuring it's visible");
+            for mut visibility in existing_visibility_query.iter_mut() {
+                *visibility = Visibility::Visible;
+            }
             return;
         }
         
@@ -3248,6 +3262,15 @@ fn create_menu_button_with_icon(
     ) {
         for mut visibility in video_query.iter_mut() {
             *visibility = Visibility::Hidden;
+        }
+    }
+
+    /// Show persistent video background when returning to menu states
+    fn show_persistent_video_background(
+        mut video_query: Query<&mut Visibility, With<PersistentVideoBackground>>,
+    ) {
+        for mut visibility in video_query.iter_mut() {
+            *visibility = Visibility::Visible;
         }
     }
 
