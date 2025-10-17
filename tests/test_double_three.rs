@@ -145,6 +145,63 @@ fn test_creates_double_three_diagonal() {
     }
 
     #[test]
+    fn test_one_end_blocked_not_free_three() {
+        let mut board = Board::new(19);
+        
+        // One end blocked by opponent
+        board.place_stone(8, 7, Player::Max);  
+        board.place_stone(8, 9, Player::Max);  
+        board.place_stone(8, 10, Player::Min); // Block one end
+        board.place_stone(7, 8, Player::Max);  
+        board.place_stone(9, 8, Player::Max);  
+        
+        // This should NOT be a double-three because horizontal line is blocked on one end
+        assert!(!GameRules::creates_double_three(&board, 8, 8, Player::Max));
+    }
+
+    #[test]
+    fn test_both_ends_blocked_not_free_three() {
+        let mut board = Board::new(19);
+        
+        // Both ends blocked
+        board.place_stone(8, 7, Player::Max);
+        board.place_stone(8, 9, Player::Max);
+        board.place_stone(8, 6, Player::Min); // Block left
+        board.place_stone(8, 10, Player::Min); // Block right
+        
+        // This should NOT create a double-three (or even a single free-three)
+        assert!(!GameRules::creates_double_three(&board, 8, 8, Player::Max));
+    }
+
+    #[test]
+    fn test_four_stones_not_free_three() {
+        let mut board = Board::new(19);
+        
+        // Creating four stones in a row should not be counted as a free-three
+        board.place_stone(8, 6, Player::Max);  
+        board.place_stone(8, 7, Player::Max);  
+        board.place_stone(8, 9, Player::Max);  
+        
+        // This creates a four, not a three
+        assert!(!GameRules::creates_double_three(&board, 8, 8, Player::Max));
+    }
+
+    #[test]
+    fn test_insufficient_space_not_free_three() {
+        let mut board = Board::new(19);
+        
+        // Pattern with opponent after only one empty space
+        board.place_stone(8, 7, Player::Max);
+        board.place_stone(8, 9, Player::Max);
+        board.place_stone(8, 11, Player::Min); // Opponent after one empty space
+        board.place_stone(7, 8, Player::Max);
+        board.place_stone(9, 8, Player::Max);
+        
+        // This should NOT be a double-three because there's not enough room to form open four
+        assert!(!GameRules::creates_double_three(&board, 8, 8, Player::Max));
+    }
+
+    #[test]
     fn analyze_double_three() {
         println!("\n=== Testing Double-Three Detection Logic ===\n");
 

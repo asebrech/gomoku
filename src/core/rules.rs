@@ -150,7 +150,17 @@ impl GameRules {
                 stones += 1;
             } else if !Board::is_bit_set(&board.occupied, idx) {
                 if !empty_found && stones > 0 {
-                    is_open = true;
+                    // Check if there's space to form an open four
+                    // We need at least one more empty space beyond this one
+                    let next_row = new_row + dr;
+                    let next_col = new_col + dc;
+                    if PatternAnalyzer::is_in_bounds(board, next_row, next_col) {
+                        let next_idx = board.index(next_row as usize, next_col as usize);
+                        // The next position must be empty (not occupied by anyone)
+                        if !Board::is_bit_set(&board.occupied, next_idx) {
+                            is_open = true;
+                        }
+                    }
                 }
                 empty_found = true;
                 if stones > 0 {
@@ -166,7 +176,9 @@ impl GameRules {
 
     #[inline]
     fn can_form_open_four(left_open: bool, right_open: bool) -> bool {
-        left_open || right_open
+        // A free three requires BOTH ends to be open (have empty space)
+        // to be able to form an open four (which is undefendable)
+        left_open && right_open
     }
 
     pub fn can_break_five_by_capture(board: &Board, row: usize, col: usize, player: Player) -> bool {
