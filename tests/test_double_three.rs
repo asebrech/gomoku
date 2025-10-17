@@ -143,3 +143,77 @@ fn test_creates_double_three_diagonal() {
         // Should not create double-three due to board constraints
         assert!(!GameRules::creates_double_three(&board, 0, 1, Player::Max));
     }
+
+    #[test]
+    fn analyze_double_three() {
+        println!("\n=== Testing Double-Three Detection Logic ===\n");
+
+        // Test 1: Basic horizontal + vertical double-three
+        println!("Test 1: Basic Cross Pattern");
+        let mut board = Board::new(19);
+        board.place_stone(8, 7, Player::Max);  
+        board.place_stone(8, 9, Player::Max);  
+        board.place_stone(7, 8, Player::Max);  
+        board.place_stone(9, 8, Player::Max);  
+        let result = GameRules::creates_double_three(&board, 8, 8, Player::Max);
+        println!("Cross pattern (should be double-three): {}", result);
+
+        // Test 2: Pattern with blocked end
+        println!("\nTest 2: One End Blocked");
+        let mut board = Board::new(19);
+        board.place_stone(8, 7, Player::Max);  
+        board.place_stone(8, 9, Player::Max);  
+        board.place_stone(8, 10, Player::Min); // Block one end
+        board.place_stone(7, 8, Player::Max);  
+        board.place_stone(9, 8, Player::Max);  
+        let result = GameRules::creates_double_three(&board, 8, 8, Player::Max);
+        println!("One end blocked (should NOT be double-three if blocked): {}", result);
+
+        // Test 3: Four stones in a row should not count as free-three
+        println!("\nTest 3: Four in a Row");
+        let mut board = Board::new(19);
+        board.place_stone(8, 6, Player::Max);  
+        board.place_stone(8, 7, Player::Max);  
+        board.place_stone(8, 9, Player::Max);  
+        let result = GameRules::creates_double_three(&board, 8, 8, Player::Max);
+        println!("Creates four in row (should NOT count as free-three): {}", result);
+        
+        // Test 4: Pattern with a gap (one empty space between stones)
+        println!("\nTest 4: Pattern with One Gap");
+        let mut board = Board::new(19);
+        board.place_stone(8, 6, Player::Max);  
+        board.place_stone(8, 8, Player::Max);  
+        board.place_stone(7, 7, Player::Max);  
+        board.place_stone(9, 7, Player::Max);  
+        let result = GameRules::creates_double_three(&board, 8, 7, Player::Max);
+        println!("With one gap (depends on whether gap should count): {}", result);
+
+        // Test 5: Both ends blocked
+        println!("\nTest 5: Both Ends Blocked");
+        let mut board = Board::new(19);
+        board.place_stone(8, 7, Player::Max);
+        board.place_stone(8, 9, Player::Max);
+        board.place_stone(8, 6, Player::Min); // Block left
+        board.place_stone(8, 10, Player::Min); // Block right
+        let result = GameRules::creates_double_three(&board, 8, 8, Player::Max);
+        println!("Both ends blocked (should NOT be free-three at all): {}", result);
+
+        // Test 6: Only one direction has open space
+        println!("\nTest 6: Only One Free Three");
+        let mut board = Board::new(19);
+        board.place_stone(8, 7, Player::Max);
+        board.place_stone(8, 9, Player::Max);
+        let result = GameRules::creates_double_three(&board, 8, 8, Player::Max);
+        println!("Only horizontal free-three (should NOT be double-three): {}", result);
+
+        // Test 7: Immediate opponent block after empty
+        println!("\nTest 7: Empty then Opponent");
+        let mut board = Board::new(19);
+        board.place_stone(8, 7, Player::Max);
+        board.place_stone(8, 9, Player::Max);
+        board.place_stone(8, 11, Player::Min); // Opponent after one empty space
+        board.place_stone(7, 8, Player::Max);
+        board.place_stone(9, 8, Player::Max);
+        let result = GameRules::creates_double_three(&board, 8, 8, Player::Max);
+        println!("Opponent after empty space (can we form open four?): {}", result);
+    }
