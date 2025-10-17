@@ -30,6 +30,7 @@ pub struct Heuristic;
 
 const WINNING_SCORE: i32 = 1_000_000;
 const FIVE_IN_ROW_SCORE: i32 = 100_000;
+const CHECK_PENALTY: i32 = 50_000;
 const LIVE_FOUR_SINGLE_SCORE: i32 = 15_000;
 const LIVE_FOUR_MULTIPLE_SCORE: i32 = 20_000;
 const HALF_FREE_FOUR_SCORE: i32 = 5_000;
@@ -110,14 +111,27 @@ impl Heuristic {
             return 0;
         }
 
+        if let Some(player_in_check) = state.player_in_check {
+            let base_eval = Self::evaluate_patterns_and_position(state);
+            
+            return match player_in_check {
+                Player::Max => base_eval - CHECK_PENALTY,
+                Player::Min => base_eval + CHECK_PENALTY,
+            };
+        }
+
+        Self::evaluate_patterns_and_position(state)
+    }
+
+    fn evaluate_patterns_and_position(state: &GameState) -> i32 {
         let (max_counts, min_counts) =
             Self::analyze_both_players(&state.board, state.win_condition);
 
         if max_counts.five_in_row > 0 || max_counts.live_four > 1 {
-            return WINNING_SCORE + depth;
+            return WINNING_SCORE;
         }
         if min_counts.five_in_row > 0 || min_counts.live_four > 1 {
-            return -WINNING_SCORE - depth;
+            return -WINNING_SCORE;
         }
 
         let max_score = Self::calculate_pattern_score(max_counts);
