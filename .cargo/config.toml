@@ -1,0 +1,15 @@
+[target.x86_64-unknown-linux-gnu]
+rustflags = [
+    "-C", "link-arg=-Wl,--as-needed",
+    "-C", "link-arg=-Wl,-rpath,$ORIGIN",
+    "-C", "link-arg=-Wl,-rpath,$ORIGIN/lib"
+]
+
+[env]
+PKG_CONFIG_ALLOW_SYSTEM_LIBS = "1"
+PKG_CONFIG_ALLOW_SYSTEM_CFLAGS = "1"
+# Force X11 backend, disable Wayland
+WINIT_UNIX_BACKEND = "x11"
+
+[build]
+target = "x86_64-unknown-linux-gnu"
