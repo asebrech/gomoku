@@ -7,13 +7,9 @@
         window::{WindowMode, MonitorSelection},
     };
     use bevy_gstreamer::camera::BackgroundImageMarker;
-    use std::sync::{Arc, Mutex};
     use gstreamer::prelude::*;
     use gstreamer::{Element, State as GstState};
-    use gstreamer_app::{AppSink, AppSinkCallbacks};
-    use gstreamer_video;
-    use image::ImageBuffer;
-    use image::Rgb;
+    use gstreamer_app::AppSink;
 
     use crate::{
         audio::PlayClickSound,
@@ -147,6 +143,7 @@
         total_assets: usize,
         loaded_assets: usize,
         loading_timer: Timer,
+        video_ready: bool,
     }
 
     impl Default for LoadingProgress {
@@ -155,6 +152,7 @@
                 total_assets: 0,
                 loaded_assets: 0,
                 loading_timer: Timer::from_seconds(0.1, TimerMode::Repeating),
+                video_ready: false,
             }
         }
     }
@@ -230,6 +228,7 @@
             .init_resource::<MenuInitialized>()
             .init_resource::<LoadingProgress>()
             .init_resource::<GlobalVideoBackgroundState>()
+            .add_systems(OnEnter(AppState::Splash), preload_menu_video_background)
             .add_systems(OnEnter(AppState::Menu), (init_dev_mode_resources, menu_setup, setup_persistent_video_background, preload_game_video_background).chain())
             .add_systems(OnEnter(AppState::HowToPlay), setup_persistent_video_background)
             .add_systems(OnEnter(MenuState::Splash), splash_screen_setup)
@@ -260,7 +259,6 @@
             )
             .add_systems(OnEnter(AppState::GameOptions), cleanup_persistent_video_background)
             .add_systems(OnEnter(AppState::Credit), cleanup_persistent_video_background)
-            .add_systems(OnEnter(AppState::Splash), cleanup_persistent_video_background)
             .add_systems(OnEnter(AppState::Game), hide_persistent_video_in_game)
             .add_systems(OnEnter(AppState::Menu), show_persistent_video_background)
             .add_systems(OnEnter(AppState::HowToPlay), show_persistent_video_background)
@@ -268,7 +266,7 @@
                 Update,
                 (
                     loading_progress_system,
-                    update_loading_bar,
+                    check_video_readiness,
                     fade_transition_system,
                 ).run_if(in_state(MenuState::Splash)),
             )
@@ -289,7 +287,7 @@
                     initialize_video_players,
                     update_video_players,
                     handle_video_looping,
-                ).run_if(in_state(AppState::Menu).or(in_state(AppState::HowToPlay))),
+                ).run_if(in_state(AppState::Menu).or(in_state(AppState::HowToPlay)).or(in_state(AppState::Splash))),
             )
             .add_systems(
                 Update,
@@ -325,11 +323,7 @@
     #[derive(Component)]
     struct OnSplashScreen;
 
-    #[derive(Component)]
-    struct LoadingBar;
 
-    #[derive(Component)]
-    struct LoadingText;
 
     #[derive(Component)]
     struct FadeTransition {
@@ -575,80 +569,7 @@
                     SplashBackground, // Tag for updating when loaded
                 ));
 
-                // Loading UI positioned at bottom center
-                parent
-                    .spawn((
-                        Node {
-                            position_type: PositionType::Absolute,
-                            bottom: Val::Px(80.0),
-                            left: Val::Percent(50.0),
-                            width: Val::Px(500.0),
-                            height: Val::Auto,
-                            flex_direction: FlexDirection::Column,
-                            align_items: AlignItems::Center,
-                            justify_content: JustifyContent::Center,
-                            padding: UiRect::all(Val::Px(30.0)),
-                            margin: UiRect::left(Val::Px(-250.0)), // Center the container
-                            ..default()
-                        },
-                        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.7)),
-                    ))
-                    .with_children(|parent| {
-                        // Loading text
-                        parent.spawn((
-                            Text::new("Initializing..."),
-                            TextFont {
-                                font_size: config.ui.font_sizes.loading,
-                                ..default()
-                            },
-                            TextColor(colors.text_primary.clone().into()),
-                            LoadingText,
-                            Node {
-                                margin: UiRect::bottom(Val::Px(15.0)),
-                                ..default()
-                            },
-                        ));
 
-                        // Loading bar container
-                        parent
-                            .spawn((
-                                Node {
-                                    width: Val::Px(400.0),
-                                    height: Val::Px(16.0),
-                                    border: UiRect::all(Val::Px(2.0)),
-                                    padding: UiRect::all(Val::Px(2.0)),
-                                    ..default()
-                                },
-                                BackgroundColor(colors.surface.clone().into()),
-                                BorderColor(colors.accent.clone().into()),
-                            ))
-                            .with_children(|parent| {
-                                // Loading bar fill
-                                parent.spawn((
-                                    Node {
-                                        width: Val::Percent(0.0),
-                                        height: Val::Percent(100.0),
-                                        ..default()
-                                    },
-                                    BackgroundColor(colors.accent.clone().into()),
-                                    LoadingBar,
-                                ));
-                            });
-
-                        // Loading percentage
-                        parent.spawn((
-                            Text::new("0%"),
-                            TextFont {
-                                font_size: config.ui.font_sizes.percentage,
-                                ..default()
-                            },
-                            TextColor(colors.text_secondary.clone().into()),
-                            Node {
-                                margin: UiRect::top(Val::Px(8.0)),
-                                ..default()
-                            },
-                        ));
-                    });
             }).id();
         
         // Now create tracked assets system for remaining assets
@@ -721,8 +642,8 @@
                     loading_progress.total_assets = total_count;
                 }
                 
-                // Start fade transition when loading is complete
-                if loaded_count >= total_count && total_count > 0 && fade_query.is_empty() {
+                // Start fade transition when loading is complete AND video is ready
+                if loaded_count >= total_count && total_count > 0 && loading_progress.video_ready && fade_query.is_empty() {
                     println!("Loading complete! Starting beautiful fade transition...");
                     println!("Loaded {} out of {} assets", loaded_count, total_count);
                     start_fade_transition(&mut commands);
@@ -731,34 +652,30 @@
         }
     }
 
-    fn update_loading_bar(
-        loading_progress: Res<LoadingProgress>,
-        mut loading_bar_query: Query<&mut Node, With<LoadingBar>>,
-        mut loading_text_query: Query<&mut Text, (With<Text>, Without<LoadingBar>)>,
+    fn check_video_readiness(
+        mut loading_progress: ResMut<LoadingProgress>,
+        video_players: Query<&VideoFilePlayer, With<PersistentVideoBackground>>,
         config: Res<GameConfig>,
     ) {
-        if loading_progress.is_changed() && loading_progress.total_assets > 0 {
-            let progress = loading_progress.loaded_assets as f32 / loading_progress.total_assets as f32;
-            let percentage = (progress * 100.0) as u32;
-            
-            // Update loading bar width
-            for mut node in loading_bar_query.iter_mut() {
-                node.width = Val::Percent(progress * 100.0);
-            }
-            
-            // Custom loading messages from config
-            let loading_message = config.get_loading_message(percentage);
-            
-            // Update loading text with custom messages
-            for mut text in loading_text_query.iter_mut() {
-                if text.0.contains('%') {
-                    text.0 = format!("{}%", percentage);
-                } else {
-                    text.0 = loading_message.clone();
+        // In dev mode, video is always "ready" (no video needed)
+        if config.dev_mode {
+            loading_progress.video_ready = true;
+            return;
+        }
+        
+        // Check if any persistent video background is ready and streaming
+        for player in video_players.iter() {
+            if player.initialized && !player.frame_buffer.is_empty() {
+                if !loading_progress.video_ready {
+                    println!("Video streaming started with buffered frames!");
+                    loading_progress.video_ready = true;
                 }
+                return;
             }
         }
     }
+
+
 
     fn start_fade_transition(commands: &mut Commands) {
         // Create fade transition controller - start with fade out
@@ -3166,27 +3083,7 @@ fn create_menu_button_with_icon(
             return;
         }
         
-        if !config.dev_mode {
-            println!("Setting up persistent GStreamer video background");
-            // Spawn a GStreamer video background at menu level (not tied to specific screen)
-            commands.spawn((
-                Node {
-                    position_type: PositionType::Absolute,
-                    top: Val::Px(0.0),
-                    left: Val::Px(0.0),
-                    width: Val::Percent(100.0),
-                    height: Val::Percent(100.0),
-                    ..default()
-                },
-                ZIndex(-10), // Put video behind everything including overlays
-                ImageNode::default(), // Will be updated by the video player
-                GStreamerVideoBackground {
-                    video_path: "backgrounds/dolphin/dolphin.webm".to_string(),
-                },
-                VideoFilePlayer::default(),
-                PersistentVideoBackground, // Mark as persistent
-            ));
-        } else {
+        if config.dev_mode {
             // In devMode, show a simple colored background
             commands.spawn((
                 Node {
@@ -3272,6 +3169,44 @@ fn create_menu_button_with_icon(
         for mut visibility in video_query.iter_mut() {
             *visibility = Visibility::Visible;
         }
+    }
+
+    /// Preload menu video background during splash screen to avoid flash screens
+    fn preload_menu_video_background(
+        mut commands: Commands,
+        config: Res<GameConfig>,
+        theme_manager: Res<ThemeManager>,
+        existing_bg_query: Query<Entity, With<PersistentVideoBackground>>,
+    ) {
+        // Skip in devMode or if already exists
+        if config.dev_mode || !existing_bg_query.is_empty() {
+            return;
+        }
+        
+        let _colors = &theme_manager.current_theme.colors;
+        
+        println!("Preloading dolphin video background during splash screen");
+        // Spawn a hidden persistent GStreamer video background for the menu
+        let entity_commands = commands.spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                top: Val::Px(0.0),
+                left: Val::Px(0.0),
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                ..default()
+            },
+            ZIndex(-10), // Put video behind everything including overlays
+            ImageNode::default(), // Will be updated by the video player
+            GStreamerVideoBackground {
+                video_path: "backgrounds/dolphin/dolphin.webm".to_string(),
+            },
+            VideoFilePlayer::default(),
+            PersistentVideoBackground, // Mark as persistent
+            Visibility::Hidden, // Initially hidden during splash
+        ));
+        
+        println!("Preloaded dolphin video background entity: {:?}", entity_commands.id());
     }
 
 

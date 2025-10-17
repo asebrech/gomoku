@@ -1,6 +1,5 @@
 use std::time::Instant;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Mutex;
+
 
 use bevy::prelude::*;
 use bevy::tasks::{Task, AsyncComputeTaskPool};
@@ -1534,7 +1533,7 @@ fn update_captures_display(
 fn setup_game_background(
     mut commands: Commands,
     config: Res<GameConfig>,
-    existing_bg_query: Query<Entity, With<PersistentGameVideoBackground>>,
+    _existing_bg_query: Query<Entity, With<PersistentGameVideoBackground>>,
     mut existing_visibility_query: Query<&mut Visibility, With<PersistentGameVideoBackground>>,
 ) {
 
@@ -1565,7 +1564,7 @@ fn setup_game_background(
     }
     
     // Spawn a persistent GStreamer video background for the game
-    let entity = commands.spawn((
+    let _entity = commands.spawn((
         Node {
             position_type: PositionType::Absolute,
             top: Val::Px(0.0),
@@ -1603,7 +1602,7 @@ fn initialize_game_video_players(
         return;
     }
     
-    for (entity, mut player, video_bg) in video_players.iter_mut() {
+    for (_entity, mut player, video_bg) in video_players.iter_mut() {
         if player.initialized {
             continue;
         }
@@ -1651,7 +1650,7 @@ fn update_game_video_players(
     mut images: ResMut<Assets<Image>>,
     time: Res<Time>,
 ) {
-    for (entity, mut player, mut image_node) in video_players.iter_mut() {
+    for (_entity, mut player, mut image_node) in video_players.iter_mut() {
         if !player.initialized {
             continue;
         }
@@ -1801,7 +1800,7 @@ pub fn preload_game_video_background(
     }
     
     // Spawn a hidden persistent GStreamer video background for the game
-    let entity = commands.spawn((
+    let _entity = commands.spawn((
         Node {
             position_type: PositionType::Absolute,
             top: Val::Px(0.0),
@@ -1825,30 +1824,6 @@ pub fn preload_game_video_background(
     ));
 }
 
-/// Cleanup game video background when exiting the game state
-fn cleanup_game_video_background(
-    mut video_players: Query<&mut GameVideoFilePlayer, Without<PersistentGameVideoBackground>>,
-) {
-    
-    for mut player in video_players.iter_mut() {
-        // Properly stop and dispose of GStreamer pipeline
-        if let Some(pipeline) = player.pipeline.take() {
-            // Immediate stop - don't wait for state changes
-            let _ = pipeline.set_state(gstreamer::State::Null);
-            
-            // Force drop the pipeline reference
-            drop(pipeline);
-        }
-        
-        // Clear all references immediately
-        player.app_sink = None;
-        player.initialized = false;
-        player.image_handle = None;
-        player.frame_buffer.clear();
-        player.frame_timer = 0.0;
-        player.video_width = 0;
-        player.video_height = 0;
-    }
-}
+
 
 

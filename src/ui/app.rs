@@ -55,7 +55,7 @@ fn setup(mut commands: Commands) {
 
 fn maintain_aspect_ratio(
 	mut resize_events: EventReader<WindowResized>,
-	mut windows: Query<&mut Window>,
+	_windows: Query<&mut Window>,
 	mut last_size: Local<Option<(f32, f32)>>,
 ) {
 	// Disable aspect ratio maintenance to prevent UI coordinate issues

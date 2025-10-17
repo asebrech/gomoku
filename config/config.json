@@ -136,22 +136,11 @@
       "Gomoku: Rust never sleeps!",
       "Gomoku: Professional time waster since 2025!"
     ],
-    "loading_messages": {
-      "96-99": "Changing headers names...",
-      "26-40": "Cloning heuristic...",
-      "61-80": "Importing neo-cat...",
-      "100": "Complete!",
-      "81-95": "Renaming variables...",
-      "41-60": "Using Minimax Algorithm...",
-      "0-10": "Initializing...",
-      "11-25": "Loading songs..."
-    },
+
     "font_sizes": {
       "title": 32.0,
       "subtitle": 18.0,
-      "button": 28.0,
-      "loading": 20.0,
-      "percentage": 16.0
+      "button": 28.0
     }
   },
   "game": {
