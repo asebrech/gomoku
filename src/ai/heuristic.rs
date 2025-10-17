@@ -114,9 +114,25 @@ impl Heuristic {
         if let Some(player_in_check) = state.player_in_check {
             let base_eval = Self::evaluate_patterns_and_position(state);
             
+            let check_penalty = if let Some(check_pos) = state.check_position {
+                let breaking_moves = crate::core::rules::GameRules::get_breaking_capture_moves(
+                    &state.board,
+                    check_pos.0,
+                    check_pos.1,
+                    player_in_check
+                );
+                
+                let num_escapes = breaking_moves.len().max(1) as f32;
+                let escape_factor = 5.0 / num_escapes;
+                
+                CHECK_PENALTY + (escape_factor * 10_000.0) as i32
+            } else {
+                CHECK_PENALTY
+            };
+            
             return match player_in_check {
-                Player::Max => base_eval - CHECK_PENALTY,
-                Player::Min => base_eval + CHECK_PENALTY,
+                Player::Max => base_eval - check_penalty,
+                Player::Min => base_eval + check_penalty,
             };
         }
 
