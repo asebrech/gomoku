@@ -21,6 +21,7 @@ pub enum TutorialState {
     #[default]
     WinExample,
     CaptureExample,
+    DoubleThreeExample,
 }
 
 pub fn tutorial_plugin(app: &mut App) {
@@ -115,6 +116,13 @@ fn setup_tutorial(mut commands: Commands, config: Res<GameConfig>, preloaded_sto
                     .with_margin(UiRect::all(Val::Px(12.0)))
                     .spawn(builder, TutorialButton::CaptureExample, colors);
                 
+                // Double Three Rule Button
+                ButtonBuilder::new("Double Three Rule")
+                    .with_style(ButtonStyle::Secondary)
+                    .with_size(ButtonSize::Large)
+                    .with_margin(UiRect::all(Val::Px(12.0)))
+                    .spawn(builder, TutorialButton::DoubleThreeExample, colors);
+                
                 // Back Button
                 ButtonBuilder::new("Back to Menu")
                     .with_style(ButtonStyle::Secondary)
@@ -132,6 +140,7 @@ struct TutorialContent;
 enum TutorialButton {
     WinExample,
     CaptureExample,
+    DoubleThreeExample,
     BackToMenu,
 }
 
@@ -145,6 +154,7 @@ fn handle_tutorial_navigation(
             match button {
                 TutorialButton::WinExample => tutorial_state.set(TutorialState::WinExample),
                 TutorialButton::CaptureExample => tutorial_state.set(TutorialState::CaptureExample),
+                TutorialButton::DoubleThreeExample => tutorial_state.set(TutorialState::DoubleThreeExample),
                 TutorialButton::BackToMenu => app_state.set(AppState::Menu),
             }
         }
@@ -185,6 +195,7 @@ fn update_tutorial_content(
                 match tutorial_state.get() {
                     TutorialState::WinExample => spawn_win_example(builder, colors, &preloaded_stones, &config),
                     TutorialState::CaptureExample => spawn_capture_example(builder, colors, &preloaded_stones, &config),
+                    TutorialState::DoubleThreeExample => spawn_double_three_example(builder, colors, &preloaded_stones, &config),
                 }
             });
         }
@@ -317,6 +328,69 @@ fn spawn_capture_example(
     });
 }
 
+fn spawn_double_three_example(
+    builder: &mut ChildSpawnerCommands, 
+    colors: &crate::ui::config::ColorConfig,
+    preloaded_stones: &PreloadedStones,
+    config: &GameConfig,
+) {
+    // Left side: explanation
+    builder.spawn((
+        Node {
+            display: Display::Flex,
+            flex_direction: FlexDirection::Column,
+            width: Val::Percent(45.0),
+            height: Val::Percent(100.0),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            row_gap: Val::Px(20.0),
+            padding: UiRect::all(Val::Px(20.0)),
+            ..default()
+        },
+        BackgroundColor(Color::srgba(
+            colors.surface.r * 0.7,
+            colors.surface.g * 0.7,
+            colors.surface.b * 0.7,
+            0.7
+        )),
+        BorderColor(colors.secondary.clone().into()),
+        BorderRadius::all(Val::Px(10.0)),
+    )).with_children(|builder| {
+        builder.spawn((
+            Text::new("Double Three Rule"),
+            TextFont {
+                font_size: 32.0,
+                ..default()
+            },
+            TextColor(colors.accent.clone().into()),
+        ));
+        
+        builder.spawn((
+            Text::new("FORBIDDEN: You cannot create two \"free threes\" with one move!\n\nA free three is a line of 3 stones that can extend to 4 in both directions.\n\nThe ❌ position would create two free threes (horizontal and vertical), which is illegal.\n\nThis rule prevents overpowered winning threats."),
+            TextFont {
+                font_size: 18.0,
+                ..default()
+            },
+            TextColor(colors.text_primary.clone().into()),
+        ));
+    });
+
+    // Right side: demo board
+    builder.spawn((
+        Node {
+            display: Display::Flex,
+            flex_direction: FlexDirection::Column,
+            width: Val::Percent(45.0),
+            height: Val::Percent(100.0),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            ..default()
+        },
+    )).with_children(|builder| {
+        spawn_demo_board(builder, create_double_three_pattern(), colors, preloaded_stones, config);
+    });
+}
+
 fn spawn_demo_board(
     builder: &mut ChildSpawnerCommands, 
     pattern: Vec<(usize, usize, StoneType)>, 
@@ -392,55 +466,97 @@ fn spawn_demo_board(
         for (x, y, stone_type) in pattern {
             let stone_size = 30.0;
             
-            if is_synthwave {
-                // Use image assets for Synthwave theme
-                let stone_handle = match stone_type {
-                    StoneType::Pink => preloaded_stones.pink_stone.clone(),
-                    StoneType::Blue => preloaded_stones.blue_stone.clone(),
-                };
-                
-                builder.spawn((
-                    Node {
-                        position_type: PositionType::Absolute,
-                        left: Val::Px(x as f32 * cell_size + cell_size / 2.0 - stone_size / 2.0),
-                        top: Val::Px(y as f32 * cell_size + cell_size / 2.0 - stone_size / 2.0),
-                        width: Val::Px(stone_size),
-                        height: Val::Px(stone_size),
-                        ..default()
-                    },
-                    ImageNode::new(stone_handle),
-                    ZIndex(10),
-                ));
-            } else {
-                // Use theme colors for other themes - circular nodes
-                let stone_color = match stone_type {
-                    StoneType::Pink => Color::srgba(
-                        colors.stone_player1.r,
-                        colors.stone_player1.g,
-                        colors.stone_player1.b,
-                        colors.stone_player1.a,
-                    ),
-                    StoneType::Blue => Color::srgba(
-                        colors.stone_player2.r,
-                        colors.stone_player2.g,
-                        colors.stone_player2.b,
-                        colors.stone_player2.a,
-                    ),
-                };
-                
-                builder.spawn((
-                    Node {
-                        position_type: PositionType::Absolute,
-                        left: Val::Px(x as f32 * cell_size + cell_size / 2.0 - stone_size / 2.0),
-                        top: Val::Px(y as f32 * cell_size + cell_size / 2.0 - stone_size / 2.0),
-                        width: Val::Px(stone_size),
-                        height: Val::Px(stone_size),
-                        ..default()
-                    },
-                    BackgroundColor(stone_color),
-                    BorderRadius::all(Val::Percent(50.0)), // Perfect circle
-                    ZIndex(10),
-                ));
+            match stone_type {
+                StoneType::Forbidden => {
+                    // Tilted red cross (45 degrees) with same thickness as board lines
+                    let cross_size = stone_size * 0.7; // Make it slightly shorter
+                    let cross_center_x = x as f32 * cell_size + cell_size / 2.0;
+                    let cross_center_y = y as f32 * cell_size + cell_size / 2.0;
+                    
+                    // First diagonal line (\)
+                    builder.spawn((
+                        Node {
+                            position_type: PositionType::Absolute,
+                            left: Val::Px(cross_center_x - cross_size / 2.0),
+                            top: Val::Px(cross_center_y - line_thickness / 2.0),
+                            width: Val::Px(cross_size),
+                            height: Val::Px(line_thickness),
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgb(0.9, 0.1, 0.1)), // Bright red
+                        Transform::from_rotation(Quat::from_rotation_z(std::f32::consts::PI / 4.0)), // 45 degrees
+                        ZIndex(10),
+                    ));
+                    
+                    // Second diagonal line (/)
+                    builder.spawn((
+                        Node {
+                            position_type: PositionType::Absolute,
+                            left: Val::Px(cross_center_x - cross_size / 2.0),
+                            top: Val::Px(cross_center_y - line_thickness / 2.0),
+                            width: Val::Px(cross_size),
+                            height: Val::Px(line_thickness),
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgb(0.9, 0.1, 0.1)), // Bright red
+                        Transform::from_rotation(Quat::from_rotation_z(-std::f32::consts::PI / 4.0)), // -45 degrees
+                        ZIndex(10),
+                    ));
+                }
+                _ => {
+                    if is_synthwave {
+                        // Use image assets for Synthwave theme
+                        let stone_handle = match stone_type {
+                            StoneType::Pink => preloaded_stones.pink_stone.clone(),
+                            StoneType::Blue => preloaded_stones.blue_stone.clone(),
+                            StoneType::Forbidden => unreachable!(), // Already handled above
+                        };
+                        
+                        builder.spawn((
+                            Node {
+                                position_type: PositionType::Absolute,
+                                left: Val::Px(x as f32 * cell_size + cell_size / 2.0 - stone_size / 2.0),
+                                top: Val::Px(y as f32 * cell_size + cell_size / 2.0 - stone_size / 2.0),
+                                width: Val::Px(stone_size),
+                                height: Val::Px(stone_size),
+                                ..default()
+                            },
+                            ImageNode::new(stone_handle),
+                            ZIndex(10),
+                        ));
+                    } else {
+                        // Use theme colors for other themes - circular nodes
+                        let stone_color = match stone_type {
+                            StoneType::Pink => Color::srgba(
+                                colors.stone_player1.r,
+                                colors.stone_player1.g,
+                                colors.stone_player1.b,
+                                colors.stone_player1.a,
+                            ),
+                            StoneType::Blue => Color::srgba(
+                                colors.stone_player2.r,
+                                colors.stone_player2.g,
+                                colors.stone_player2.b,
+                                colors.stone_player2.a,
+                            ),
+                            StoneType::Forbidden => unreachable!(), // Already handled above
+                        };
+                        
+                        builder.spawn((
+                            Node {
+                                position_type: PositionType::Absolute,
+                                left: Val::Px(x as f32 * cell_size + cell_size / 2.0 - stone_size / 2.0),
+                                top: Val::Px(y as f32 * cell_size + cell_size / 2.0 - stone_size / 2.0),
+                                width: Val::Px(stone_size),
+                                height: Val::Px(stone_size),
+                                ..default()
+                            },
+                            BackgroundColor(stone_color),
+                            BorderRadius::all(Val::Percent(50.0)), // Perfect circle
+                            ZIndex(10),
+                        ));
+                    }
+                }
             }
         }
     });
@@ -450,6 +566,7 @@ fn spawn_demo_board(
 enum StoneType {
     Pink,
     Blue,
+    Forbidden, // Special marker for forbidden moves
 }
 
 fn create_win_pattern() -> Vec<(usize, usize, StoneType)> {
@@ -480,6 +597,21 @@ fn create_capture_pattern() -> Vec<(usize, usize, StoneType)> {
         (4, 3, StoneType::Blue),
         (2, 5, StoneType::Pink),
         (5, 5, StoneType::Pink),
+    ]
+}
+
+fn create_double_three_pattern() -> Vec<(usize, usize, StoneType)> {
+    vec![
+        // Cross pattern: -X-
+        //                XOX  where O is the forbidden center
+        //                -X-
+        (3, 4, StoneType::Pink),   // Left
+        (5, 4, StoneType::Pink),   // Right
+        (4, 3, StoneType::Pink),   // Top
+        (4, 5, StoneType::Pink),   // Bottom
+        
+        // The forbidden center position
+        (4, 4, StoneType::Forbidden), // This creates double-three (horizontal and vertical)
     ]
 }
 

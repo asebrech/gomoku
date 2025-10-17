@@ -89,6 +89,8 @@ pub struct OnGameScreen;
 pub struct Stone(#[allow(dead_code)] Player);
 #[derive(Component)]
 pub struct AvailableArea;
+#[derive(Component)]
+pub struct ForbiddenMarker;
 #[derive(Event)]
 pub struct StonePlacement {
     x: usize,
@@ -160,6 +162,7 @@ pub fn game_plugin(app: &mut App) {
             setup_game_ui,
             setup_game_background,
             show_persistent_game_video_background,
+            update_available_placement, // Initialize forbidden markers on game start
         ).chain())
         .add_systems(
             Update,
@@ -170,7 +173,10 @@ pub fn game_plugin(app: &mut App) {
                 process_next_round.run_if(on_event::<MovePlayed>),
                 start_ai_computation,  // Start async AI computation
                 poll_ai_computation,   // Poll for AI computation results
-                update_available_placement.run_if(on_event::<MovePlayed>),
+                update_available_placement.run_if(
+                    on_event::<MovePlayed>
+                        .or(resource_changed::<GameState>)
+                ),
                 update_current_player_display.run_if(
                     resource_changed::<GameState>
                         .or(resource_changed::<GameStatus>)
@@ -498,17 +504,30 @@ pub fn update_available_placement(
     game_state: Res<GameState>,
     parents: Query<(Entity, &Children, &GridCell), With<GridCell>>,
     mut dots: Query<(&mut BackgroundColor, &mut Visibility), With<PreviewDot>>,
+    forbidden_markers: Query<Entity, With<ForbiddenMarker>>,
+    board_query: Query<Entity, With<BoardRoot>>,
 ) {
     // Consume events
     for _ in ev_board_update.read() {}
 
+    // Clear all existing forbidden markers
+    for marker_entity in forbidden_markers.iter() {
+        commands.entity(marker_entity).despawn();
+    }
+
+    // Get the board entity
+    let Ok(board_entity) = board_query.get_single() else {
+        error!("Failed to find board entity");
+        return;
+    };
+
     info!("Updating stone preview...");
     for (entity, children, cell) in parents.iter() {
-        // Check if position is empty and doesn't create double-three
-        let is_valid = game_state.board.is_empty_position(cell.x, cell.y)
-            && !GameRules::creates_double_three(&game_state.board, cell.x, cell.y, game_state.current_player);
+        let is_empty = game_state.board.is_empty_position(cell.x, cell.y);
+        let creates_double_three = GameRules::creates_double_three(&game_state.board, cell.x, cell.y, game_state.current_player);
         
-        if is_valid {
+        if is_empty && !creates_double_three {
+            // Valid placement - show preview dot
             for &child in children {
                 if let Ok((mut bg, mut visibility)) = dots.get_mut(child) {
                     *bg = BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.4));
@@ -516,7 +535,19 @@ pub fn update_available_placement(
                     commands.entity(entity).insert(AvailableArea);
                 }
             }
+        } else if is_empty && creates_double_three {
+            // Forbidden placement - hide preview dot and show red cross
+            for &child in children {
+                if let Ok((mut bg, mut visibility)) = dots.get_mut(child) {
+                    *bg = BackgroundColor(Color::NONE);
+                    *visibility = Visibility::Hidden;
+                    commands.entity(entity).remove::<AvailableArea>();
+                }
+            }
+            // Spawn forbidden cross marker
+            spawn_forbidden_cross(&mut commands, board_entity, cell.x, cell.y);
         } else {
+            // Occupied position - hide preview dot
             for &child in children {
                 if let Ok((mut bg, mut visibility)) = dots.get_mut(child) {
                     *bg = BackgroundColor(Color::NONE);
@@ -526,6 +557,51 @@ pub fn update_available_placement(
             }
         }
     }
+}
+
+fn spawn_forbidden_cross(commands: &mut Commands, board_entity: Entity, cell_x: usize, cell_y: usize) {
+    let line_thickness = 2.0; // Match tutorial exactly
+    let cross_size = BoardUtils::STONE_SIZE * 0.7; // Match tutorial exactly
+    
+    // Calculate position relative to board (same as stone positioning)
+    let cross_center_x = cell_x as f32 * BoardUtils::CELL_SIZE + BoardUtils::CELL_SIZE / 2.0;
+    let cross_center_y = cell_y as f32 * BoardUtils::CELL_SIZE + BoardUtils::CELL_SIZE / 2.0;
+    
+    commands.entity(board_entity).with_children(|builder| {
+        // First diagonal line (\)
+        builder.spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(cross_center_x - cross_size / 2.0),
+                top: Val::Px(cross_center_y - line_thickness / 2.0),
+                width: Val::Px(cross_size),
+                height: Val::Px(line_thickness),
+                ..default()
+            },
+            BackgroundColor(Color::srgb(1.0, 0.0, 0.0)), // Bright pure red
+            Transform::from_rotation(Quat::from_rotation_z(std::f32::consts::PI / 4.0)), // 45 degrees
+            ZIndex(20), // Above stones and board
+            ForbiddenMarker,
+            OnGameScreen,
+        ));
+        
+        // Second diagonal line (/)
+        builder.spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(cross_center_x - cross_size / 2.0),
+                top: Val::Px(cross_center_y - line_thickness / 2.0),
+                width: Val::Px(cross_size),
+                height: Val::Px(line_thickness),
+                ..default()
+            },
+            BackgroundColor(Color::srgb(1.0, 0.0, 0.0)), // Bright pure red
+            Transform::from_rotation(Quat::from_rotation_z(-std::f32::consts::PI / 4.0)), // -45 degrees
+            ZIndex(20), // Above stones and board
+            ForbiddenMarker,
+            OnGameScreen,
+        ));
+    });
 }
 
 pub fn place_stone(
