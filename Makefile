@@ -31,7 +31,11 @@ help:
 release: setup
 	@echo "Building optimized release version..."
 	@echo "Setting devMode to false for release..."
-	@sed -i '' 's/"devMode": true/"devMode": false/g' config/config.json
+	@if [ "$$(uname -s)" = "Darwin" ]; then \
+		sed -i '' 's/"devMode": true/"devMode": false/g' config/config.json; \
+	else \
+		sed -i 's/"devMode": true/"devMode": false/g' config/config.json; \
+	fi
 	export PKG_CONFIG_PATH=$(PWD)/deps/lib/pkgconfig:$$PKG_CONFIG_PATH && cargo build --release
 	@echo "✅ Release build complete!"
 	@echo "Run with: make up"
@@ -40,7 +44,11 @@ release: setup
 dev: setup
 	@echo "Building development version with optimized dependencies..."
 	@echo "Setting devMode to true for development..."
-	@sed -i '' 's/"devMode": false/"devMode": true/g' config/config.json
+	@if [ "$$(uname -s)" = "Darwin" ]; then \
+		sed -i '' 's/"devMode": false/"devMode": true/g' config/config.json; \
+	else \
+		sed -i 's/"devMode": false/"devMode": true/g' config/config.json; \
+	fi
 	export PKG_CONFIG_PATH=$(PWD)/deps/lib/pkgconfig:$$PKG_CONFIG_PATH && cargo build
 	@echo "✅ Development build complete!"
 	@echo "Run with: make up-dev"
@@ -48,17 +56,31 @@ dev: setup
 # Build and run the executable
 up: release check-assets
 	@echo "Running Gomoku..."
-	@export DYLD_LIBRARY_PATH=$(PWD)/deps/lib:$$DYLD_LIBRARY_PATH && \
-	export GST_PLUGIN_PATH=$(PWD)/deps/lib:$$GST_PLUGIN_PATH && \
-	export GST_PLUGIN_SYSTEM_PATH="" && \
-	export GST_REGISTRY=$(PWD)/deps/lib/registry.bin && \
-	export GST_REGISTRY_FORK=no && \
-	export GST_REGISTRY_UPDATE=yes && \
-	if [ ! -f $(PWD)/deps/lib/registry.bin ]; then \
-		rm -f ~/.cache/gstreamer-1.0/registry.*.bin 2>/dev/null || true; \
-		echo "Building GStreamer plugin registry..."; \
-	fi && \
-	./target/release/gomoku
+	@if [ "$$(uname -s)" = "Darwin" ]; then \
+		export DYLD_LIBRARY_PATH=$(PWD)/deps/lib:$$DYLD_LIBRARY_PATH && \
+		export GST_PLUGIN_PATH=$(PWD)/deps/lib:$$GST_PLUGIN_PATH && \
+		export GST_PLUGIN_SYSTEM_PATH="" && \
+		export GST_REGISTRY=$(PWD)/deps/lib/registry.bin && \
+		export GST_REGISTRY_FORK=no && \
+		export GST_REGISTRY_UPDATE=yes && \
+		if [ ! -f $(PWD)/deps/lib/registry.bin ]; then \
+			rm -f ~/.cache/gstreamer-1.0/registry.*.bin 2>/dev/null || true; \
+			echo "Building GStreamer plugin registry..."; \
+		fi && \
+		./target/release/gomoku; \
+	else \
+		export LD_LIBRARY_PATH=$(PWD)/deps/lib:$$LD_LIBRARY_PATH && \
+		export GST_PLUGIN_PATH=$(PWD)/deps/lib/gstreamer-1.0:$$GST_PLUGIN_PATH && \
+		export GST_PLUGIN_SYSTEM_PATH="" && \
+		export GST_REGISTRY=$(PWD)/deps/lib/registry.bin && \
+		export GST_REGISTRY_FORK=no && \
+		export GST_REGISTRY_UPDATE=yes && \
+		if [ ! -f $(PWD)/deps/lib/registry.bin ]; then \
+			rm -f ~/.cache/gstreamer-1.0/registry.*.bin 2>/dev/null || true; \
+			echo "Building GStreamer plugin registry..."; \
+		fi && \
+		./target/release/gomoku; \
+	fi
 
 # Build and run the development executable (faster startup)
 up-dev: dev check-assets
@@ -67,23 +89,42 @@ up-dev: dev check-assets
 		ln -sf ../../assets target/debug/assets; \
 		ln -sf ../../config target/debug/config; \
 	fi
-	@export DYLD_LIBRARY_PATH=$(PWD)/deps/lib:$$DYLD_LIBRARY_PATH && \
-	export GST_PLUGIN_PATH=$(PWD)/deps/lib:$$GST_PLUGIN_PATH && \
-	export GST_PLUGIN_SYSTEM_PATH="" && \
-	export GST_REGISTRY=$(PWD)/deps/lib/registry.bin && \
-	export GST_REGISTRY_FORK=no && \
-	export GST_REGISTRY_UPDATE=no && \
-	./target/debug/gomoku
+	@if [ "$$(uname -s)" = "Darwin" ]; then \
+		export DYLD_LIBRARY_PATH=$(PWD)/deps/lib:$$DYLD_LIBRARY_PATH && \
+		export GST_PLUGIN_PATH=$(PWD)/deps/lib:$$GST_PLUGIN_PATH && \
+		export GST_PLUGIN_SYSTEM_PATH="" && \
+		export GST_REGISTRY=$(PWD)/deps/lib/registry.bin && \
+		export GST_REGISTRY_FORK=no && \
+		export GST_REGISTRY_UPDATE=no && \
+		./target/debug/gomoku; \
+	else \
+		export LD_LIBRARY_PATH=$(PWD)/deps/lib:$$LD_LIBRARY_PATH && \
+		export GST_PLUGIN_PATH=$(PWD)/deps/lib/gstreamer-1.0:$$GST_PLUGIN_PATH && \
+		export GST_PLUGIN_SYSTEM_PATH="" && \
+		export GST_REGISTRY=$(PWD)/deps/lib/registry.bin && \
+		export GST_REGISTRY_FORK=no && \
+		export GST_REGISTRY_UPDATE=no && \
+		./target/debug/gomoku; \
+	fi
 
 # Ultra-fast development mode (no video, instant startup)
 fast: dev check-assets
 	@echo "Running Gomoku (ultra-fast mode - no video)..."
-	@export DYLD_LIBRARY_PATH=$(PWD)/deps/lib:$$DYLD_LIBRARY_PATH && \
-	export GST_PLUGIN_PATH="" && \
-	export GST_PLUGIN_SYSTEM_PATH="" && \
-	export GST_REGISTRY_UPDATE=no && \
-	export GST_REGISTRY_FORK=no && \
-	./target/debug/gomoku
+	@if [ "$$(uname -s)" = "Darwin" ]; then \
+		export DYLD_LIBRARY_PATH=$(PWD)/deps/lib:$$DYLD_LIBRARY_PATH && \
+		export GST_PLUGIN_PATH="" && \
+		export GST_PLUGIN_SYSTEM_PATH="" && \
+		export GST_REGISTRY_UPDATE=no && \
+		export GST_REGISTRY_FORK=no && \
+		./target/debug/gomoku; \
+	else \
+		export LD_LIBRARY_PATH=$(PWD)/deps/lib:$$LD_LIBRARY_PATH && \
+		export GST_PLUGIN_PATH="" && \
+		export GST_PLUGIN_SYSTEM_PATH="" && \
+		export GST_REGISTRY_UPDATE=no && \
+		export GST_REGISTRY_FORK=no && \
+		./target/debug/gomoku; \
+	fi
 
 # Clean everything (cargo + deps)
 clean:
@@ -99,9 +140,15 @@ setup:
 	@echo "Setting up cross-platform dependencies..."
 	./setup_deps.sh
 	@echo "Fixing pkg-config library naming issues..."
-	@sed -i '' 's/-lglib_2\.0/-lglib-2.0/g' deps/lib/pkgconfig/glib-2.0.pc 2>/dev/null || true
-	@sed -i '' 's/-lgio_2\.0/-lgio-2.0/g' deps/lib/pkgconfig/gio-2.0.pc 2>/dev/null || true
-	@sed -i '' 's/-lgobject_2\.0/-lgobject-2.0/g' deps/lib/pkgconfig/gobject-2.0.pc 2>/dev/null || true
+	@if [ "$$(uname -s)" = "Darwin" ]; then \
+		sed -i '' 's/-lglib_2\.0/-lglib-2.0/g' deps/lib/pkgconfig/glib-2.0.pc 2>/dev/null || true; \
+		sed -i '' 's/-lgio_2\.0/-lgio-2.0/g' deps/lib/pkgconfig/gio-2.0.pc 2>/dev/null || true; \
+		sed -i '' 's/-lgobject_2\.0/-lgobject-2.0/g' deps/lib/pkgconfig/gobject-2.0.pc 2>/dev/null || true; \
+	else \
+		sed -i 's/-lglib_2\.0/-lglib-2.0/g' deps/lib/pkgconfig/glib-2.0.pc 2>/dev/null || true; \
+		sed -i 's/-lgio_2\.0/-lgio-2.0/g' deps/lib/pkgconfig/gio-2.0.pc 2>/dev/null || true; \
+		sed -i 's/-lgobject_2\.0/-lgobject-2.0/g' deps/lib/pkgconfig/gobject-2.0.pc 2>/dev/null || true; \
+	fi
 	@echo "✅ Dependencies setup complete!"
 
 check-assets:
@@ -138,8 +185,13 @@ deploy:
 	@cp -r config dist/gomoku/
 	@echo "#!/bin/bash" > dist/gomoku/run.sh
 	@echo "cd \"\$$(dirname \"\$$0\")\"" >> dist/gomoku/run.sh
-	@echo "export DYLD_LIBRARY_PATH=\$$(pwd)/lib:\$$DYLD_LIBRARY_PATH" >> dist/gomoku/run.sh
-	@echo "export GST_PLUGIN_PATH=\$$(pwd)/lib:\$$GST_PLUGIN_PATH" >> dist/gomoku/run.sh
+	@if [ "$$(uname -s)" = "Darwin" ]; then \
+		echo "export DYLD_LIBRARY_PATH=\$$(pwd)/lib:\$$DYLD_LIBRARY_PATH" >> dist/gomoku/run.sh; \
+		echo "export GST_PLUGIN_PATH=\$$(pwd)/lib:\$$GST_PLUGIN_PATH" >> dist/gomoku/run.sh; \
+	else \
+		echo "export LD_LIBRARY_PATH=\$$(pwd)/lib:\$$LD_LIBRARY_PATH" >> dist/gomoku/run.sh; \
+		echo "export GST_PLUGIN_PATH=\$$(pwd)/lib/gstreamer-1.0:\$$GST_PLUGIN_PATH" >> dist/gomoku/run.sh; \
+	fi
 	@echo "export GST_PLUGIN_SYSTEM_PATH=" >> dist/gomoku/run.sh
 	@echo "export GST_REGISTRY=\$$(pwd)/lib/registry.bin" >> dist/gomoku/run.sh
 	@echo "export GST_REGISTRY_FORK=no" >> dist/gomoku/run.sh

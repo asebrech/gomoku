@@ -144,11 +144,111 @@ EOF
 
 # Linux setup
 elif [[ "$OS" == "Linux" ]]; then
-    echo "Linux dependency setup not yet implemented"
-    echo "Please install GStreamer development packages:"
-    echo "  Ubuntu/Debian: sudo apt install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev"
-    echo "  Fedora: sudo dnf install gstreamer1-devel gstreamer1-plugins-base-devel"
-    exit 1
+    echo "Setting up GStreamer for Linux using system libraries..."
+    
+    # Check if system GStreamer is available
+    GST_SYSTEM_PREFIX=""
+    for prefix in /usr /usr/local; do
+        if [ -f "$prefix/lib/x86_64-linux-gnu/libgstreamer-1.0.so" ] || [ -f "$prefix/lib/libgstreamer-1.0.so" ]; then
+            GST_SYSTEM_PREFIX="$prefix"
+            break
+        fi
+    done
+    
+    if [ -z "$GST_SYSTEM_PREFIX" ]; then
+        echo "❌ GStreamer not found on system."
+        echo "Please install GStreamer development packages:"
+        echo "  Ubuntu/Debian: sudo apt install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev"
+        echo "  Fedora: sudo dnf install gstreamer1-devel gstreamer1-plugins-base-devel"
+        exit 1
+    fi
+    
+    echo "Found GStreamer at: $GST_SYSTEM_PREFIX"
+    
+    # Find the actual library directory
+    GST_LIB_DIR=""
+    for libdir in "$GST_SYSTEM_PREFIX/lib/x86_64-linux-gnu" "$GST_SYSTEM_PREFIX/lib64" "$GST_SYSTEM_PREFIX/lib"; do
+        if [ -f "$libdir/libgstreamer-1.0.so" ]; then
+            GST_LIB_DIR="$libdir"
+            break
+        fi
+    done
+    
+    # Find the include directory
+    GST_INCLUDE_DIR=""
+    for incdir in "$GST_SYSTEM_PREFIX/include"; do
+        if [ -d "$incdir/gstreamer-1.0" ]; then
+            GST_INCLUDE_DIR="$incdir"
+            break
+        fi
+    done
+    
+    # Find pkg-config directory
+    GST_PKGCONFIG_DIR=""
+    for pcdir in "$GST_LIB_DIR/pkgconfig" "$GST_SYSTEM_PREFIX/lib/pkgconfig" "$GST_SYSTEM_PREFIX/lib64/pkgconfig" "$GST_SYSTEM_PREFIX/share/pkgconfig"; do
+        if [ -f "$pcdir/gstreamer-1.0.pc" ]; then
+            GST_PKGCONFIG_DIR="$pcdir"
+            break
+        fi
+    done
+    
+    # Copy system libraries to local deps
+    if [ -n "$GST_LIB_DIR" ]; then
+        echo "Copying GStreamer libraries from $GST_LIB_DIR..."
+        cp "$GST_LIB_DIR"/libgstreamer*.so* "$LIBS_DIR/" 2>/dev/null || true
+        cp "$GST_LIB_DIR"/libgst*.so* "$LIBS_DIR/" 2>/dev/null || true
+        cp "$GST_LIB_DIR"/libglib*.so* "$LIBS_DIR/" 2>/dev/null || true
+        cp "$GST_LIB_DIR"/libgobject*.so* "$LIBS_DIR/" 2>/dev/null || true
+        cp "$GST_LIB_DIR"/libgio*.so* "$LIBS_DIR/" 2>/dev/null || true
+        
+        # Copy GStreamer plugins
+        echo "Copying GStreamer plugins..."
+        GST_PLUGIN_DIRS=("$GST_LIB_DIR/gstreamer-1.0" "$GST_SYSTEM_PREFIX/lib/x86_64-linux-gnu/gstreamer-1.0" "$GST_SYSTEM_PREFIX/lib64/gstreamer-1.0")
+        for plugin_dir in "${GST_PLUGIN_DIRS[@]}"; do
+            if [ -d "$plugin_dir" ]; then
+                mkdir -p "$LIBS_DIR/gstreamer-1.0"
+                cp "$plugin_dir"/*.so "$LIBS_DIR/gstreamer-1.0/" 2>/dev/null || true
+                echo "Copied plugins from: $plugin_dir"
+                break
+            fi
+        done
+    fi
+    
+    # Copy headers if available
+    if [ -n "$GST_INCLUDE_DIR" ]; then
+        HEADER_DIR="$DEPS_DIR/include"
+        mkdir -p "$HEADER_DIR"
+        if [ -d "$GST_INCLUDE_DIR/gstreamer-1.0" ]; then
+            cp -r "$GST_INCLUDE_DIR/gstreamer-1.0" "$HEADER_DIR/" 2>/dev/null || true
+        fi
+        if [ -d "$GST_INCLUDE_DIR/glib-2.0" ]; then
+            cp -r "$GST_INCLUDE_DIR/glib-2.0" "$HEADER_DIR/" 2>/dev/null || true
+        fi
+    fi
+    
+    # Copy or create pkg-config files
+    if [ -n "$GST_PKGCONFIG_DIR" ]; then
+        echo "Copying pkg-config files from $GST_PKGCONFIG_DIR..."
+        cp "$GST_PKGCONFIG_DIR"/gstreamer*.pc "$PKG_CONFIG_DIR/" 2>/dev/null || true
+        cp "$GST_PKGCONFIG_DIR"/glib*.pc "$PKG_CONFIG_DIR/" 2>/dev/null || true
+        cp "$GST_PKGCONFIG_DIR"/gobject*.pc "$PKG_CONFIG_DIR/" 2>/dev/null || true
+        cp "$GST_PKGCONFIG_DIR"/gio*.pc "$PKG_CONFIG_DIR/" 2>/dev/null || true
+    fi
+    
+    # Set prefix to our local installation
+    GST_PREFIX="$DEPS_DIR"
+    
+    # Update pkg-config files to point to our local installation
+    for pc_file in "$PKG_CONFIG_DIR"/*.pc; do
+        if [ -f "$pc_file" ]; then
+            sed -i "s|^prefix=.*|prefix=$GST_PREFIX|g" "$pc_file"
+            sed -i "s|^exec_prefix=.*|exec_prefix=\${prefix}|g" "$pc_file"
+            sed -i "s|^libdir=.*|libdir=\${exec_prefix}/lib|g" "$pc_file"
+            sed -i "s|^includedir=.*|includedir=\${prefix}/include|g" "$pc_file"
+        fi
+    done
+    
+    echo "Using GStreamer from: $GST_PREFIX"
 else
     echo "❌ Unsupported OS: $OS"
     exit 1
