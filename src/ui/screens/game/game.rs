@@ -20,7 +20,7 @@ use crate::{
             game::{
                 board::{BoardRoot, BoardUtils, PreviewDot}, 
                 settings::{spawn_settings_panel, BackToMenuButton, ResetBoardButton, VolumeDisplay, VolumeDown, VolumeUp}
-            }, menu::GameAudio, splash::PreloadedStones, utils::despawn_screen
+            }, menu::{GameAudio, MenuState}, splash::PreloadedStones, utils::despawn_screen
         },
     }
 };
@@ -213,9 +213,7 @@ pub fn game_plugin(app: &mut App) {
                 handle_game_over_actions,
             ).run_if(in_state(AppState::Game)),
         )
-        .add_systems(OnExit(AppState::Game), (hide_persistent_game_video_background, despawn_screen::<OnGameScreen>))
-        .add_systems(OnEnter(AppState::Menu), hide_persistent_game_video_background)
-        .add_systems(OnEnter(AppState::HowToPlay), hide_persistent_game_video_background);
+        .add_systems(OnExit(AppState::Game), (hide_persistent_game_video_background, despawn_screen::<OnGameScreen>));
 }
 
 fn update_game_settings_from_config(
@@ -1056,12 +1054,14 @@ pub fn toggle_pause(
 pub fn handle_escape_key(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut app_state: ResMut<NextState<AppState>>,
+    mut menu_state: ResMut<NextState<MenuState>>,
     game_status: Res<GameStatus>,
 ) {
     if keyboard_input.just_pressed(KeyCode::Escape) {
         // Don't allow going back to menu while AI is thinking
         if *game_status != GameStatus::AIThinking {
             app_state.set(AppState::Menu);
+            menu_state.set(MenuState::Main);
         }
     }
 }
@@ -1261,11 +1261,13 @@ fn reset_board(
 fn handle_back_to_menu_button(
     button_query: Query<&Interaction, (Changed<Interaction>, With<BackToMenuButton>)>,
     mut app_state: ResMut<NextState<AppState>>,
+    mut menu_state: ResMut<NextState<MenuState>>,
 ) {
     for interaction in button_query.iter() {
         if *interaction == Interaction::Pressed {
             info!("Back to Menu button pressed!");
             app_state.set(AppState::Menu);
+            menu_state.set(MenuState::Main);
         }
     }
 }
@@ -1430,6 +1432,7 @@ fn handle_game_over_actions(
     button_query: Query<(&Interaction, &GameOverAction), (Changed<Interaction>, With<Button>)>,
     overlay_query: Query<Entity, With<GameOverOverlay>>,
     mut app_state: ResMut<NextState<AppState>>,
+    mut menu_state: ResMut<NextState<MenuState>>,
     mut reset_board: EventWriter<ResetBoard>,
 ) {
     for (interaction, action) in button_query.iter() {
@@ -1457,6 +1460,7 @@ fn handle_game_over_actions(
                 GameOverAction::BackToMenu => {
                     info!("Back to Menu button pressed from game over screen!");
                     app_state.set(AppState::Menu);
+                    menu_state.set(MenuState::Main);
                 }
             }
         }

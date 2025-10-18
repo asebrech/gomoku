@@ -136,7 +136,6 @@
       "Gomoku: Rust never sleeps!",
       "Gomoku: Professional time waster since 2025!"
     ],
-
     "font_sizes": {
       "title": 32.0,
       "subtitle": 18.0,
@@ -156,7 +155,7 @@
       "muted": false
     },
     "display": {
-      "fullscreen": false,
+      "fullscreen": true,
       "vsync": false
     },
     "gameplay": {
