@@ -7,8 +7,7 @@
 use crate::core::board::{Board, Player};
 use crate::core::patterns::{PatternAnalyzer, DIRECTIONS};
 
-const FREE_THREE_LENGTH: usize = 3;
-const MAX_SEARCH_DISTANCE: isize = 4;
+
 
 pub struct GameRules;
 
@@ -97,77 +96,100 @@ impl GameRules {
         player: Player,
         (dr, dc): (isize, isize),
     ) -> bool {
-        let (stones, left_open, right_open) = Self::analyze_line(board, row, col, player, dr, dc);
-        stones == FREE_THREE_LENGTH && Self::can_form_open_four(left_open, right_open)
+        Self::would_create_free_three_line(board, row, col, player, dr, dc)
     }
 
-    fn analyze_line(
+    fn would_create_free_three_line(
         board: &Board,
         row: usize,
         col: usize,
         player: Player,
         dr: isize,
         dc: isize,
-    ) -> (usize, bool, bool) {
-        let left_info = Self::scan_direction(board, row, col, player, -dr, -dc);
-        let right_info = Self::scan_direction(board, row, col, player, dr, dc);
-
-        let total_stones = 1 + left_info.0 + right_info.0;
-        let left_open = left_info.1;
-        let right_open = right_info.1;
-
-        (total_stones, left_open, right_open)
-    }
-
-    fn scan_direction(
-        board: &Board,
-        row: usize,
-        col: usize,
-        player: Player,
-        dr: isize,
-        dc: isize,
-    ) -> (usize, bool) {
-        let player_bits = board.get_player_bits(player);
-        let opponent_bits = board.get_player_bits(player.opponent());
-
-        let mut stones = 0;
-        let mut empty_found = false;
-        let mut is_open = false;
-
-        for i in 1..=MAX_SEARCH_DISTANCE {
-            let new_row = row as isize + dr * i;
-            let new_col = col as isize + dc * i;
-
-            if !PatternAnalyzer::is_in_bounds(board, new_row, new_col) {
-                break;
-            }
-            let idx = board.index(new_row as usize, new_col as usize);
-
-            if Board::is_bit_set(player_bits, idx) {
-                if empty_found {
+    ) -> bool {
+        let mut stones_in_line = vec![(row as isize, col as isize)]; // Include the move position
+        
+        for &direction_multiplier in &[1, -1] {
+            let actual_dr = dr * direction_multiplier;
+            let actual_dc = dc * direction_multiplier;
+            
+            for distance in 1..=4 { // Search up to 4 positions away
+                let check_row = row as isize + actual_dr * distance;
+                let check_col = col as isize + actual_dc * distance;
+                
+                if !PatternAnalyzer::is_in_bounds(board, check_row, check_col) {
                     break;
                 }
-                stones += 1;
-            } else if !Board::is_bit_set(&board.occupied, idx) {
-                if !empty_found && stones > 0 {
-                    is_open = true;
+                
+                let idx = board.index(check_row as usize, check_col as usize);
+                let player_bits = board.get_player_bits(player);
+                
+                if Board::is_bit_set(player_bits, idx) {
+                    stones_in_line.push((check_row, check_col));
                 }
-                empty_found = true;
-                if stones > 0 {
-                    break;
-                }
-            } else if Board::is_bit_set(opponent_bits, idx) {
-                break;
             }
         }
-
-        (stones, is_open)
+        
+        if stones_in_line.len() < 3 {
+            return false;
+        }
+        
+        stones_in_line.sort_by_key(|&(r, c)| {
+            if dr != 0 { r } else { c }
+        });
+        
+        for i in 0..=stones_in_line.len().saturating_sub(3) {
+            let three_stones = &stones_in_line[i..i+3];
+            
+            if Self::is_valid_free_three_pattern(board, three_stones, dr, dc) {
+                return true;
+            }
+        }
+        
+        false
     }
 
-    #[inline]
-    fn can_form_open_four(left_open: bool, right_open: bool) -> bool {
-        left_open || right_open
+    fn is_valid_free_three_pattern(
+        board: &Board,
+        three_stones: &[(isize, isize)],
+        dr: isize,
+        dc: isize,
+    ) -> bool {
+        let first_stone = three_stones[0];
+        let middle_stone = three_stones[1];
+        let last_stone = three_stones[2];
+        
+        let gap1 = Self::calculate_gap(first_stone, middle_stone, dr, dc);
+        let gap2 = Self::calculate_gap(middle_stone, last_stone, dr, dc);
+        
+        let is_valid_pattern = (gap1 == 1 && gap2 == 1) || // XXX
+                              (gap1 == 1 && gap2 == 2) || // XX-X  
+                              (gap1 == 2 && gap2 == 1);   // X-XX
+        
+        if !is_valid_pattern {
+            return false;
+        }
+        
+        let before_row = first_stone.0 - dr;
+        let before_col = first_stone.1 - dc;
+        let can_extend_before = PatternAnalyzer::is_valid_empty(board, before_row, before_col);
+        
+        let after_row = last_stone.0 + dr;
+        let after_col = last_stone.1 + dc;
+        let can_extend_after = PatternAnalyzer::is_valid_empty(board, after_row, after_col);
+        
+        can_extend_before || can_extend_after
     }
+
+    fn calculate_gap(stone1: (isize, isize), stone2: (isize, isize), dr: isize, _dc: isize) -> isize {
+        if dr != 0 {
+            (stone2.0 - stone1.0).abs()
+        } else {
+            (stone2.1 - stone1.1).abs()
+        }
+    }
+
+
 
     pub fn can_break_five_by_capture(board: &Board, row: usize, col: usize, player: Player) -> bool {
         let opponent = player.opponent();

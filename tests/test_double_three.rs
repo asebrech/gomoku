@@ -143,3 +143,36 @@ fn test_creates_double_three_diagonal() {
         // Should not create double-three due to board constraints
         assert!(!GameRules::creates_double_three(&board, 0, 1, Player::Max));
     }
+
+    #[test]
+    fn test_double_three_exact_example_from_subject() {
+        let mut board = Board::new(19);
+        
+        // Recreate the exact scenario from the subject appendix
+        // Red stones forming the pattern where playing at 'a' creates double-three
+        //
+        // Pattern (using 0-indexed coordinates):
+        //     . . . . . . . .
+        //     . . X . . . . .  <- (row 1, col 2)
+        //     . . . X . . . .  <- (row 2, col 3)
+        //     . . . . . . . .
+        //     . . . . . a X X  <- 'a' at (row 4, col 5), stones at (row 4, col 6) and (row 4, col 7)
+        //
+        // This creates:
+        // 1. Diagonal free-three: stones at (1,2), (2,3), and placing at (4,5) would form diagonal line
+        // 2. Horizontal free-three: placing at (4,5) with stones at (4,6), (4,7) forms horizontal line
+        
+        // Place the diagonal stones
+        board.place_stone(1, 2, Player::Max);  // First diagonal stone
+        board.place_stone(2, 3, Player::Max);  // Second diagonal stone
+        
+        // Place the horizontal stones
+        board.place_stone(4, 6, Player::Max);  // First horizontal stone
+        board.place_stone(4, 7, Player::Max);  // Second horizontal stone
+        
+        // Playing at position 'a' (4, 5) should create a double-three
+        // This creates two free-threes:
+        // 1. Diagonal: (1,2) -> (2,3) -> (4,5) with potential to extend to (5,6)
+        // 2. Horizontal: (4,5) -> (4,6) -> (4,7) with potential to extend on both sides
+        assert!(GameRules::creates_double_three(&board, 4, 5, Player::Max));
+    }
