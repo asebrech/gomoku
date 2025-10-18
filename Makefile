@@ -1,10 +1,40 @@
-.PHONY: dev release install zip unzip check-assets clean
+.PHONY: dev release install check-assets clean setup build run help
+
+# Default target - show help
+all: help
+
+help:
+	@echo "Gomoku Build System - Cross-Platform Support"
+	@echo ""
+	@echo "Available targets:"
+	@echo "  setup     - Setup dependencies for cross-platform builds"
+	@echo "  build     - Build the project using cross-platform build script"
+	@echo "  run       - Quick run with automatic dependency setup"
+	@echo "  dev       - Development build with cargo (requires manual setup)"
+	@echo "  release   - Release build with cargo (requires manual setup)"
+	@echo "  install   - Install the application (not yet implemented)"
+	@echo "  clean     - Clean cargo build artifacts"
+	@echo ""
+	@echo "For new users, try: make setup && make run"
+
+setup:
+	@echo "Setting up cross-platform dependencies..."
+	./setup_deps.sh
+
+build: check-assets
+	@echo "Building with cross-platform script..."
+	./build.sh
+
+run: check-assets
+	@echo "Running with cross-platform script..."
+	./run.sh
 
 check-assets:
 	@if [ ! -f assets/backgrounds/ingame-background/*.png ] && [ -f assets/backgrounds/ingame-background/ingame-background.zip ]; then \
-		$(MAKE) unzip; \
-	elif [ ! -f assets/backgrounds/dolphin/*.png ] && [ -f assets/backgrounds/dolphin/dolphin.zip ]; then \
-		$(MAKE) unzip; \
+		cd assets/backgrounds/ingame-background && unzip -o ingame-background.zip; \
+	fi
+	@if [ ! -f assets/backgrounds/dolphin/*.png ] && [ -f assets/backgrounds/dolphin/dolphin.zip ]; then \
+		cd assets/backgrounds/dolphin && unzip -o dolphin.zip; \
 	fi
 
 dev: check-assets
@@ -16,21 +46,6 @@ release: check-assets
 install:
 	@echo "Install target not yet implemented"
 
-zip:
-	cd assets/backgrounds/ingame-background && zip -r ingame-background.zip * -x "*.zip"
-	cd assets/backgrounds/dolphin && zip -r dolphin.zip * -x "*.zip"
-	@echo "Backgrounds compressed to zip files"
-
-unzip:
-	@if [ ! -f assets/backgrounds/ingame-background/*.png ]; then \
-		cd assets/backgrounds/ingame-background && unzip -o ingame-background.zip; \
-	fi
-	@if [ ! -f assets/backgrounds/dolphin/*.png ]; then \
-		cd assets/backgrounds/dolphin && unzip -o dolphin.zip; \
-	fi
-	@echo "Backgrounds extracted from zip files"
-
 clean:
-	find assets/backgrounds/ingame-background -type f ! -name "*.zip" -delete
-	find assets/backgrounds/dolphin -type f ! -name "*.zip" -delete
-	@echo "All images removed, zip files kept"
+	cargo clean
+	@echo "Cargo build artifacts cleaned"
