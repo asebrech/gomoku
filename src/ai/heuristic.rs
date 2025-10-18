@@ -115,7 +115,7 @@ impl Heuristic {
             let base_eval = Self::evaluate_patterns_and_position(state);
             
             let check_penalty = if let Some(check_pos) = state.check_position {
-                let breaking_moves = crate::core::rules::GameRules::get_breaking_capture_moves(
+                let breaking_moves = crate::core::rules::CaptureBreaking::get_breaking_capture_moves(
                     &state.board,
                     check_pos.0,
                     check_pos.1,

@@ -141,7 +141,7 @@ fn test_corner_moves() {
 
 #[test] 
 fn test_double_three_moves_excluded() {
-    use gomoku::core::rules::GameRules;
+    use gomoku::core::rules::{WinDetection, DoubleThreeDetection, CaptureBreaking};
     
     let mut board = Board::new(19);
     
@@ -192,7 +192,7 @@ fn test_double_three_moves_excluded() {
     // And both have space to extend to 4, making them "open threes"
     
     // Verify that position (9,9) would create double-three
-    assert!(GameRules::creates_double_three(&board, 9, 9, Player::Max),
+    assert!(DoubleThreeDetection::creates_double_three(&board, 9, 9, Player::Max),
             "Position (9,9) should create double-three");
     
     // Now test that MoveGenerator excludes this move
@@ -206,7 +206,7 @@ fn test_double_three_moves_excluded() {
     
     // Verify that ALL returned moves are valid (don't create double-three)
     for &mv in &moves {
-        assert!(!GameRules::creates_double_three(&board, mv.0, mv.1, Player::Max),
+        assert!(!DoubleThreeDetection::creates_double_three(&board, mv.0, mv.1, Player::Max),
                 "Move ({}, {}) should not create double-three but was included", mv.0, mv.1);
     }
     

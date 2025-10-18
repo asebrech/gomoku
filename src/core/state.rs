@@ -15,7 +15,7 @@ use crate::ai::pattern_history::PatternHistoryAnalyzer;
 use crate::ai::move_generation::MoveGenerator;
 use crate::core::board::{Board, Player};
 use crate::core::captures::CaptureHandler;
-use crate::core::rules::GameRules;
+use crate::core::rules::{WinDetection, DoubleThreeDetection, CaptureBreaking};
 use bevy::prelude::*;
 use std::hash::Hash;
 
@@ -80,7 +80,7 @@ impl GameState {
         if let Some(player_in_check) = self.player_in_check {
             if player_in_check == self.current_player.opponent() {
                 if let Some(check_pos) = self.check_position {
-                    let breaking_moves = GameRules::get_breaking_capture_moves(&self.board, check_pos.0, check_pos.1, player_in_check);
+                    let breaking_moves = CaptureBreaking::get_breaking_capture_moves(&self.board, check_pos.0, check_pos.1, player_in_check);
                     if !breaking_moves.is_empty() {
                         return breaking_moves;
                     }
@@ -100,14 +100,14 @@ impl GameState {
             return false;
         }
         
-        if GameRules::creates_double_three(&self.board, mv.0, mv.1, self.current_player) {
+        if DoubleThreeDetection::creates_double_three(&self.board, mv.0, mv.1, self.current_player) {
             return false;
         }
         
         if let Some(player_in_check) = self.player_in_check {
             if player_in_check == self.current_player.opponent() {
                 if let Some(check_pos) = self.check_position {
-                    let breaking_moves = GameRules::get_breaking_capture_moves(&self.board, check_pos.0, check_pos.1, player_in_check);
+                    let breaking_moves = CaptureBreaking::get_breaking_capture_moves(&self.board, check_pos.0, check_pos.1, player_in_check);
                     return breaking_moves.contains(&mv);
                 }
             }
@@ -219,7 +219,7 @@ impl GameState {
             return true;
         }
 
-        let (has_win, is_breakable) = GameRules::check_win_and_breakable(&self.board, mv.0, mv.1, self.win_condition);
+        let (has_win, is_breakable) = WinDetection::check_win_and_breakable(&self.board, mv.0, mv.1, self.win_condition);
         
         if has_win {
             if is_breakable {
@@ -294,6 +294,6 @@ impl GameState {
     }
 
     pub fn check_capture_win(&self) -> Option<Player> {
-        GameRules::check_capture_win(self.max_captures, self.min_captures, self.capture_to_win)
+        WinDetection::check_capture_win(self.max_captures, self.min_captures, self.capture_to_win)
     }
 }

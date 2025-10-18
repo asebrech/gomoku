@@ -1,4 +1,4 @@
-use gomoku::core::{board::{Board, Player}, rules::GameRules};
+use gomoku::core::{board::{Board, Player}, rules::DoubleThreeDetection};
 
 
     #[test]
@@ -19,7 +19,7 @@ use gomoku::core::{board::{Board, Player}, rules::GameRules};
         board.place_stone(7, 9, Player::Max);   // Bottom
         
         // Placing at (6,8) should create double-three (horizontal and vertical)
-        assert!(GameRules::creates_double_three(&board, 6, 8, Player::Max));
+        assert!(DoubleThreeDetection::creates_double_three(&board, 6, 8, Player::Max));
     }
 
 
@@ -55,7 +55,7 @@ fn test_creates_double_three_diagonal() {
     board.place_stone(10, 8, Player::Max);
     
     // Placing at (9,9) creates two 3-stone diagonal lines
-    assert!(GameRules::creates_double_three(&board, 9, 9, Player::Max));
+    assert!(DoubleThreeDetection::creates_double_three(&board, 9, 9, Player::Max));
 }
 
     #[test]
@@ -67,7 +67,7 @@ fn test_creates_double_three_diagonal() {
         board.place_stone(5, 7, Player::Max);
         
         // Placing at (5,6) creates only one free-three - should be allowed
-        assert!(!GameRules::creates_double_three(&board, 5, 6, Player::Max));
+        assert!(!DoubleThreeDetection::creates_double_three(&board, 5, 6, Player::Max));
     }
 
     #[test]
@@ -80,7 +80,7 @@ fn test_creates_double_three_diagonal() {
         board.place_stone(5, 8, Player::Min); // Blocks one end
         
         // This shouldn't create a free-three since one end is blocked
-        assert!(!GameRules::creates_double_three(&board, 5, 6, Player::Max));
+        assert!(!DoubleThreeDetection::creates_double_three(&board, 5, 6, Player::Max));
     }
 
     #[test]
@@ -92,7 +92,7 @@ fn test_creates_double_three_diagonal() {
         board.place_stone(0, 3, Player::Max);
         // Board edge limits the potential for open four
         
-        assert!(!GameRules::creates_double_three(&board, 0, 2, Player::Max));
+        assert!(!DoubleThreeDetection::creates_double_three(&board, 0, 2, Player::Max));
     }
 
     #[test]
@@ -114,7 +114,7 @@ fn test_creates_double_three_diagonal() {
         board.place_stone(10, 9, Player::Max); // Bottom
         
         // Placing at (9,8) should create double-three if both can form open fours
-        let creates_double = GameRules::creates_double_three(&board, 9, 8, Player::Max);
+        let creates_double = DoubleThreeDetection::creates_double_three(&board, 9, 8, Player::Max);
         
         // This depends on your exact implementation of free-three detection
         println!("Complex scenario creates double-three: {}", creates_double);
@@ -129,7 +129,7 @@ fn test_creates_double_three_diagonal() {
         board.place_stone(5, 7, Player::Max);
         board.place_stone(5, 4, Player::Min); // Opponent blocks potential
         
-        assert!(!GameRules::creates_double_three(&board, 5, 6, Player::Max));
+        assert!(!DoubleThreeDetection::creates_double_three(&board, 5, 6, Player::Max));
     }
 
     #[test]
@@ -141,7 +141,7 @@ fn test_creates_double_three_diagonal() {
         board.place_stone(0, 2, Player::Max);
         
         // Should not create double-three due to board constraints
-        assert!(!GameRules::creates_double_three(&board, 0, 1, Player::Max));
+        assert!(!DoubleThreeDetection::creates_double_three(&board, 0, 1, Player::Max));
     }
 
     #[test]
@@ -174,7 +174,7 @@ fn test_creates_double_three_diagonal() {
         // This creates two free-threes:
         // 1. Diagonal: (1,2) -> (2,3) -> (4,5) with potential to extend to (5,6)
         // 2. Horizontal: (4,5) -> (4,6) -> (4,7) with potential to extend on both sides
-        assert!(GameRules::creates_double_three(&board, 4, 5, Player::Max));
+        assert!(DoubleThreeDetection::creates_double_three(&board, 4, 5, Player::Max));
     }
 
     #[test]
@@ -193,7 +193,7 @@ fn test_creates_double_three_diagonal() {
         // Playing at (8,7) should create double-three:
         // Horizontal: (8,6) - (8,7) - (8,8) consecutive 
         // Vertical: (7,7) - (8,7) - (9,7) consecutive
-        assert!(GameRules::creates_double_three(&board, 8, 7, Player::Max));
+        assert!(DoubleThreeDetection::creates_double_three(&board, 8, 7, Player::Max));
     }
 
     #[test]
@@ -212,7 +212,7 @@ fn test_creates_double_three_diagonal() {
         // Playing at (10,10) creates:
         // Horizontal: (10,8)-(10,9)-(10,10) consecutive
         // Vertical: (9,10)-(10,10)-(11,10) consecutive
-        assert!(GameRules::creates_double_three(&board, 10, 10, Player::Max));
+        assert!(DoubleThreeDetection::creates_double_three(&board, 10, 10, Player::Max));
     }
 
     #[test]
@@ -232,7 +232,7 @@ fn test_creates_double_three_diagonal() {
         // Playing at center creates:
         // Horizontal: (9,8)-(9,9)-(9,10) consecutive
         // Vertical: (8,9)-(9,9)-(10,9) consecutive
-        assert!(GameRules::creates_double_three(&board, center, center, Player::Max));
+        assert!(DoubleThreeDetection::creates_double_three(&board, center, center, Player::Max));
     }
 
     #[test]
@@ -246,7 +246,7 @@ fn test_creates_double_three_diagonal() {
         board.place_stone(4, 4, Player::Max);
         
         // Playing at (1,4) should create double-three if there's space to extend
-        let creates_double = GameRules::creates_double_three(&board, 1, 4, Player::Max);
+        let creates_double = DoubleThreeDetection::creates_double_three(&board, 1, 4, Player::Max);
         
         // This might not create double-three due to edge constraints
         // The test verifies the logic handles edge cases gracefully
@@ -271,7 +271,7 @@ fn test_creates_double_three_diagonal() {
         
         // Should NOT create double-three because extensions are blocked
         // This tests if our logic correctly checks for extension possibilities
-        let result = GameRules::creates_double_three(&board, 8, 8, Player::Max);
+        let result = DoubleThreeDetection::creates_double_three(&board, 8, 8, Player::Max);
         
         // The result depends on implementation - if extensions are blocked, should be false
         if result {
@@ -300,7 +300,7 @@ fn test_creates_double_three_diagonal() {
         // Playing at (5,6) should create double-three from subsequences:
         // Horizontal: (5,4)-(5,5)-(5,6) and (5,5)-(5,6)-(5,7)
         // Vertical: (3,6)-(4,6)-(5,6) and (4,6)-(5,6)-(7,6)
-        assert!(GameRules::creates_double_three(&board, 5, 6, Player::Max));
+        assert!(DoubleThreeDetection::creates_double_three(&board, 5, 6, Player::Max));
     }
 
     #[test]
@@ -317,7 +317,7 @@ fn test_creates_double_three_diagonal() {
         board.place_stone(8, 9, Player::Min);
         
         // Should still detect if one direction can form free-three
-        let creates_double = GameRules::creates_double_three(&board, 8, 7, Player::Max);
+        let creates_double = DoubleThreeDetection::creates_double_three(&board, 8, 7, Player::Max);
         
         // Depends on implementation - might be false if horizontal is blocked
         println!("With opponent interference: {}", creates_double);
@@ -337,7 +337,7 @@ fn test_creates_double_three_diagonal() {
         // Playing at (9,10) creates:
         // Horizontal: XX? -> XXX
         // Vertical: ?XX -> XXX (where ? is filled)
-        assert!(GameRules::creates_double_three(&board, 9, 10, Player::Max));
+        assert!(DoubleThreeDetection::creates_double_three(&board, 9, 10, Player::Max));
     }
 
     #[test]
@@ -355,7 +355,7 @@ fn test_creates_double_three_diagonal() {
         // Playing at (5,6) should create:
         // Horizontal: (5,5)-(5,6)-(5,7) consecutive
         // Vertical: (5,6)-(6,6)-(7,6) consecutive
-        assert!(GameRules::creates_double_three(&board, 5, 6, Player::Max));
+        assert!(DoubleThreeDetection::creates_double_three(&board, 5, 6, Player::Max));
         
         // Case 2: Test boundary conditions
         let mut board2 = Board::new(19);
@@ -364,7 +364,7 @@ fn test_creates_double_three_diagonal() {
         board2.place_stone(2, 2, Player::Max);
         board2.place_stone(3, 2, Player::Max);
         
-        let result2 = GameRules::creates_double_three(&board2, 1, 2, Player::Max);
+        let result2 = DoubleThreeDetection::creates_double_three(&board2, 1, 2, Player::Max);
         println!("Boundary case: {}", result2);
     }
 
@@ -384,7 +384,7 @@ fn test_creates_double_three_diagonal() {
         board.place_stone(center + 1, center + 1, Player::Max);
         
         // Should detect double-three (horizontal and diagonal form free-threes)
-        assert!(GameRules::creates_double_three(&board, center, center, Player::Max));
+        assert!(DoubleThreeDetection::creates_double_three(&board, center, center, Player::Max));
     }
 
     #[test]
@@ -398,8 +398,8 @@ fn test_creates_double_three_diagonal() {
         board.place_stone(7, 6, Player::Max);
         
         // Should work for Max but not for Min (since stones belong to Max)
-        assert!(GameRules::creates_double_three(&board, 5, 6, Player::Max));
-        assert!(!GameRules::creates_double_three(&board, 5, 6, Player::Min));
+        assert!(DoubleThreeDetection::creates_double_three(&board, 5, 6, Player::Max));
+        assert!(!DoubleThreeDetection::creates_double_three(&board, 5, 6, Player::Min));
         
         // Player Min scenario with adjacent stones
         let mut board2 = Board::new(19);
@@ -409,8 +409,8 @@ fn test_creates_double_three_diagonal() {
         board2.place_stone(10, 9, Player::Min);
         
         // Should work for Min but not for Max
-        assert!(GameRules::creates_double_three(&board2, 8, 9, Player::Min));
-        assert!(!GameRules::creates_double_three(&board2, 8, 9, Player::Max));
+        assert!(DoubleThreeDetection::creates_double_three(&board2, 8, 9, Player::Min));
+        assert!(!DoubleThreeDetection::creates_double_three(&board2, 8, 9, Player::Max));
     }
 
     #[test]
@@ -424,7 +424,7 @@ fn test_creates_double_three_diagonal() {
         board.place_stone(2, 2, Player::Max);
         
         // Should work even near boundaries if extensions are possible
-        let corner_result = GameRules::creates_double_three(&board, 0, 2, Player::Max);
+        let corner_result = DoubleThreeDetection::creates_double_three(&board, 0, 2, Player::Max);
         println!("Corner double-three: {}", corner_result);
         
         // Test at bottom-right corner
@@ -434,7 +434,7 @@ fn test_creates_double_three_diagonal() {
         board2.place_stone(17, 17, Player::Max);
         board2.place_stone(16, 17, Player::Max);
         
-        let bottom_corner_result = GameRules::creates_double_three(&board2, 18, 17, Player::Max);
+        let bottom_corner_result = DoubleThreeDetection::creates_double_three(&board2, 18, 17, Player::Max);
         println!("Bottom corner double-three: {}", bottom_corner_result);
     }
 
@@ -452,10 +452,10 @@ fn test_creates_double_three_diagonal() {
         board.place_stone(8, 6, Player::Min);  // Min stone shouldn't interfere
         
         // Should still create double-three for Max
-        assert!(GameRules::creates_double_three(&board, 5, 6, Player::Max));
+        assert!(DoubleThreeDetection::creates_double_three(&board, 5, 6, Player::Max));
         
         // But not for Min (Min doesn't have the pattern)
-        assert!(!GameRules::creates_double_three(&board, 5, 6, Player::Min));
+        assert!(!DoubleThreeDetection::creates_double_three(&board, 5, 6, Player::Min));
     }
 
     #[test]
@@ -470,7 +470,7 @@ fn test_creates_double_three_diagonal() {
         board.place_stone(11, 10, Player::Max); // Vertical pair
         
         // Playing at (10,10) creates exactly 3 stones in each direction
-        assert!(GameRules::creates_double_three(&board, 10, 10, Player::Max));
+        assert!(DoubleThreeDetection::creates_double_three(&board, 10, 10, Player::Max));
         
         // Verify we don't get false positives with just 2 stones
         let mut board2 = Board::new(19);
@@ -479,7 +479,7 @@ fn test_creates_double_three_diagonal() {
         board2.place_stone(6, 5, Player::Max);  // Vertical pair
         
         // This should NOT create double-three (only one valid direction)
-        assert!(!GameRules::creates_double_three(&board2, 5, 5, Player::Max));
+        assert!(!DoubleThreeDetection::creates_double_three(&board2, 5, 5, Player::Max));
     }
 
     #[test]
@@ -496,7 +496,7 @@ fn test_creates_double_three_diagonal() {
         
         // Playing at (8,9) creates 4 stones horizontally and potentially vertically
         // Should still detect valid 3-stone subsequences for free-threes
-        let result = GameRules::creates_double_three(&board, 8, 9, Player::Max);
+        let result = DoubleThreeDetection::creates_double_three(&board, 8, 9, Player::Max);
         println!("Four stone pattern creates double-three: {}", result);
         
         // The result depends on whether the implementation correctly finds
@@ -520,10 +520,10 @@ fn test_creates_double_three_diagonal() {
         board.place_stone(10, 9, Player::Max);
         
         // Should still work correctly even with many stones on board
-        assert!(GameRules::creates_double_three(&board, 8, 9, Player::Max));
+        assert!(DoubleThreeDetection::creates_double_three(&board, 8, 9, Player::Max));
         
         // Verify it's specific to the player
-        assert!(!GameRules::creates_double_three(&board, 8, 9, Player::Min));
+        assert!(!DoubleThreeDetection::creates_double_three(&board, 8, 9, Player::Min));
     }
 
     #[test]
@@ -537,7 +537,7 @@ fn test_creates_double_three_diagonal() {
         board1.place_stone(8, 9, Player::Max);
         board1.place_stone(10, 9, Player::Max);
         
-        assert!(GameRules::creates_double_three(&board1, 9, 9, Player::Max));
+        assert!(DoubleThreeDetection::creates_double_three(&board1, 9, 9, Player::Max));
         
         // Case 2: L-shaped pattern (should NOT create double-three)
         let mut board2 = Board::new(19);
@@ -547,7 +547,7 @@ fn test_creates_double_three_diagonal() {
         board2.place_stone(7, 7, Player::Max);  // Vertical
         
         // This creates an L-shape, not two free-threes
-        let l_result = GameRules::creates_double_three(&board2, 5, 7, Player::Max);
+        let l_result = DoubleThreeDetection::creates_double_three(&board2, 5, 7, Player::Max);
         println!("L-shaped pattern: {}", l_result);
         
         // The result depends on whether (5,5)-(5,6)-(5,7) and (5,7)-(6,7)-(7,7) 
@@ -582,7 +582,7 @@ fn test_creates_double_three_diagonal() {
         // 2. Potentially create two free-threes (horizontal and vertical)
         // 3. But be ALLOWED because it captures
         
-        let creates_double = GameRules::creates_double_three(&board, 5, 7, Player::Max);
+        let creates_double = DoubleThreeDetection::creates_double_three(&board, 5, 7, Player::Max);
         println!("Double-three with capture allowed: {}", creates_double);
         
         // Should be false (allowed) because the move captures opponent stones
@@ -605,7 +605,7 @@ fn test_creates_double_three_diagonal() {
         // Vertical: X-X-? (at column 5)
         
         // Move at (5,5) would create two free-threes without capturing
-        let creates_double = GameRules::creates_double_three(&board, 5, 5, Player::Max);
+        let creates_double = DoubleThreeDetection::creates_double_three(&board, 5, 5, Player::Max);
         println!("Double-three without capture: {}", creates_double);
         
         // Should be true (forbidden) because no capture occurs
@@ -627,7 +627,7 @@ fn test_creates_double_three_diagonal() {
         board.place_stone(5, 4, Player::Max);
         
         // Move at (5,7) captures and creates one free-three
-        let creates_double = GameRules::creates_double_three(&board, 5, 7, Player::Max);
+        let creates_double = DoubleThreeDetection::creates_double_three(&board, 5, 7, Player::Max);
         println!("Single three with capture: {}", creates_double);
         
         // Should be false (allowed) - single free-three is always allowed
@@ -653,7 +653,7 @@ fn test_creates_double_three_diagonal() {
         board.place_stone(5, 3, Player::Max); // Our stone
         
         // Move at (3,5) might capture and create patterns
-        let creates_double = GameRules::creates_double_three(&board, 3, 5, Player::Max);
+        let creates_double = DoubleThreeDetection::creates_double_three(&board, 3, 5, Player::Max);
         println!("Multiple captures scenario: {}", creates_double);
         
         // Result depends on actual capture detection and pattern formation
@@ -693,7 +693,7 @@ fn test_creates_double_three_diagonal() {
         println!("Testing comprehensive capture exception scenario:");
         println!("Move at (9, 10) captures pair (9, 8)-(9, 9) and creates double-three");
         
-        let creates_double = GameRules::creates_double_three(&board, 9, 10, Player::Max);
+        let creates_double = DoubleThreeDetection::creates_double_three(&board, 9, 10, Player::Max);
         println!("Creates double-three: {}", creates_double);
         
         // Verify our capture detection works
@@ -723,7 +723,7 @@ fn test_creates_double_three_diagonal() {
         // Leave (9, 5) and (9, 9) empty for horizontal extension
         // Leave (6, 8) and (10, 8) empty for vertical extension
         
-        let creates_double_no_capture = GameRules::creates_double_three(&board_no_capture, 9, 8, Player::Max);
+        let creates_double_no_capture = DoubleThreeDetection::creates_double_three(&board_no_capture, 9, 8, Player::Max);
         println!("Clear double-three pattern without capture: {}", creates_double_no_capture);
         
         // Should be true (forbidden) when no capture occurs and double-three is created

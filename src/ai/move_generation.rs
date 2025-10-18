@@ -14,7 +14,7 @@
 
 use crate::core::board::{Board, Player};
 use crate::core::patterns::{DIRECTIONS, PatternAnalyzer};
-use crate::core::rules::GameRules;
+use crate::core::rules::DoubleThreeDetection;
 use std::collections::HashSet;
 
 pub struct MoveGenerator;
@@ -152,7 +152,7 @@ impl MoveGenerator {
 
         let filtered_moves: Vec<(usize, usize)> = moves
             .into_iter()
-            .filter(|&(row, col)| !GameRules::creates_double_three(board, row, col, player))
+            .filter(|&(row, col)| !DoubleThreeDetection::creates_double_three(board, row, col, player))
             .collect();
 
         if filtered_moves.len() > 25 {
@@ -335,7 +335,7 @@ impl MoveGenerator {
 
         let mut filtered_moves: Vec<(usize, usize)> = candidates
             .into_iter()
-            .filter(|&(row, col)| !GameRules::creates_double_three(board, row, col, player))
+            .filter(|&(row, col)| !DoubleThreeDetection::creates_double_three(board, row, col, player))
             .collect();
 
         filtered_moves.sort_by_key(|&mv| -Self::calculate_threat_priority(board, mv, player));

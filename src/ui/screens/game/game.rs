@@ -6,7 +6,7 @@ use futures_lite::future;
 use crate::{
     ai::lazy_smp::{lazy_smp_search, SearchResult},
     audio::{PlayStonePlacementSound, PlayWinSound, PlayLoseSound},
-    core::{board::Player, rules::GameRules, state::GameState}, 
+    core::{board::Player, rules::{DoubleThreeDetection, CaptureBreaking}, state::GameState}, 
     ui::{
         app::{AppState, GameSettings}, 
         config::GameConfig,
@@ -450,7 +450,7 @@ pub fn update_available_placement(
         if let Some(player_in_check) = game_state.player_in_check {
             if player_in_check == game_state.current_player.opponent() {
                 if let Some(check_pos) = game_state.check_position {
-                    let moves = GameRules::get_breaking_capture_moves(
+                    let moves = CaptureBreaking::get_breaking_capture_moves(
                         &game_state.board, 
                         check_pos.0, 
                         check_pos.1, 
@@ -472,7 +472,7 @@ pub fn update_available_placement(
             breaking_set.contains(&(cell.x, cell.y))
         } else {
             game_state.board.is_empty_position(cell.x, cell.y)
-                && !GameRules::creates_double_three(&game_state.board, cell.x, cell.y, game_state.current_player)
+                && !DoubleThreeDetection::creates_double_three(&game_state.board, cell.x, cell.y, game_state.current_player)
         };
         
         if is_valid {
