@@ -519,8 +519,8 @@ fn test_heuristic_half_free_scoring() {
     
     let score = Heuristic::evaluate(&state, 1);
     
-    // Should score 5000 points for half-free four
-    assert!(score >= 5000 && score < 10000, "Half-free four should score around 5000 points: {}", score);
+    // Should score 3500 points for half-free four (updated weight)
+    assert!(score >= 3500 && score < 7000, "Half-free four should score around 3500 points: {}", score);
 }
 
 #[test]

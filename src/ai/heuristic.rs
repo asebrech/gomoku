@@ -30,18 +30,18 @@ pub struct Heuristic;
 
 const WINNING_SCORE: i32 = 1_000_000;
 const FIVE_IN_ROW_SCORE: i32 = 100_000;
-const CHECK_PENALTY: i32 = 50_000;
+const CHECK_PENALTY: i32 = 10_000;
 const LIVE_FOUR_SINGLE_SCORE: i32 = 15_000;
 const LIVE_FOUR_MULTIPLE_SCORE: i32 = 20_000;
-const HALF_FREE_FOUR_SCORE: i32 = 5_000;
+const HALF_FREE_FOUR_SCORE: i32 = 3_500;
 const WINNING_THREAT_SCORE: i32 = 10_000;
-const DEAD_FOUR_SCORE: i32 = 1_000;
+const DEAD_FOUR_SCORE: i32 = 400;
 const LIVE_THREE_SCORE: i32 = 500;
 const HALF_FREE_THREE_SCORE: i32 = 200;
-const DEAD_THREE_SCORE: i32 = 100;
+const DEAD_THREE_SCORE: i32 = 50;
 const LIVE_TWO_SCORE: i32 = 50;
 const HALF_FREE_TWO_SCORE: i32 = 20;
-const CAPTURE_BONUS_MULTIPLIER: i32 = 5_000;
+const CAPTURE_BONUS_MULTIPLIER: i32 = 15_000;
 
 #[derive(Debug, Clone, Copy)]
 struct PatternCounts {
@@ -113,23 +113,8 @@ impl Heuristic {
 
         if let Some(player_in_check) = state.player_in_check {
             let base_eval = Self::evaluate_patterns_and_position(state);
-            
-            let check_penalty = if let Some(check_pos) = state.check_position {
-                let breaking_moves = crate::core::rules::CaptureBreaking::get_breaking_capture_moves(
-                    &state.board,
-                    check_pos.0,
-                    check_pos.1,
-                    player_in_check
-                );
-                
-                let num_escapes = breaking_moves.len().max(1) as f32;
-                let escape_factor = 5.0 / num_escapes;
-                
-                CHECK_PENALTY + (escape_factor * 10_000.0) as i32
-            } else {
-                CHECK_PENALTY
-            };
-            
+            let check_penalty = Self::calculate_check_penalty(state, player_in_check);
+
             return match player_in_check {
                 Player::Max => base_eval - check_penalty,
                 Player::Min => base_eval + check_penalty,
@@ -166,6 +151,23 @@ impl Heuristic {
             .pattern_analyzer
             .calculate_historical_bonus(Player::Min);
         max_bonus - min_bonus
+    }
+
+    fn calculate_check_penalty(state: &GameState, player_in_check: Player) -> i32 {
+        if let Some(check_pos) = state.check_position {
+            let breaking_moves = crate::core::rules::CaptureBreaking::get_breaking_capture_moves(
+                &state.board,
+                check_pos.0,
+                check_pos.1,
+                player_in_check,
+            );
+
+            let num_escapes = breaking_moves.len().max(1) as f32;
+            let escape_factor = 5.0 / num_escapes;
+            CHECK_PENALTY + (escape_factor * 10_000.0) as i32
+        } else {
+            CHECK_PENALTY
+        }
     }
 
     fn analyze_both_players(board: &Board, win_condition: usize) -> (PatternCounts, PatternCounts) {
