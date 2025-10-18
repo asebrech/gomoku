@@ -7,6 +7,7 @@ use crate::{
         screens::{
             utils::despawn_screen,
             splash::PreloadedStones,
+            menu::MenuState,
         },
     },
 };
@@ -138,6 +139,7 @@ enum TutorialButton {
 fn handle_tutorial_navigation(
     mut tutorial_state: ResMut<NextState<TutorialState>>,
     mut app_state: ResMut<NextState<AppState>>,
+    mut menu_state: ResMut<NextState<MenuState>>,
     interaction_query: Query<(&Interaction, &TutorialButton), (Changed<Interaction>, With<Button>)>,
 ) {
     for (interaction, button) in interaction_query.iter() {
@@ -145,7 +147,10 @@ fn handle_tutorial_navigation(
             match button {
                 TutorialButton::WinExample => tutorial_state.set(TutorialState::WinExample),
                 TutorialButton::CaptureExample => tutorial_state.set(TutorialState::CaptureExample),
-                TutorialButton::BackToMenu => app_state.set(AppState::Menu),
+                TutorialButton::BackToMenu => {
+                    app_state.set(AppState::Menu);
+                    menu_state.set(MenuState::Main);
+                },
             }
         }
     }
@@ -154,9 +159,11 @@ fn handle_tutorial_navigation(
 fn handle_escape_key(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut app_state: ResMut<NextState<AppState>>,
+    mut menu_state: ResMut<NextState<MenuState>>,
 ) {
     if keyboard_input.just_pressed(KeyCode::Escape) {
         app_state.set(AppState::Menu);
+        menu_state.set(MenuState::Main);
     }
 }
 

@@ -230,7 +230,6 @@
             .init_resource::<GlobalVideoBackgroundState>()
             .add_systems(OnEnter(AppState::Splash), preload_menu_video_background)
             .add_systems(OnEnter(AppState::Menu), (init_dev_mode_resources, menu_setup, setup_persistent_video_background, preload_game_video_background).chain())
-            .add_systems(OnEnter(AppState::HowToPlay), setup_persistent_video_background)
             .add_systems(OnEnter(MenuState::Splash), splash_screen_setup)
             .add_systems(OnEnter(MenuState::Main), (main_menu_setup, setup_audio_if_needed))
             .add_systems(OnEnter(MenuState::Settings), (settings_menu_setup, force_settings_display_update))
@@ -305,7 +304,7 @@
     }
 
     #[derive(Clone, Copy, Default, Eq, PartialEq, Debug, Hash, States)]
-    enum MenuState {
+    pub enum MenuState {
         #[default]
         Splash,
         Main,
@@ -3076,15 +3075,18 @@ fn create_menu_button_with_icon(
         
         // If video background already exists, just make sure it's visible
         if !existing_bg_query.is_empty() {
-            println!("Persistent video background already exists, ensuring it's visible");
+            println!("Persistent video background already exists, ensuring it's visible (dev mode: {})", config.dev_mode);
             for mut visibility in existing_visibility_query.iter_mut() {
                 *visibility = Visibility::Visible;
             }
             return;
         }
         
+        println!("Creating new persistent video background (dev mode: {})", config.dev_mode);
+        
         if config.dev_mode {
             // In devMode, show a simple colored background
+            println!("Creating simple colored background for dev mode");
             commands.spawn((
                 Node {
                     position_type: PositionType::Absolute,
@@ -3103,52 +3105,58 @@ fn create_menu_button_with_icon(
     /// Cleanup persistent video background when leaving the menu system
     fn cleanup_persistent_video_background(
         mut commands: Commands,
-        mut video_query: Query<(Entity, &mut VideoFilePlayer), With<PersistentVideoBackground>>,
+        mut video_query: Query<(Entity, Option<&mut VideoFilePlayer>), With<PersistentVideoBackground>>,
     ) {
         println!("Cleaning up persistent video background");
         
-        for (entity, mut player) in video_query.iter_mut() {
-            // Properly stop and dispose of GStreamer pipeline
-            if let Some(ref pipeline) = player.pipeline {
-                // First set to PAUSED, then to NULL for proper shutdown
-                if let Err(e) = pipeline.set_state(gstreamer::State::Paused) {
-                    eprintln!("Failed to set pipeline to Paused state: {}", e);
-                } else {
-                    // Wait for the state change to complete
-                    let (result, current_state, _pending_state) = pipeline.state(Some(gstreamer::ClockTime::from_seconds(1)));
-                    match (result, current_state) {
-                        (Ok(_), gstreamer::State::Paused) => {
-                            println!("Menu pipeline paused successfully");
-                        }
-                        _ => {
-                            println!("Warning: Menu pipeline pause may not have completed");
-                        }
-                    }
-                    
-                    // Now set to NULL
-                    if let Err(e) = pipeline.set_state(gstreamer::State::Null) {
-                        eprintln!("Failed to set pipeline to Null state: {}", e);
+        for (entity, maybe_player) in video_query.iter_mut() {
+            // Handle video entities (release mode)
+            if let Some(mut player) = maybe_player {
+                // Properly stop and dispose of GStreamer pipeline
+                if let Some(ref pipeline) = player.pipeline {
+                    // First set to PAUSED, then to NULL for proper shutdown
+                    if let Err(e) = pipeline.set_state(gstreamer::State::Paused) {
+                        eprintln!("Failed to set pipeline to Paused state: {}", e);
                     } else {
-                        // Wait for the NULL state change to complete
+                        // Wait for the state change to complete
                         let (result, current_state, _pending_state) = pipeline.state(Some(gstreamer::ClockTime::from_seconds(1)));
                         match (result, current_state) {
-                            (Ok(_), gstreamer::State::Null) => {
-                                println!("Menu GStreamer pipeline stopped successfully");
+                            (Ok(_), gstreamer::State::Paused) => {
+                                println!("Menu pipeline paused successfully");
                             }
                             _ => {
-                                println!("Warning: Menu pipeline stop may not have completed");
+                                println!("Warning: Menu pipeline pause may not have completed");
+                            }
+                        }
+                        
+                        // Now set to NULL
+                        if let Err(e) = pipeline.set_state(gstreamer::State::Null) {
+                            eprintln!("Failed to set pipeline to Null state: {}", e);
+                        } else {
+                            // Wait for the NULL state change to complete
+                            let (result, current_state, _pending_state) = pipeline.state(Some(gstreamer::ClockTime::from_seconds(1)));
+                            match (result, current_state) {
+                                (Ok(_), gstreamer::State::Null) => {
+                                    println!("Menu GStreamer pipeline stopped successfully");
+                                }
+                                _ => {
+                                    println!("Warning: Menu pipeline stop may not have completed");
+                                }
                             }
                         }
                     }
                 }
+                
+                // Clear the pipeline reference
+                player.pipeline = None;
+                player.app_sink = None;
+                player.initialized = false;
+            } else {
+                // Handle simple background entities (dev mode)
+                println!("Cleaning up simple persistent background (dev mode)");
             }
             
-            // Clear the pipeline reference
-            player.pipeline = None;
-            player.app_sink = None;
-            player.initialized = false;
-            
-            // Despawn the entity
+            // Despawn the entity regardless of type
             commands.entity(entity).despawn();
         }
     }
@@ -3157,7 +3165,9 @@ fn create_menu_button_with_icon(
     fn hide_persistent_video_in_game(
         mut video_query: Query<&mut Visibility, With<PersistentVideoBackground>>,
     ) {
+        println!("hide_persistent_video_in_game called - found {} backgrounds", video_query.iter().count());
         for mut visibility in video_query.iter_mut() {
+            println!("Hiding persistent video background");
             *visibility = Visibility::Hidden;
         }
     }
@@ -3166,7 +3176,9 @@ fn create_menu_button_with_icon(
     fn show_persistent_video_background(
         mut video_query: Query<&mut Visibility, With<PersistentVideoBackground>>,
     ) {
+        println!("show_persistent_video_background called - found {} backgrounds", video_query.iter().count());
         for mut visibility in video_query.iter_mut() {
+            println!("Setting persistent video background to visible");
             *visibility = Visibility::Visible;
         }
     }

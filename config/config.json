@@ -1,5 +1,5 @@
 {
-  "devMode": false,
+  "devMode": true,
   "assets": {
     "backgrounds": {
       "splash": "backgrounds/login/gomoku-splash.png",

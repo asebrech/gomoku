@@ -1,4 +1,4 @@
-.PHONY: dev release clean up help setup check-assets all-build deploy
+.PHONY: dev release clean up up-dev fast help setup check-assets all-build deploy
 
 # Default target - show help
 all: help
@@ -9,7 +9,9 @@ help:
 	@echo "Main targets:"
 	@echo "  make release  - Setup libs + build optimized release version"
 	@echo "  make dev      - Setup libs + build development version (fast compile, optimized deps)"
-	@echo "  make up       - Build and run the executable"
+	@echo "  make up       - Build and run the release executable"
+	@echo "  make up-dev   - Build and run the development executable (faster startup)"
+	@echo "  make fast     - Ultra-fast development mode (no video, instant startup)"
 	@echo "  make clean    - Clean everything (cargo + deps)"
 	@echo ""
 	@echo "Advanced targets:"
@@ -18,6 +20,8 @@ help:
 	@echo "  deploy        - Create complete distribution package"
 	@echo ""
 	@echo "For new users: make release && make up"
+	@echo "For development: make dev && make up-dev (faster)"
+	@echo "For instant testing: make fast (no video, ultra-fast)"
 	@echo ""
 	@echo "Note: GStreamer dependencies are downloaded automatically."
 
@@ -26,6 +30,8 @@ help:
 # Setup libs + build optimized release version
 release: setup
 	@echo "Building optimized release version..."
+	@echo "Setting devMode to false for release..."
+	@sed -i '' 's/"devMode": true/"devMode": false/g' config/config.json
 	export PKG_CONFIG_PATH=$(PWD)/deps/lib/pkgconfig:$$PKG_CONFIG_PATH && cargo build --release
 	@echo "✅ Release build complete!"
 	@echo "Run with: make up"
@@ -33,17 +39,15 @@ release: setup
 # Setup libs + build development version (fast compile, optimized deps)
 dev: setup
 	@echo "Building development version with optimized dependencies..."
+	@echo "Setting devMode to true for development..."
+	@sed -i '' 's/"devMode": false/"devMode": true/g' config/config.json
 	export PKG_CONFIG_PATH=$(PWD)/deps/lib/pkgconfig:$$PKG_CONFIG_PATH && cargo build
 	@echo "✅ Development build complete!"
-	@echo "Run with: make up"
+	@echo "Run with: make up-dev"
 
 # Build and run the executable
-up: check-assets
+up: release check-assets
 	@echo "Running Gomoku..."
-	@if [ ! -f target/release/gomoku ]; then \
-		echo "Release build not found, building first..."; \
-		$(MAKE) release; \
-	fi
 	@export DYLD_LIBRARY_PATH=$(PWD)/deps/lib:$$DYLD_LIBRARY_PATH && \
 	export GST_PLUGIN_PATH=$(PWD)/deps/lib:$$GST_PLUGIN_PATH && \
 	export GST_PLUGIN_SYSTEM_PATH="" && \
@@ -55,6 +59,31 @@ up: check-assets
 		echo "Building GStreamer plugin registry..."; \
 	fi && \
 	./target/release/gomoku
+
+# Build and run the development executable (faster startup)
+up-dev: dev check-assets
+	@echo "Running Gomoku (development version)..."
+	@if [ ! -L target/debug/assets ]; then \
+		ln -sf ../../assets target/debug/assets; \
+		ln -sf ../../config target/debug/config; \
+	fi
+	@export DYLD_LIBRARY_PATH=$(PWD)/deps/lib:$$DYLD_LIBRARY_PATH && \
+	export GST_PLUGIN_PATH=$(PWD)/deps/lib:$$GST_PLUGIN_PATH && \
+	export GST_PLUGIN_SYSTEM_PATH="" && \
+	export GST_REGISTRY=$(PWD)/deps/lib/registry.bin && \
+	export GST_REGISTRY_FORK=no && \
+	export GST_REGISTRY_UPDATE=no && \
+	./target/debug/gomoku
+
+# Ultra-fast development mode (no video, instant startup)
+fast: dev check-assets
+	@echo "Running Gomoku (ultra-fast mode - no video)..."
+	@export DYLD_LIBRARY_PATH=$(PWD)/deps/lib:$$DYLD_LIBRARY_PATH && \
+	export GST_PLUGIN_PATH="" && \
+	export GST_PLUGIN_SYSTEM_PATH="" && \
+	export GST_REGISTRY_UPDATE=no && \
+	export GST_REGISTRY_FORK=no && \
+	./target/debug/gomoku
 
 # Clean everything (cargo + deps)
 clean:
