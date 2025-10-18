@@ -73,4 +73,19 @@ impl PatternAnalyzer {
         Self::is_in_bounds(board, row, col)
             && Board::is_bit_set(&board.occupied, board.index(row as usize, col as usize))
     }
+
+    /// Count consecutive stones bidirectionally from a position
+    #[inline]
+    pub fn count_consecutive_bidirectional(
+        board: &Board,
+        row: usize,
+        col: usize,
+        dx: isize,
+        dy: isize,
+        player: Player,
+    ) -> usize {
+        let backward = Self::count_consecutive(board, row, col, -dx, -dy, player);
+        let forward = Self::count_consecutive(board, row, col, dx, dy, player);
+        backward + forward + 1
+    }
 }

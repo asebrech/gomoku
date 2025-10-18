@@ -15,6 +15,7 @@
 use crate::core::board::{Board, Player};
 use crate::core::patterns::{DIRECTIONS, PatternAnalyzer};
 use crate::core::rules::DoubleThreeDetection;
+use crate::ai::pattern_utils;
 use std::collections::HashSet;
 
 pub struct MoveGenerator;
@@ -91,7 +92,7 @@ impl MoveGenerator {
 
     fn creates_five_in_row(board: &Board, pos: (usize, usize), player: Player) -> bool {
         for &(dx, dy) in &DIRECTIONS {
-            let total = Self::count_consecutive_bidirectional(board, pos.0, pos.1, dx, dy, player);
+            let total = PatternAnalyzer::count_consecutive_bidirectional(board, pos.0, pos.1, dx, dy, player);
             if total >= 5 {
                 return true;
             }
@@ -107,6 +108,12 @@ impl MoveGenerator {
         let open_fours = Self::find_open_four_threats(board, opponent);
         if !open_fours.is_empty() {
             return Some(open_fours);
+        }
+
+        // Check for gapped threats that need blocking
+        let gapped_threats = Self::find_gapped_threats(board, opponent);
+        if !gapped_threats.is_empty() {
+            return Some(gapped_threats);
         }
 
         None
@@ -141,6 +148,79 @@ impl MoveGenerator {
         threats.into_iter().collect()
     }
 
+    /// Simple function to find gapped threats that need immediate blocking
+    fn find_gapped_threats(board: &Board, player: Player) -> Vec<(usize, usize)> {
+        let mut threats = HashSet::new();
+        let player_bits = board.get_player_bits(player);
+
+        board.iterate_bits(player_bits, |row, col| {
+            for &(dx, dy) in &DIRECTIONS {
+                // Look for patterns like X.X.X or XX.X that could become winning
+                let mut stones_found = vec![(row, col)];
+                
+                // Check forward direction for more stones with gaps
+                for dist in 2..=6 {
+                    let check_row = row as isize + dx * dist;
+                    let check_col = col as isize + dy * dist;
+                    
+                    if PatternAnalyzer::is_in_bounds(board, check_row, check_col) {
+                        let idx = board.index(check_row as usize, check_col as usize);
+                        if Board::is_bit_set(&player_bits, idx) {
+                            stones_found.push((check_row as usize, check_col as usize));
+                        } else if Board::is_bit_set(&board.occupied, idx) {
+                            // Hit opponent stone, stop looking
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                
+                // If we found 3+ stones in a line with gaps, check if it's actually dangerous
+                if stones_found.len() >= 3 {
+                    let first = stones_found.first().unwrap();
+                    let last = stones_found.last().unwrap();
+                    
+                    let start_row = first.0 as isize;
+                    let start_col = first.1 as isize;
+                    let end_row = last.0 as isize;
+                    let end_col = last.1 as isize;
+                    
+                    let total_span = ((end_row - start_row).abs() + (end_col - start_col).abs()) + 1;
+                    
+                    // Only consider it a threat if:
+                    // 1. The pattern spans 5 or fewer positions (could become 5-in-a-row)
+                    // 2. There are actual empty gaps that could be filled
+                    if total_span <= 5 {
+                        let steps = ((end_row - start_row) / dx.max(1)).max((end_col - start_col) / dy.max(1));
+                        let mut empty_gaps = 0;
+                        let mut threat_positions = Vec::new();
+                        
+                        for step in 1..steps {
+                            let gap_row = start_row + dx * step;
+                            let gap_col = start_col + dy * step;
+                            
+                            if PatternAnalyzer::is_valid_empty(board, gap_row, gap_col) {
+                                empty_gaps += 1;
+                                threat_positions.push((gap_row as usize, gap_col as usize));
+                            }
+                        }
+                        
+                        // Only add as threats if there are few enough gaps to be completable
+                        // and the pattern could actually form 5 in a row
+                        if empty_gaps > 0 && stones_found.len() + empty_gaps >= 5 && empty_gaps <= 2 {
+                            for pos in threat_positions {
+                                threats.insert(pos);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        threats.into_iter().collect()
+    }
+
     fn find_threat_moves(board: &Board, player: Player) -> Vec<(usize, usize)> {
         let mut moves = HashSet::new();
 
@@ -155,76 +235,93 @@ impl MoveGenerator {
             .filter(|&(row, col)| !DoubleThreeDetection::creates_double_three(board, row, col, player))
             .collect();
 
-        if filtered_moves.len() > 25 {
-            let mut prioritized_moves: Vec<((usize, usize), i32)> = filtered_moves
-                .into_iter()
-                .map(|mv| {
-                    let priority = Self::calculate_threat_priority(board, mv, player);
-                    (mv, priority)
-                })
-                .collect();
+        let mut prioritized_moves: Vec<((usize, usize), i32)> = filtered_moves
+            .into_iter()
+            .map(|mv| {
+                let priority = Self::calculate_threat_priority(board, mv, player);
+                (mv, priority)
+            })
+            .collect();
 
-            prioritized_moves.sort_by_key(|(_, priority)| -priority);
+        prioritized_moves.sort_by_key(|(_, priority)| -priority);
 
+        if prioritized_moves.len() > 25 {
             prioritized_moves.truncate(25);
-            prioritized_moves.into_iter().map(|(mv, _)| mv).collect()
-        } else {
-            let mut prioritized_moves: Vec<((usize, usize), i32)> = filtered_moves
-                .into_iter()
-                .map(|mv| {
-                    let priority = Self::calculate_threat_priority(board, mv, player);
-                    (mv, priority)
-                })
-                .collect();
-
-            prioritized_moves.sort_by_key(|(_, priority)| -priority);
-            prioritized_moves.into_iter().map(|(mv, _)| mv).collect()
         }
+
+        prioritized_moves.into_iter().map(|(mv, _)| mv).collect()
     }
 
     fn calculate_threat_priority(board: &Board, mv: (usize, usize), player: Player) -> i32 {
         let (row, col) = mv;
         let mut priority = 0;
 
+        // Use heuristic-style pattern analysis for more accurate threat assessment
         for &check_player in &[player, player.opponent()] {
-            for &(dx, dy) in &DIRECTIONS {
-                let backward =
-                    PatternAnalyzer::count_consecutive(board, row, col, -dx, -dy, check_player);
-                let forward =
-                    PatternAnalyzer::count_consecutive(board, row, col, dx, dy, check_player);
-                let total = backward + forward + 1;
-
-                let pattern_value = match total {
-                    5 => 10000,
-                    4 => {
-                        let back_row = row as isize - dx * (backward as isize + 1);
-                        let back_col = col as isize - dy * (backward as isize + 1);
-                        let fwd_row = row as isize + dx * (forward as isize + 1);
-                        let fwd_col = col as isize + dy * (forward as isize + 1);
-
-                        let back_open = PatternAnalyzer::is_valid_empty(board, back_row, back_col);
-                        let fwd_open = PatternAnalyzer::is_valid_empty(board, fwd_row, fwd_col);
-
-                        if back_open && fwd_open { 1000 } else { 500 }
-                    }
-                    3 => 200,
-                    2 => 50,
-                    _ => 0,
-                };
-
-                if check_player == player {
-                    priority += pattern_value * 2;
-                } else {
-                    priority += pattern_value;
-                }
+            let player_priority = Self::calculate_player_threat_value(board, row, col, check_player);
+            
+            if check_player == player {
+                priority += player_priority * 2; // Offensive moves weighted higher
+            } else {
+                priority += player_priority; // Defensive moves (blocking opponent)
             }
         }
 
+        // Small positional bonus for center play
         let center = board.size / 2;
         let distance = Self::manhattan_distance(row, col, center, center) as i32;
         priority += 10 - distance.min(10);
 
         priority
+    }
+
+    fn calculate_player_threat_value(board: &Board, row: usize, col: usize, player: Player) -> i32 {
+        let mut max_value = 0;
+
+        // Analyze each direction for patterns
+        for &(dx, dy) in &DIRECTIONS {
+            let backward = PatternAnalyzer::count_consecutive(board, row, col, -dx, -dy, player);
+            let forward = PatternAnalyzer::count_consecutive(board, row, col, dx, dy, player);
+            let total_stones = backward + forward + 1;
+
+            if total_stones < 2 {
+                continue;
+            }
+
+            // Check if this pattern has sufficient space to win (reuse heuristic function)
+            let pattern_start_row = row as isize - dx * backward as isize;
+            let pattern_start_col = col as isize - dy * backward as isize;
+            let total_space = pattern_utils::count_total_space(
+                board,
+                pattern_start_row as usize,
+                pattern_start_col as usize,
+                dx,
+                dy,
+                total_stones,
+            );
+            if total_space < 5 { // Assuming win condition of 5
+                continue;
+            }
+
+            // Use heuristic's existing pattern freedom analysis
+            let pattern_start_row = row as isize - dx * backward as isize;
+            let pattern_start_col = col as isize - dy * backward as isize;
+            let freedom = pattern_utils::analyze_pattern_freedom(
+                board,
+                pattern_start_row as usize,
+                pattern_start_col as usize,
+                dx,
+                dy,
+                total_stones,
+            );
+            
+            // Use shared pattern scoring function - single source of truth!
+            let pattern_value = pattern_utils::get_pattern_score(total_stones, freedom);
+
+            max_value = max_value.max(pattern_value);
+        }
+
+        max_value
     }
 
     fn find_threat_creating_moves(board: &Board, player: Player) -> HashSet<(usize, usize)> {
@@ -247,75 +344,20 @@ impl MoveGenerator {
                         }
                     }
                 }
-
-                Self::add_gapped_pattern_moves(board, row, col, dx, dy, player, &mut moves);
             }
         });
 
         moves
     }
 
-    fn add_gapped_pattern_moves(
-        board: &Board,
-        row: usize,
-        col: usize,
-        dx: isize,
-        dy: isize,
-        player: Player,
-        moves: &mut HashSet<(usize, usize)>,
-    ) {
-        let player_bits = board.get_player_bits(player);
-        let scan_range = 7;
 
-        for direction in [-1, 1] {
-            let mut stones_found = 1;
-            let mut gaps_in_sequence = 0;
-            let mut sequence_positions = vec![];
-
-            for offset in 1..=scan_range {
-                let r = row as isize + dx * direction * offset;
-                let c = col as isize + dy * direction * offset;
-
-                if !PatternAnalyzer::is_in_bounds(board, r, c) {
-                    break;
-                }
-
-                let idx = board.index(r as usize, c as usize);
-
-                if Board::is_bit_set(player_bits, idx) {
-                    stones_found += 1;
-                    sequence_positions.push((r, c));
-                } else if PatternAnalyzer::is_valid_empty(board, r, c) {
-                    gaps_in_sequence += 1;
-                    sequence_positions.push((r, c));
-
-                    if gaps_in_sequence > 2 {
-                        break;
-                    }
-                } else {
-                    break;
-                }
-
-                if sequence_positions.len() > 6 && stones_found < 3 {
-                    break;
-                }
-            }
-
-            if stones_found >= 3 && gaps_in_sequence > 0 {
-                for (r, c) in sequence_positions {
-                    if PatternAnalyzer::is_valid_empty(board, r, c) {
-                        moves.insert((r as usize, c as usize));
-                    }
-                }
-            }
-        }
-    }
 
     fn get_zone_based_moves(board: &Board, player: Player) -> Vec<(usize, usize)> {
         let mut candidates = HashSet::new();
         let stone_count = board.count_stones();
 
         let zone_radius = if stone_count < 10 { 3 } else { 2 };
+        let max_zone_moves = if stone_count < 10 { 25 } else { 20 };
 
         board.iterate_bits(&board.occupied, |row, col| {
             for dr in -(zone_radius as isize)..=(zone_radius as isize) {
@@ -339,27 +381,11 @@ impl MoveGenerator {
             .collect();
 
         filtered_moves.sort_by_key(|&mv| -Self::calculate_threat_priority(board, mv, player));
-
-        let stone_count = board.count_stones();
-        let max_zone_moves = if stone_count < 10 { 25 } else { 20 };
-
         filtered_moves.truncate(max_zone_moves);
         filtered_moves
     }
 
-    #[inline]
-    pub fn count_consecutive_bidirectional(
-        board: &Board,
-        row: usize,
-        col: usize,
-        dx: isize,
-        dy: isize,
-        player: Player,
-    ) -> usize {
-        let backward = PatternAnalyzer::count_consecutive(board, row, col, -dx, -dy, player);
-        let forward = PatternAnalyzer::count_consecutive(board, row, col, dx, dy, player);
-        backward + forward + 1
-    }
+
 
     #[inline]
     pub fn manhattan_distance(row1: usize, col1: usize, row2: usize, col2: usize) -> usize {

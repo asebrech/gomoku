@@ -25,23 +25,24 @@
 use crate::core::board::{Board, Player};
 use crate::core::patterns::{DIRECTIONS, PatternAnalyzer, PatternFreedom};
 use crate::core::state::GameState;
+use crate::ai::pattern_utils;
+
+pub const WINNING_SCORE: i32 = 1_000_000;
+pub const FIVE_IN_ROW_SCORE: i32 = 100_000;
+pub const CHECK_PENALTY: i32 = 10_000;
+pub const LIVE_FOUR_SINGLE_SCORE: i32 = 15_000;
+pub const LIVE_FOUR_MULTIPLE_SCORE: i32 = 20_000;
+pub const HALF_FREE_FOUR_SCORE: i32 = 3_500;
+pub const WINNING_THREAT_SCORE: i32 = 10_000;
+pub const DEAD_FOUR_SCORE: i32 = 400;
+pub const LIVE_THREE_SCORE: i32 = 500;
+pub const HALF_FREE_THREE_SCORE: i32 = 200;
+pub const DEAD_THREE_SCORE: i32 = 50;
+pub const LIVE_TWO_SCORE: i32 = 50;
+pub const HALF_FREE_TWO_SCORE: i32 = 20;
+pub const CAPTURE_BONUS_MULTIPLIER: i32 = 15_000;
 
 pub struct Heuristic;
-
-const WINNING_SCORE: i32 = 1_000_000;
-const FIVE_IN_ROW_SCORE: i32 = 100_000;
-const CHECK_PENALTY: i32 = 10_000;
-const LIVE_FOUR_SINGLE_SCORE: i32 = 15_000;
-const LIVE_FOUR_MULTIPLE_SCORE: i32 = 20_000;
-const HALF_FREE_FOUR_SCORE: i32 = 3_500;
-const WINNING_THREAT_SCORE: i32 = 10_000;
-const DEAD_FOUR_SCORE: i32 = 400;
-const LIVE_THREE_SCORE: i32 = 500;
-const HALF_FREE_THREE_SCORE: i32 = 200;
-const DEAD_THREE_SCORE: i32 = 50;
-const LIVE_TWO_SCORE: i32 = 50;
-const HALF_FREE_TWO_SCORE: i32 = 20;
-const CAPTURE_BONUS_MULTIPLIER: i32 = 15_000;
 
 #[derive(Debug, Clone, Copy)]
 struct PatternCounts {
@@ -252,13 +253,13 @@ impl Heuristic {
         let length = length.min(win_condition);
 
         let total_available_space =
-            Self::count_total_space(board, pattern_start_row, pattern_start_col, dx, dy, length);
+            pattern_utils::count_total_space(board, pattern_start_row, pattern_start_col, dx, dy, length);
 
         if total_available_space < win_condition {
             return None;
         }
 
-        let freedom = Self::analyze_pattern_freedom(
+        let freedom = pattern_utils::analyze_pattern_freedom(
             board,
             pattern_start_row,
             pattern_start_col,
@@ -298,55 +299,7 @@ impl Heuristic {
         }
     }
 
-    fn count_total_space(
-        board: &Board,
-        start_row: usize,
-        start_col: usize,
-        dx: isize,
-        dy: isize,
-        pattern_length: usize,
-    ) -> usize {
-        let mut space = pattern_length;
 
-        space += Self::count_empty_in_direction(
-            board,
-            start_row as isize - dx,
-            start_col as isize - dy,
-            -dx,
-            -dy,
-        );
-
-        let end_row = start_row as isize + (pattern_length - 1) as isize * dx;
-        let end_col = start_col as isize + (pattern_length - 1) as isize * dy;
-        space += Self::count_empty_in_direction(board, end_row + dx, end_col + dy, dx, dy);
-
-        space
-    }
-
-    fn count_empty_in_direction(
-        board: &Board,
-        start_row: isize,
-        start_col: isize,
-        dx: isize,
-        dy: isize,
-    ) -> usize {
-        let mut count = 0;
-        let mut current_row = start_row;
-        let mut current_col = start_col;
-
-        while PatternAnalyzer::is_in_bounds(board, current_row, current_col) {
-            let idx = board.index(current_row as usize, current_col as usize);
-            if !Board::is_bit_set(&board.occupied, idx) {
-                count += 1;
-                current_row += dx;
-                current_col += dy;
-            } else {
-                break;
-            }
-        }
-
-        count
-    }
 
     fn update_counts(counts: &mut PatternCounts, pattern: PatternInfo) {
         match pattern.length {
@@ -456,26 +409,5 @@ impl Heuristic {
         (current_row as usize, current_col as usize)
     }
 
-    fn analyze_pattern_freedom(
-        board: &Board,
-        start_row: usize,
-        start_col: usize,
-        dx: isize,
-        dy: isize,
-        length: usize,
-    ) -> PatternFreedom {
-        let before_row = start_row as isize - dx;
-        let before_col = start_col as isize - dy;
-        let start_open = PatternAnalyzer::is_valid_empty(board, before_row, before_col);
 
-        let end_row = start_row as isize + (length as isize * dx);
-        let end_col = start_col as isize + (length as isize * dy);
-        let end_open = PatternAnalyzer::is_valid_empty(board, end_row, end_col);
-
-        match (start_open, end_open) {
-            (true, true) => PatternFreedom::Free,
-            (true, false) | (false, true) => PatternFreedom::HalfFree,
-            (false, false) => PatternFreedom::Flanked,
-        }
-    }
 }

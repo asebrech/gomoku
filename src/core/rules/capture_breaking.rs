@@ -34,9 +34,7 @@ impl CaptureBreaking {
         let opponent = player.opponent();
         
         for &(dx, dy) in &DIRECTIONS {
-            let mut count = 1;
-            count += PatternAnalyzer::count_consecutive(board, row, col, dx, dy, player);
-            count += PatternAnalyzer::count_consecutive(board, row, col, -dx, -dy, player);
+            let count = PatternAnalyzer::count_consecutive_bidirectional(board, row, col, dx, dy, player);
 
             if count >= 5 {
                 // Find all stones in this five-in-a-row line
@@ -107,9 +105,7 @@ impl CaptureBreaking {
         let mut breaking_moves = Vec::new();
         
         for &(dx, dy) in &DIRECTIONS {
-            let mut count = 1;
-            count += PatternAnalyzer::count_consecutive(board, row, col, dx, dy, player);
-            count += PatternAnalyzer::count_consecutive(board, row, col, -dx, -dy, player);
+            let count = PatternAnalyzer::count_consecutive_bidirectional(board, row, col, dx, dy, player);
 
             if count >= 5 {
                 // Find all stones in this five-in-a-row line

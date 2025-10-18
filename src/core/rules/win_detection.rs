@@ -46,9 +46,7 @@ impl WinDetection {
         };
 
         for &(dx, dy) in &DIRECTIONS {
-            let mut count = 1;
-            count += PatternAnalyzer::count_consecutive(board, row, col, dx, dy, player);
-            count += PatternAnalyzer::count_consecutive(board, row, col, -dx, -dy, player);
+            let count = PatternAnalyzer::count_consecutive_bidirectional(board, row, col, dx, dy, player);
 
             if count >= win_condition {
                 return true;
@@ -90,9 +88,7 @@ impl WinDetection {
         };
 
         for &(dx, dy) in &DIRECTIONS {
-            let mut count = 1;
-            count += PatternAnalyzer::count_consecutive(board, row, col, dx, dy, player);
-            count += PatternAnalyzer::count_consecutive(board, row, col, -dx, -dy, player);
+            let count = PatternAnalyzer::count_consecutive_bidirectional(board, row, col, dx, dy, player);
 
             if count >= win_condition {
                 let is_breakable = CaptureBreaking::can_break_five_by_capture(board, row, col, player);
