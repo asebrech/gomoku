@@ -1,7 +1,6 @@
 use crate::core::board::{Board, Player};
 use crate::core::patterns::{DIRECTIONS, PatternAnalyzer, PatternFreedom};
 use crate::core::state::GameState;
-use crate::ai::pattern_utils;
 
 // Scoring constants for different game situations
 pub const WINNING_SCORE: i32 = 1_000_000;
@@ -255,11 +254,11 @@ impl Heuristic {
         }
         let length = length.min(win_condition);
         let total_available_space =
-            pattern_utils::count_total_space(board, pattern_start_row, pattern_start_col, dx, dy, length);
+            PatternAnalyzer::count_total_space(board, pattern_start_row, pattern_start_col, dx, dy, length);
         if total_available_space < win_condition {
             return None;
         }
-        let freedom = pattern_utils::analyze_pattern_freedom(
+        let freedom = PatternAnalyzer::analyze_pattern_freedom(
             board,
             pattern_start_row,
             pattern_start_col,

@@ -88,4 +88,90 @@ impl PatternAnalyzer {
         let forward = Self::count_consecutive(board, row, col, dx, dy, player);
         backward + forward + 1
     }
+
+    /// Counts the total available space for a pattern in a given direction.
+    /// 
+    /// This includes the pattern length itself plus all empty squares that
+    /// extend the pattern in both directions until blocked by stones or board edges.
+    pub fn count_total_space(
+        board: &Board,
+        start_row: usize,
+        start_col: usize,
+        dx: isize,
+        dy: isize,
+        pattern_length: usize,
+    ) -> usize {
+        let mut space = pattern_length;
+
+        space += Self::count_empty_in_direction(
+            board,
+            start_row as isize - dx,
+            start_col as isize - dy,
+            -dx,
+            -dy,
+        );
+
+        let end_row = start_row as isize + (pattern_length - 1) as isize * dx;
+        let end_col = start_col as isize + (pattern_length - 1) as isize * dy;
+        space += Self::count_empty_in_direction(board, end_row + dx, end_col + dy, dx, dy);
+
+        space
+    }
+
+    /// Counts empty squares in a specific direction from a starting position.
+    pub fn count_empty_in_direction(
+        board: &Board,
+        start_row: isize,
+        start_col: isize,
+        dx: isize,
+        dy: isize,
+    ) -> usize {
+        let mut count = 0;
+        let mut current_row = start_row;
+        let mut current_col = start_col;
+
+        while Self::is_in_bounds(board, current_row, current_col) {
+            let idx = board.index(current_row as usize, current_col as usize);
+            if !Board::is_bit_set(&board.occupied, idx) {
+                count += 1;
+                current_row += dx;
+                current_col += dy;
+            } else {
+                break;
+            }
+        }
+
+        count
+    }
+
+    /// Analyzes the freedom of a pattern to determine its tactical value.
+    /// 
+    /// This function examines the spaces before and after a pattern to classify
+    /// whether it's free, half-free, or flanked.
+    pub fn analyze_pattern_freedom(
+        board: &Board,
+        start_row: usize,
+        start_col: usize,
+        dx: isize,
+        dy: isize,
+        length: usize,
+    ) -> PatternFreedom {
+        let before_row = start_row as isize - dx;
+        let before_col = start_col as isize - dy;
+        let start_open = Self::is_valid_empty(board, before_row, before_col);
+
+        let end_row = start_row as isize + (length - 1) as isize * dx;
+        let end_col = start_col as isize + (length - 1) as isize * dy;
+        let after_row = end_row + dx;
+        let after_col = end_col + dy;
+        let end_open = Self::is_valid_empty(board, after_row, after_col);
+
+        match (start_open, end_open) {
+            (true, true) => PatternFreedom::Free,
+            (true, false) | (false, true) => PatternFreedom::HalfFree,
+            (false, false) => PatternFreedom::Flanked,
+        }
+    }
+
+
 }

@@ -1,8 +1,7 @@
 //! Tests for shared pattern analysis utilities.
 
-use gomoku::ai::pattern_utils::{count_total_space, analyze_pattern_freedom, count_empty_in_direction, get_pattern_score};
+use gomoku::core::patterns::{PatternAnalyzer, PatternFreedom};
 use gomoku::core::board::{Board, Player};
-use gomoku::core::patterns::PatternFreedom;
 
 #[test]
 fn test_analyze_pattern_freedom() {
@@ -13,17 +12,17 @@ fn test_analyze_pattern_freedom() {
     board.place_stone(9, 7, Player::Max);
     board.place_stone(9, 8, Player::Max);
 
-    let freedom = analyze_pattern_freedom(&board, 9, 6, 0, 1, 3);
+    let freedom = PatternAnalyzer::analyze_pattern_freedom(&board, 9, 6, 0, 1, 3);
     assert_eq!(freedom, PatternFreedom::Free);
 
     // Test half-free pattern: O X X X .
     board.place_stone(9, 5, Player::Min); // Block one end
-    let freedom = analyze_pattern_freedom(&board, 9, 6, 0, 1, 3);
+    let freedom = PatternAnalyzer::analyze_pattern_freedom(&board, 9, 6, 0, 1, 3);
     assert_eq!(freedom, PatternFreedom::HalfFree);
 
     // Test flanked pattern: O X X X O
     board.place_stone(9, 9, Player::Min); // Block other end
-    let freedom = analyze_pattern_freedom(&board, 9, 6, 0, 1, 3);
+    let freedom = PatternAnalyzer::analyze_pattern_freedom(&board, 9, 6, 0, 1, 3);
     assert_eq!(freedom, PatternFreedom::Flanked);
 }
 
@@ -36,7 +35,7 @@ fn test_count_total_space() {
     board.place_stone(9, 7, Player::Max);
     board.place_stone(9, 8, Player::Max);
 
-    let space = count_total_space(&board, 9, 6, 0, 1, 3);
+    let space = PatternAnalyzer::count_total_space(&board, 9, 6, 0, 1, 3);
     // Should have space for pattern (3) + empty spaces on both sides
     assert!(space >= 5, "Should have at least 5 spaces for win condition");
 
@@ -45,7 +44,7 @@ fn test_count_total_space() {
     small_board.place_stone(1, 1, Player::Max);
     small_board.place_stone(1, 2, Player::Max);
 
-    let space = count_total_space(&small_board, 1, 1, 0, 1, 2);
+    let space = PatternAnalyzer::count_total_space(&small_board, 1, 1, 0, 1, 2);
     // On 4x4 board, pattern starting at (1,1) with length 2 should have total space of 4
     assert_eq!(space, 4, "Pattern on 4x4 board should have exactly 4 spaces");
 }
@@ -60,15 +59,15 @@ fn test_count_empty_in_direction() {
     board.place_stone(9, 9, Player::Min); // Blocking stone
 
     // Count empty spaces to the right from position (9, 7)
-    let empty_count = count_empty_in_direction(&board, 9, 7, 0, 1);
+    let empty_count = PatternAnalyzer::count_empty_in_direction(&board, 9, 7, 0, 1);
     assert_eq!(empty_count, 2, "Should count 2 empty spaces before hitting the blocking stone");
 
     // Count empty spaces to the left from position (9, 4) 
-    let empty_count = count_empty_in_direction(&board, 9, 4, 0, -1);
+    let empty_count = PatternAnalyzer::count_empty_in_direction(&board, 9, 4, 0, -1);
     assert_eq!(empty_count, 5, "Should count 5 empty spaces to the left before hitting board edge");
     
     // Count from position right after stones - should count 1 empty space then hit stone
-    let empty_count = count_empty_in_direction(&board, 9, 7, 0, -1);
+    let empty_count = PatternAnalyzer::count_empty_in_direction(&board, 9, 7, 0, -1);
     assert_eq!(empty_count, 1, "Should count 1 empty space before hitting the stone at (9,6)");
 }
 
@@ -83,12 +82,10 @@ fn test_pattern_utils_consistency() {
     board.place_stone(9, 8, Player::Max);
     board.place_stone(9, 9, Player::Max);
 
-    let freedom = analyze_pattern_freedom(&board, 9, 6, 0, 1, 4);
-    let score = get_pattern_score(4, freedom);
-    let space = count_total_space(&board, 9, 6, 0, 1, 4);
+    let freedom = PatternAnalyzer::analyze_pattern_freedom(&board, 9, 6, 0, 1, 4);
+    let space = PatternAnalyzer::count_total_space(&board, 9, 6, 0, 1, 4);
 
     // Verify values are reasonable
-    assert!(score > 0, "Pattern should have positive score");
     assert!(space >= 4, "Pattern should have at least its own length in space");
     assert_ne!(freedom, PatternFreedom::Flanked, "Pattern should not be flanked on empty board");
 }

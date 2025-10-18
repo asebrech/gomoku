@@ -1,8 +1,11 @@
 use crate::core::board::{Board, Player};
-use crate::core::patterns::{DIRECTIONS, PatternAnalyzer};
+use crate::core::patterns::{DIRECTIONS, PatternAnalyzer, PatternFreedom};
 use crate::core::rules::DoubleThreeDetection;
-use crate::ai::pattern_utils;
-use crate::ai::heuristic::CAPTURE_BONUS_MULTIPLIER;
+use crate::ai::heuristic::{
+    CAPTURE_BONUS_MULTIPLIER, FIVE_IN_ROW_SCORE, LIVE_FOUR_SINGLE_SCORE, 
+    HALF_FREE_FOUR_SCORE, DEAD_FOUR_SCORE, LIVE_THREE_SCORE, 
+    HALF_FREE_THREE_SCORE, DEAD_THREE_SCORE, LIVE_TWO_SCORE, HALF_FREE_TWO_SCORE
+};
 use std::collections::HashSet;
 
 const CENTER_POSITION_BONUS: i32 = 10;
@@ -275,7 +278,7 @@ impl MoveGenerator {
             }
             let pattern_start_row = row as isize - dx * backward as isize;
             let pattern_start_col = col as isize - dy * backward as isize;
-            let total_space = pattern_utils::count_total_space(
+            let total_space = PatternAnalyzer::count_total_space(
                 board,
                 pattern_start_row as usize,
                 pattern_start_col as usize,
@@ -288,7 +291,7 @@ impl MoveGenerator {
             }
             let pattern_start_row = row as isize - dx * backward as isize;
             let pattern_start_col = col as isize - dy * backward as isize;
-            let freedom = pattern_utils::analyze_pattern_freedom(
+            let freedom = PatternAnalyzer::analyze_pattern_freedom(
                 board,
                 pattern_start_row as usize,
                 pattern_start_col as usize,
@@ -296,7 +299,7 @@ impl MoveGenerator {
                 dy,
                 total_stones,
             );
-            let pattern_value = pattern_utils::get_pattern_score(total_stones, freedom);
+            let pattern_value = get_pattern_score(total_stones, freedom);
             max_value = max_value.max(pattern_value);
         }
         max_value
@@ -404,5 +407,31 @@ impl MoveGenerator {
     #[inline]
     pub fn manhattan_distance(row1: usize, col1: usize, row2: usize, col2: usize) -> usize {
         ((row1 as isize - row2 as isize).abs() + (col1 as isize - col2 as isize).abs()) as usize
+    }
+}
+
+/// Gets the appropriate score for a pattern based on its length and freedom.
+/// 
+/// This function provides pattern scoring using the official heuristic constants
+/// to ensure consistency between move generation and position evaluation.
+fn get_pattern_score(length: usize, freedom: PatternFreedom) -> i32 {
+    match length {
+        5 => FIVE_IN_ROW_SCORE,
+        4 => match freedom {
+            PatternFreedom::Free => LIVE_FOUR_SINGLE_SCORE,
+            PatternFreedom::HalfFree => HALF_FREE_FOUR_SCORE,
+            PatternFreedom::Flanked => DEAD_FOUR_SCORE,
+        },
+        3 => match freedom {
+            PatternFreedom::Free => LIVE_THREE_SCORE,
+            PatternFreedom::HalfFree => HALF_FREE_THREE_SCORE,
+            PatternFreedom::Flanked => DEAD_THREE_SCORE,
+        },
+        2 => match freedom {
+            PatternFreedom::Free => LIVE_TWO_SCORE,
+            PatternFreedom::HalfFree => HALF_FREE_TWO_SCORE,
+            PatternFreedom::Flanked => 0, // Dead twos are ignored
+        },
+        _ => 0,
     }
 }
