@@ -16,7 +16,12 @@ use crate::core::board::{Board, Player};
 use crate::core::patterns::{DIRECTIONS, PatternAnalyzer};
 use crate::core::rules::DoubleThreeDetection;
 use crate::ai::pattern_utils;
+use crate::ai::heuristic::CAPTURE_BONUS_MULTIPLIER;
 use std::collections::HashSet;
+
+/// Maximum bonus points for center position in move generation.
+/// Decreases linearly with distance from center (max 10 points for center, 0 for edges).
+const CENTER_POSITION_BONUS: i32 = 10;
 
 pub struct MoveGenerator;
 
@@ -267,10 +272,14 @@ impl MoveGenerator {
             }
         }
 
+        // Capture bonus: significantly boost moves that create captures
+        let capture_bonus = Self::calculate_capture_bonus(board, row, col, player);
+        priority += capture_bonus;
+
         // Small positional bonus for center play
         let center = board.size / 2;
         let distance = Self::manhattan_distance(row, col, center, center) as i32;
-        priority += 10 - distance.min(10);
+        priority += CENTER_POSITION_BONUS - distance.min(CENTER_POSITION_BONUS);
 
         priority
     }
@@ -322,6 +331,58 @@ impl MoveGenerator {
         }
 
         max_value
+    }
+
+    fn calculate_capture_bonus(board: &Board, row: usize, col: usize, player: Player) -> i32 {
+        let mut bonus = 0;
+        let opponent = player.opponent();
+
+        // Check all directions for capture opportunities
+        for &(dx, dy) in &DIRECTIONS {
+            let adj_row = row as isize + dx;
+            let adj_col = col as isize + dy;
+            
+            if PatternAnalyzer::is_in_bounds(board, adj_row, adj_col) {
+                let adj_row = adj_row as usize;
+                let adj_col = adj_col as usize;
+                
+                // Check if adjacent position has opponent stone
+                if let Some(piece_player) = board.get_player(adj_row, adj_col) {
+                    if piece_player == opponent {
+                        // Check for capture pattern: our_stone -> opponent -> opponent -> our_stone
+                        let far_row = adj_row as isize + dx;
+                        let far_col = adj_col as isize + dy;
+                        
+                        if PatternAnalyzer::is_in_bounds(board, far_row, far_col) {
+                            let far_row = far_row as usize;
+                            let far_col = far_col as usize;
+                            
+                            if let Some(piece_player) = board.get_player(far_row, far_col) {
+                                if piece_player == opponent {
+                                    // Check if there's our stone after the opponent pair
+                                    let end_row = far_row as isize + dx;
+                                    let end_col = far_col as isize + dy;
+                                    
+                                    if PatternAnalyzer::is_in_bounds(board, end_row, end_col) {
+                                        let end_row = end_row as usize;
+                                        let end_col = end_col as usize;
+                                        
+                                        if let Some(piece_player) = board.get_player(end_row, end_col) {
+                                            if piece_player == player {
+                                                // This creates a capture! Use scaled heuristic constant for consistency
+                                                bonus += CAPTURE_BONUS_MULTIPLIER / 50; // 15000/50 = 300 points
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        bonus
     }
 
     fn find_threat_creating_moves(board: &Board, player: Player) -> HashSet<(usize, usize)> {
