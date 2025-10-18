@@ -28,18 +28,30 @@ impl MoveGenerator {
             return vec![board.center()];
         }
         if let Some(winning_move) = Self::find_winning_move(board, player) {
-            return vec![winning_move];
+            if !DoubleThreeDetection::creates_double_three(board, winning_move.0, winning_move.1, player) {
+                return vec![winning_move];
+            }
         }
         if let Some(block_moves) = Self::find_must_block_moves(board, player.opponent()) {
             if !block_moves.is_empty() {
-                return block_moves;
+                let legal_blocks = Self::filter_double_three_moves(board, block_moves, player);
+                if !legal_blocks.is_empty() {
+                    return legal_blocks;
+                }
             }
         }
         let threat_moves = Self::find_threat_moves(board, player);
         if !threat_moves.is_empty() {
-            return threat_moves;
+            return Self::filter_double_three_moves(board, threat_moves, player);
         }
-        Self::get_zone_based_moves(board, player)
+        let zone_moves = Self::get_zone_based_moves(board, player);
+        let legal_zone_moves = Self::filter_double_three_moves(board, zone_moves, player);
+        
+        if legal_zone_moves.is_empty() {
+            return Self::find_any_legal_move(board, player);
+        }
+        
+        legal_zone_moves
     }
 
     /// Finds a move that creates an immediate five-in-a-row win
@@ -220,10 +232,7 @@ impl MoveGenerator {
         moves.extend(our_threats);
         let opp_threats = Self::find_threat_creating_moves(board, player.opponent());
         moves.extend(opp_threats);
-        let filtered_moves: Vec<(usize, usize)> = moves
-            .into_iter()
-            .filter(|&(row, col)| !DoubleThreeDetection::creates_double_three(board, row, col, player))
-            .collect();
+        let filtered_moves: Vec<(usize, usize)> = moves.into_iter().collect();
         let mut prioritized_moves: Vec<((usize, usize), i32)> = filtered_moves
             .into_iter()
             .map(|mv| {
@@ -394,10 +403,7 @@ impl MoveGenerator {
                 }
             }
         });
-        let mut filtered_moves: Vec<(usize, usize)> = candidates
-            .into_iter()
-            .filter(|&(row, col)| !DoubleThreeDetection::creates_double_three(board, row, col, player))
-            .collect();
+        let mut filtered_moves: Vec<(usize, usize)> = candidates.into_iter().collect();
         filtered_moves.sort_by_key(|&mv| -Self::calculate_threat_priority(board, mv, player));
         filtered_moves.truncate(max_zone_moves);
         filtered_moves
@@ -407,6 +413,40 @@ impl MoveGenerator {
     #[inline]
     pub fn manhattan_distance(row1: usize, col1: usize, row2: usize, col2: usize) -> usize {
         ((row1 as isize - row2 as isize).abs() + (col1 as isize - col2 as isize).abs()) as usize
+    }
+
+    /// Filters out moves that would create illegal double-three patterns
+    /// 
+    /// This function applies the double-three rule validation to all candidate moves,
+    /// ensuring that no move violates the forbidden double-three pattern rule.
+    /// Returns only legal moves that don't create double-three violations.
+    fn filter_double_three_moves(board: &Board, moves: Vec<(usize, usize)>, player: Player) -> Vec<(usize, usize)> {
+        moves
+            .into_iter()
+            .filter(|(row, col)| !DoubleThreeDetection::creates_double_three(board, *row, *col, player))
+            .collect()
+    }
+
+    /// Last resort: exhaustive search for ANY legal move on the board
+    /// 
+    /// This function is called only when normal move generation fails to find
+    /// legal moves. It searches every empty position on the board to find at
+    /// least one legal move that doesn't violate double-three rules. This
+    /// prevents AI deadlock while ensuring no illegal moves are returned.
+    /// 
+    /// Returns empty Vec only if there are truly no legal moves (game should end).
+    fn find_any_legal_move(board: &Board, player: Player) -> Vec<(usize, usize)> {
+        for row in 0..board.size {
+            for col in 0..board.size {
+                // Check if position is empty and legal
+                if board.get_player(row, col).is_none() 
+                    && !DoubleThreeDetection::creates_double_three(board, row, col, player) {
+                    return vec![(row, col)];
+                }
+            }
+        }
+        // Truly no legal moves - return empty (game should end)
+        vec![]
     }
 }
 
