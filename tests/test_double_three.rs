@@ -553,3 +553,181 @@ fn test_creates_double_three_diagonal() {
         // The result depends on whether (5,5)-(5,6)-(5,7) and (5,7)-(6,7)-(7,7) 
         // both count as valid free-threes
     }
+
+    #[test]
+    fn test_double_three_allowed_with_capture() {
+        // Test the rule: "it is not forbidden to introduce a double-three by capturing a pair"
+        
+        let mut board = Board::new(19);
+        
+        // Set up a scenario where placing a stone would:
+        // 1. Create a double-three pattern
+        // 2. But also capture opponent stones
+        
+        // Place opponent stones that can be captured
+        board.place_stone(5, 5, Player::Min); // Opponent stone 1
+        board.place_stone(5, 6, Player::Min); // Opponent stone 2
+        
+        // Place our stones to set up potential free-threes
+        board.place_stone(5, 3, Player::Max); // Our stone for horizontal line
+        board.place_stone(5, 4, Player::Max); // Our stone for horizontal line
+        // If we place at (5,7), it would complete: X-X-?-o-o-X (capture + extend)
+        
+        board.place_stone(3, 7, Player::Max); // Our stone for vertical line
+        board.place_stone(4, 7, Player::Max); // Our stone for vertical line
+        // If we place at (5,7), it would also create: X-X-? vertically
+        
+        // The move at (5,7) should:
+        // 1. Capture the pair at (5,5) and (5,6)
+        // 2. Potentially create two free-threes (horizontal and vertical)
+        // 3. But be ALLOWED because it captures
+        
+        let creates_double = GameRules::creates_double_three(&board, 5, 7, Player::Max);
+        println!("Double-three with capture allowed: {}", creates_double);
+        
+        // Should be false (allowed) because the move captures opponent stones
+        assert!(!creates_double, "Double-three should be allowed when capturing opponent stones");
+    }
+
+    #[test]
+    fn test_double_three_forbidden_without_capture() {
+        // Test that double-three is still forbidden when no capture occurs
+        
+        let mut board = Board::new(19);
+        
+        // Set up a scenario that creates double-three but doesn't capture
+        board.place_stone(5, 3, Player::Max);
+        board.place_stone(5, 4, Player::Max);
+        // Horizontal: X-X-?-_-_
+        
+        board.place_stone(3, 5, Player::Max);
+        board.place_stone(4, 5, Player::Max);
+        // Vertical: X-X-? (at column 5)
+        
+        // Move at (5,5) would create two free-threes without capturing
+        let creates_double = GameRules::creates_double_three(&board, 5, 5, Player::Max);
+        println!("Double-three without capture: {}", creates_double);
+        
+        // Should be true (forbidden) because no capture occurs
+        assert!(creates_double, "Double-three should still be forbidden when no capture occurs");
+    }
+
+    #[test]
+    fn test_capture_with_single_three_allowed() {
+        // Test that capturing is always allowed, even with a single free-three
+        
+        let mut board = Board::new(19);
+        
+        // Set up opponent stones to capture
+        board.place_stone(5, 5, Player::Min);
+        board.place_stone(5, 6, Player::Min);
+        
+        // Set up one potential free-three
+        board.place_stone(5, 3, Player::Max);
+        board.place_stone(5, 4, Player::Max);
+        
+        // Move at (5,7) captures and creates one free-three
+        let creates_double = GameRules::creates_double_three(&board, 5, 7, Player::Max);
+        println!("Single three with capture: {}", creates_double);
+        
+        // Should be false (allowed) - single free-three is always allowed
+        assert!(!creates_double, "Single free-three with capture should be allowed");
+    }
+
+    #[test]
+    fn test_multiple_captures_with_double_three() {
+        // Test double-three exception with multiple potential captures
+        
+        let mut board = Board::new(19);
+        
+        // Set up multiple opponent pairs to capture
+        board.place_stone(4, 5, Player::Min);
+        board.place_stone(5, 5, Player::Min); // Pair 1
+        
+        board.place_stone(6, 5, Player::Min);
+        board.place_stone(7, 5, Player::Min); // Pair 2
+        
+        // Set up our stones for potential double-three
+        board.place_stone(2, 5, Player::Max); // Our stone
+        board.place_stone(5, 2, Player::Max); // Our stone
+        board.place_stone(5, 3, Player::Max); // Our stone
+        
+        // Move at (3,5) might capture and create patterns
+        let creates_double = GameRules::creates_double_three(&board, 3, 5, Player::Max);
+        println!("Multiple captures scenario: {}", creates_double);
+        
+        // Result depends on actual capture detection and pattern formation
+    }
+
+    #[test]
+    fn test_comprehensive_capture_exception_rule() {
+        // Comprehensive test demonstrating the capture exception rule
+        // "it is not forbidden to introduce a double-three by capturing a pair"
+        
+        let mut board = Board::new(19);
+        
+        // Set up a clear scenario where placing a stone would:
+        // 1. Create a double-three pattern (horizontal + vertical)
+        // 2. But also capture opponent stones
+        
+        // Place opponent stones in a capturable pattern
+        board.place_stone(9, 8, Player::Min);  // Opponent stone 1
+        board.place_stone(9, 9, Player::Min);  // Opponent stone 2 (forms a pair)
+        
+        // Set up horizontal free-three potential: X X _ o o X
+        board.place_stone(9, 6, Player::Max);  // Our stone
+        board.place_stone(9, 7, Player::Max);  // Our stone
+        board.place_stone(9, 11, Player::Max); // Our stone (after capture point)
+        
+        // Set up vertical free-three potential
+        board.place_stone(7, 10, Player::Max);  // Our stone
+        board.place_stone(8, 10, Player::Max);  // Our stone
+        // If we place at (9, 10), we'd have: X X ? (vertically)
+        
+        // The move at (9, 10) should:
+        // 1. Capture the pair at (9, 8) and (9, 9) by flanking them
+        // 2. Create horizontal pattern: X X X _ _ X (after capture)
+        // 3. Create vertical pattern: X X X
+        // 4. Be ALLOWED despite double-three because it captures
+        
+        println!("Testing comprehensive capture exception scenario:");
+        println!("Move at (9, 10) captures pair (9, 8)-(9, 9) and creates double-three");
+        
+        let creates_double = GameRules::creates_double_three(&board, 9, 10, Player::Max);
+        println!("Creates double-three: {}", creates_double);
+        
+        // Verify our capture detection works
+        use gomoku::core::captures::CaptureHandler;
+        let captures = CaptureHandler::detect_captures(&board, 9, 10, Player::Max);
+        println!("Captures detected: {:?}", captures);
+        
+        // Should be false (allowed) because the move captures opponent stones
+        assert!(!creates_double, "Double-three should be allowed when capturing opponent stones");
+        assert!(!captures.is_empty(), "Should detect captures in this scenario");
+        
+        // Now test a different scenario that definitely creates double-three without capture
+        let mut board_no_capture = Board::new(19);
+        
+        // Create a clearer double-three scenario
+        // Horizontal line: X X _ 
+        board_no_capture.place_stone(9, 6, Player::Max);  
+        board_no_capture.place_stone(9, 7, Player::Max);  
+        // Place at (9, 8) would extend: X X X
+        
+        // Vertical line: X X _
+        board_no_capture.place_stone(7, 8, Player::Max);  
+        board_no_capture.place_stone(8, 8, Player::Max);  
+        // Place at (9, 8) would extend: X X X (vertically)
+        
+        // Ensure space for extensions (free-three requirement)
+        // Leave (9, 5) and (9, 9) empty for horizontal extension
+        // Leave (6, 8) and (10, 8) empty for vertical extension
+        
+        let creates_double_no_capture = GameRules::creates_double_three(&board_no_capture, 9, 8, Player::Max);
+        println!("Clear double-three pattern without capture: {}", creates_double_no_capture);
+        
+        // Should be true (forbidden) when no capture occurs and double-three is created
+        assert!(creates_double_no_capture, "Double-three should be forbidden when no capture occurs");
+        
+        println!("✓ Capture exception rule working correctly!");
+    }

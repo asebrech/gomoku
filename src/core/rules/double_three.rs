@@ -12,6 +12,7 @@
 
 use crate::core::board::{Board, Player};
 use crate::core::patterns::{PatternAnalyzer, DIRECTIONS};
+use crate::core::captures::CaptureHandler;
 
 /// Double-three detection functionality.
 pub struct DoubleThreeDetection;
@@ -23,6 +24,10 @@ impl DoubleThreeDetection {
     /// patterns simultaneously. This is typically forbidden in tournament Gomoku
     /// to prevent certain winning strategies from becoming too powerful.
     ///
+    /// **Important Exception**: If the move results in capturing opponent stones,
+    /// then it is NOT considered forbidden, even if it creates a double-three.
+    /// The capture takes precedence over the double-three rule.
+    ///
     /// # Arguments
     /// * `board` - The game board
     /// * `row` - Row where the stone would be placed
@@ -30,8 +35,16 @@ impl DoubleThreeDetection {
     /// * `player` - The player making the move
     ///
     /// # Returns
-    /// `true` if the move creates a double-three (forbidden), `false` otherwise
+    /// `true` if the move creates a forbidden double-three, `false` otherwise
     pub fn creates_double_three(board: &Board, row: usize, col: usize, player: Player) -> bool {
+        // First check if this move would result in a capture
+        // If it captures opponent stones, then double-three rule doesn't apply
+        let captures = CaptureHandler::detect_captures(board, row, col, player);
+        if !captures.is_empty() {
+            return false; // Not forbidden if it captures
+        }
+
+        // Only check for double-three if no captures occur
         DIRECTIONS
             .iter()
             .filter(|&&dir| Self::is_free_three_in_direction(board, row, col, player, dir))
