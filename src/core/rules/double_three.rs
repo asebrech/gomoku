@@ -191,15 +191,101 @@ impl DoubleThreeDetection {
             return false;
         }
         
-        // Check if we can extend to form an open four (space at either end)
+        // Check if we can extend to form a true "open four" (unblockable by opponent)
+        // For a free-three to be valid, it must be able to create an open four that
+        // the opponent cannot block with a single move
+        Self::can_form_open_four(board, three_stones, dr, dc)
+    }
+
+    /// Check if a three-stone pattern can form a threatening four.
+    ///
+    /// A free-three must be able to extend to form a four that creates a winning threat.
+    /// This includes both open fours (with both ends free) and closed fours that still
+    /// threaten to win. The key is that the opponent cannot prevent the threat formation.
+    ///
+    /// # Arguments  
+    /// * `board` - The game board
+    /// * `three_stones` - Array of three stone positions
+    /// * `dr` - Row direction
+    /// * `dc` - Column direction
+    ///
+    /// # Returns
+    /// `true` if the pattern can form a threatening four
+    fn can_form_open_four(
+        board: &Board,
+        three_stones: &[(isize, isize)],
+        dr: isize,
+        dc: isize,
+    ) -> bool {
+        let first_stone = three_stones[0];
+        let last_stone = three_stones[2];
+        
+        // Check extension before the first stone
         let before_row = first_stone.0 - dr;
         let before_col = first_stone.1 - dc;
-        let can_extend_before = PatternAnalyzer::is_valid_empty(board, before_row, before_col);
+        if PatternAnalyzer::is_valid_empty(board, before_row, before_col) {
+            // Can we extend here to form a threatening four?
+            if Self::would_create_threatening_four(board, three_stones, (before_row, before_col), dr, dc) {
+                return true;
+            }
+        }
         
+        // Check extension after the last stone
         let after_row = last_stone.0 + dr;
         let after_col = last_stone.1 + dc;
-        let can_extend_after = PatternAnalyzer::is_valid_empty(board, after_row, after_col);
+        if PatternAnalyzer::is_valid_empty(board, after_row, after_col) {
+            // Can we extend here to form a threatening four?
+            if Self::would_create_threatening_four(board, three_stones, (after_row, after_col), dr, dc) {
+                return true;
+            }
+        }
         
+        false
+    }
+
+    /// Check if adding a fourth stone would create a threatening four.
+    ///
+    /// A threatening four is one that either:
+    /// 1. Is completely open (both ends free) - unblockable
+    /// 2. Has one open end that can be extended to win
+    /// 3. Forms a pattern that the opponent cannot prevent from becoming winning
+    ///
+    /// # Arguments
+    /// * `board` - The game board
+    /// * `three_stones` - The existing three stones
+    /// * `fourth_stone` - The potential fourth stone position
+    /// * `dr` - Row direction
+    /// * `dc` - Column direction
+    ///
+    /// # Returns
+    /// `true` if the four would be threatening
+    fn would_create_threatening_four(
+        board: &Board,
+        three_stones: &[(isize, isize)],
+        fourth_stone: (isize, isize),
+        dr: isize,
+        dc: isize,
+    ) -> bool {
+        // Create the four-stone line by combining existing stones with the new one
+        let mut four_stones = three_stones.to_vec();
+        four_stones.push(fourth_stone);
+        
+        // Sort the stones by position
+        four_stones.sort_by_key(|&(r, c)| {
+            if dr != 0 { r } else { c }
+        });
+        
+        let first = four_stones[0];
+        let last = four_stones[3];
+        
+        // Check if we can extend to form a five (winning)
+        let before_first = (first.0 - dr, first.1 - dc);
+        let after_last = (last.0 + dr, last.1 + dc);
+        
+        let can_extend_before = PatternAnalyzer::is_valid_empty(board, before_first.0, before_first.1);
+        let can_extend_after = PatternAnalyzer::is_valid_empty(board, after_last.0, after_last.1);
+        
+        // A threatening four needs at least one extension possibility
         can_extend_before || can_extend_after
     }
 

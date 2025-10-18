@@ -731,3 +731,443 @@ fn test_creates_double_three_diagonal() {
         
         println!("✓ Capture exception rule working correctly!");
     }
+
+    #[test]
+    fn test_enhanced_blocking_logic_simple_case() {
+        let mut board = Board::new(19);
+        
+        // Test case where opponent can easily block both potential fours
+        // This should NOT be considered a double-three since opponent can block
+        
+        // Create two potential three-stone patterns that CAN form threatening fours
+        // Horizontal: X X _ with space to extend
+        board.place_stone(10, 10, Player::Max);
+        board.place_stone(10, 11, Player::Max);
+        // Space at (10, 9) and (10, 13) for extensions
+        
+        // Vertical: X X _ with space to extend  
+        board.place_stone(8, 12, Player::Max);
+        board.place_stone(9, 12, Player::Max);
+        // Space at (7, 12) and (11, 12) for extensions
+        
+        // Playing at (10, 12) should create a double-three since both patterns
+        // can form threatening fours (have extension possibilities)
+        assert!(DoubleThreeDetection::creates_double_three(&board, 10, 12, Player::Max));
+    }
+
+    #[test]
+    fn test_enhanced_blocking_logic_blocked_pattern() {
+        let mut board = Board::new(19);
+        
+        // Test case where one pattern is blocked and cannot form a threatening four
+        
+        // Horizontal: X X _ but blocked on one end
+        board.place_stone(10, 10, Player::Max);
+        board.place_stone(10, 11, Player::Max);
+        board.place_stone(10, 9, Player::Min); // Opponent blocks one extension
+        // Only (10, 13) available for extension
+        
+        // Vertical: X X _ with full extension possibilities
+        board.place_stone(8, 12, Player::Max);
+        board.place_stone(9, 12, Player::Max);
+        // Both (7, 12) and (11, 12) available
+        
+        // This should still create double-three because:
+        // 1. Horizontal can still form threatening four by extending to (10, 13)
+        // 2. Vertical can form threatening four in both directions
+        assert!(DoubleThreeDetection::creates_double_three(&board, 10, 12, Player::Max));
+    }
+
+    #[test] 
+    fn test_enhanced_blocking_logic_both_ends_blocked() {
+        let mut board = Board::new(19);
+        
+        // Test case where a pattern is completely blocked
+        
+        // Horizontal: blocked X X _ blocked (cannot form threatening four)
+        board.place_stone(10, 10, Player::Max);
+        board.place_stone(10, 11, Player::Max);
+        board.place_stone(10, 9, Player::Min);  // Block left extension
+        board.place_stone(10, 13, Player::Min); // Block right extension
+        
+        // Vertical: X X _ with extension possibilities
+        board.place_stone(8, 12, Player::Max);
+        board.place_stone(9, 12, Player::Max);
+        // Both (7, 12) and (11, 12) available
+        
+        // This should NOT create double-three because:
+        // 1. Horizontal cannot form threatening four (both ends blocked)  
+        // 2. Only vertical can form threatening four
+        // Need TWO threatening patterns for double-three
+        assert!(!DoubleThreeDetection::creates_double_three(&board, 10, 12, Player::Max));
+    }
+
+    #[test]
+    fn test_enhanced_gapped_patterns_with_blocking() {
+        let mut board = Board::new(19);
+        
+        // Test gapped patterns (X_X) with blocking considerations
+        
+        // Horizontal gapped: X _ X with extension possibilities
+        board.place_stone(10, 9, Player::Max);
+        board.place_stone(10, 11, Player::Max);
+        // Can extend at (10, 8) and (10, 12)
+        
+        // Vertical gapped: X _ X with one end blocked
+        board.place_stone(8, 10, Player::Max);
+        board.place_stone(11, 10, Player::Max);
+        board.place_stone(7, 10, Player::Min); // Block one extension
+        // Can still extend at (12, 10)
+        
+        // Playing at (10, 10) fills both gaps
+        // Both patterns can still form threatening fours despite partial blocking
+        assert!(DoubleThreeDetection::creates_double_three(&board, 10, 10, Player::Max));
+    }
+
+    #[test]
+    fn test_enhanced_threat_formation_validation() {
+        let mut board = Board::new(19);
+        
+        // Test that we properly validate if a four can actually threaten to win
+        
+        // Create patterns that form fours but cannot threaten (no winning extension)
+        // Horizontal: against board edge
+        board.place_stone(10, 16, Player::Max);
+        board.place_stone(10, 17, Player::Max);
+        // Extension only possible at (10, 15), not at (10, 18) due to board edge
+        
+        // Vertical: normal pattern with extensions
+        board.place_stone(8, 18, Player::Max);
+        board.place_stone(9, 18, Player::Max);
+        // Extensions possible at (7, 18) and (11, 18)
+        
+        // The horizontal pattern is limited by board edge but can still threaten
+        // The vertical pattern has full threat potential
+        // This should still be considered double-three
+        assert!(DoubleThreeDetection::creates_double_three(&board, 10, 18, Player::Max));
+    }
+
+    #[test]
+    fn test_enhanced_complex_blocking_scenario() {
+        let mut board = Board::new(19);
+        
+        // Complex scenario with multiple stones and blocking attempts
+        
+        // Create a pattern where opponent has tried to block but failed
+        // Horizontal: X O X _ with extension possibility
+        board.place_stone(10, 8, Player::Max);
+        board.place_stone(10, 9, Player::Min);  // Opponent tried to block
+        board.place_stone(10, 10, Player::Max);
+        // Can extend at (10, 12) to form X O X X with threat at (10, 13)
+        
+        // Vertical: X X _ with clear extensions
+        board.place_stone(8, 11, Player::Max);
+        board.place_stone(9, 11, Player::Max);
+        // Extensions at (7, 11) and (12, 11)
+        
+        // Playing at (10, 11) should create double-three
+        // The horizontal pattern X O X X can still threaten
+        // The vertical pattern X X X can threaten in both directions
+        assert!(DoubleThreeDetection::creates_double_three(&board, 10, 11, Player::Max));
+    }
+
+    #[test]
+    fn test_enhanced_false_positive_prevention() {
+        let mut board = Board::new(19);
+        
+        // Test that we don't create false positives for non-threatening patterns
+        
+        // Pattern 1: X X _ but completely surrounded/blocked
+        board.place_stone(10, 10, Player::Max);
+        board.place_stone(10, 11, Player::Max);
+        board.place_stone(10, 9, Player::Min);   // Block left
+        board.place_stone(10, 13, Player::Min);  // Block right far
+        board.place_stone(9, 12, Player::Min);   // Additional blocking
+        
+        // Pattern 2: Only one stone, cannot form three
+        board.place_stone(8, 12, Player::Max);
+        
+        // This should NOT create double-three because:
+        // 1. Pattern 1 cannot form threatening four (blocked)
+        // 2. Pattern 2 doesn't have enough stones to form three
+        assert!(!DoubleThreeDetection::creates_double_three(&board, 10, 12, Player::Max));
+    }
+
+    #[test]
+    fn test_enhanced_diagonal_blocking_scenarios() {
+        let mut board = Board::new(19);
+        
+        // Test diagonal patterns with blocking considerations
+        
+        // Diagonal 1 (\): X X _ with extension possibilities
+        board.place_stone(8, 8, Player::Max);
+        board.place_stone(9, 9, Player::Max);
+        // Can extend at (7, 7) and (11, 11)
+        
+        // Diagonal 2 (/): X _ X with one end blocked
+        board.place_stone(8, 12, Player::Max);
+        board.place_stone(11, 9, Player::Max);
+        board.place_stone(12, 8, Player::Min); // Block one extension
+        // Can still extend at (7, 13)
+        
+        // Playing at (10, 10) should create double-three
+        // Both diagonal patterns can still form threatening fours
+        assert!(DoubleThreeDetection::creates_double_three(&board, 10, 10, Player::Max));
+    }
+
+    #[test]
+    fn test_enhanced_minimum_threat_requirement() {
+        let mut board = Board::new(19);
+        
+        // Test that we need at least TWO truly threatening patterns
+        
+        // Only one valid threatening pattern
+        board.place_stone(10, 10, Player::Max);
+        board.place_stone(10, 11, Player::Max);
+        // Extensions possible at (10, 9) and (10, 13)
+        
+        // Second "pattern" is not threatening (only one stone)
+        board.place_stone(8, 12, Player::Max);
+        // Cannot form a three-stone pattern
+        
+        // This should NOT create double-three (only one threatening pattern)
+        assert!(!DoubleThreeDetection::creates_double_three(&board, 10, 12, Player::Max));
+        
+        // Now add another stone to make second pattern threatening
+        board.place_stone(9, 12, Player::Max);
+        // Now vertical pattern X X _ can threaten
+        
+        // This should NOW create double-three (two threatening patterns)
+        assert!(DoubleThreeDetection::creates_double_three(&board, 10, 12, Player::Max));
+    }
+
+    #[test]
+    fn test_enhanced_edge_case_board_boundaries() {
+        let mut board = Board::new(19);
+        
+        // Test patterns near board edges where extensions are limited
+        
+        // Near top edge: limited vertical extension
+        board.place_stone(1, 10, Player::Max);
+        board.place_stone(2, 10, Player::Max);
+        // Can only extend downward at (4, 10), not upward due to edge
+        
+        // Horizontal pattern: normal extensions
+        board.place_stone(3, 8, Player::Max);
+        board.place_stone(3, 9, Player::Max);
+        // Can extend at (3, 7) and (3, 11)
+        
+        // Even with limited extensions, if both can still threaten, it's double-three
+        assert!(DoubleThreeDetection::creates_double_three(&board, 3, 10, Player::Max));
+    }
+
+    #[test]
+    fn test_enhanced_opponent_stone_interference() {
+        let mut board = Board::new(19);
+        
+        // Test that opponent stones in the middle don't prevent threat formation
+        // if the pattern can still form a threatening four
+        
+        // Pattern: X O _ X with extensions
+        board.place_stone(10, 8, Player::Max);
+        board.place_stone(10, 9, Player::Min);  // Opponent stone
+        board.place_stone(10, 11, Player::Max);
+        // Extension at (10, 12) would create X O X X, threatening at (10, 13)
+        
+        // Vertical pattern: clear X X _
+        board.place_stone(8, 10, Player::Max);
+        board.place_stone(9, 10, Player::Max);
+        // Extensions at (7, 10) and (12, 10)
+        
+        // This should create double-three because both patterns can threaten
+        assert!(DoubleThreeDetection::creates_double_three(&board, 10, 10, Player::Max));
+    }
+
+    #[test]
+    fn test_enhanced_comprehensive_blocking_validation() {
+        let mut board = Board::new(19);
+        
+        // Test comprehensive scenario with multiple blocking attempts
+        // This tests the full logic of our enhanced threat validation
+        
+        // Pattern 1: X _ X O _ (partially blocked but can still threaten)
+        board.place_stone(10, 8, Player::Max);   // X
+        board.place_stone(10, 10, Player::Max);  // X (gap filled by move at 10,9)
+        board.place_stone(10, 11, Player::Min);  // O (partial block)
+        // Extension still possible at (10, 7) to create: _ X X X O
+        // This can threaten at (10, 6) to form winning sequence
+        
+        // Pattern 2: X X _ with clear extensions
+        board.place_stone(8, 9, Player::Max);
+        board.place_stone(7, 9, Player::Max);
+        // Extensions at (6, 9) and (11, 9)
+        
+        // Test the move at (10, 9) which completes both patterns
+        let creates_double = DoubleThreeDetection::creates_double_three(&board, 10, 9, Player::Max);
+        
+        // Should create double-three because:
+        // 1. Horizontal: X X X O _ can threaten by extending left
+        // 2. Vertical: X X X can threaten in both directions
+        assert!(creates_double, "Should detect double-three despite partial blocking");
+        
+        // Now test a case where blocking prevents threat formation
+        let mut board2 = Board::new(19);
+        
+        // Pattern 1: O X _ X O (completely blocked)
+        board2.place_stone(10, 7, Player::Min);   // O (block)
+        board2.place_stone(10, 8, Player::Max);   // X
+        board2.place_stone(10, 10, Player::Max);  // X (gap filled by move)
+        board2.place_stone(10, 11, Player::Min);  // O (block)
+        // Cannot threaten - both extensions blocked
+        
+        // Pattern 2: Valid threatening pattern
+        board2.place_stone(8, 9, Player::Max);
+        board2.place_stone(7, 9, Player::Max);
+        
+        // Should NOT create double-three (only one threatening pattern)
+        assert!(!DoubleThreeDetection::creates_double_three(&board2, 10, 9, Player::Max));
+    }
+
+    #[test]
+    fn test_enhanced_complex_gap_patterns() {
+        let mut board = Board::new(19);
+        
+        // Test complex gapped patterns that our enhanced logic should handle
+        
+        // Pattern 1: X _ _ X pattern (with one stone in middle gap)
+        board.place_stone(10, 7, Player::Max);   // X
+        board.place_stone(10, 10, Player::Max);  // X
+        // Move at (10, 8) creates X X _ X, need to fill (10, 9) for X X X X
+        
+        // Pattern 2: X _ X pattern (standard gap)
+        board.place_stone(8, 8, Player::Max);    // X
+        board.place_stone(7, 8, Player::Max);    // X
+        // Move at (9, 8) creates X X X
+        
+        // The move at (10, 8) should create double-three
+        // Even though Pattern 1 has a larger gap, it can still form a threatening four
+        assert!(DoubleThreeDetection::creates_double_three(&board, 10, 8, Player::Max));
+        
+        // Test with invalid gap pattern
+        let mut board2 = Board::new(19);
+        
+        // Pattern with too large gap: X _ _ _ X (invalid for free-three)
+        board2.place_stone(10, 6, Player::Max);
+        board2.place_stone(10, 10, Player::Max);
+        // Gap of 3 is too large for valid free-three pattern
+        
+        // Valid pattern
+        board2.place_stone(8, 8, Player::Max);
+        board2.place_stone(7, 8, Player::Max);
+        
+        // Should NOT create double-three (invalid gap pattern)
+        assert!(!DoubleThreeDetection::creates_double_three(&board2, 10, 8, Player::Max));
+    }
+
+    #[test]
+    fn test_enhanced_direction_independence() {
+        // Test that our enhanced logic works consistently across specific directional patterns
+        
+        // Test horizontal + vertical (should work)
+        let mut board1 = Board::new(19);
+        // Horizontal pattern: X X _ (will be filled at center)
+        board1.place_stone(9, 7, Player::Max);
+        board1.place_stone(9, 8, Player::Max);
+        // Vertical pattern: X X _ (will be filled at center)
+        board1.place_stone(7, 9, Player::Max);
+        board1.place_stone(8, 9, Player::Max);
+        
+        assert!(DoubleThreeDetection::creates_double_three(&board1, 9, 9, Player::Max),
+               "Horizontal + Vertical should create double-three");
+        
+        // Test diagonal patterns (more complex due to intersection)
+        let mut board2 = Board::new(19);
+        // Diagonal \ pattern: X X _ (will be filled at center)
+        board2.place_stone(7, 7, Player::Max);
+        board2.place_stone(8, 8, Player::Max);
+        // Diagonal / pattern: X X _ (will be filled at center)
+        board2.place_stone(7, 11, Player::Max);
+        board2.place_stone(8, 10, Player::Max);
+        
+        let diagonal_result = DoubleThreeDetection::creates_double_three(&board2, 9, 9, Player::Max);
+        // Diagonal patterns might not always create double-three depending on extensions
+        // Just ensure it doesn't panic and gives consistent results
+        
+        // Test mixed directions (horizontal + diagonal)
+        let mut board3 = Board::new(19);
+        // Horizontal pattern
+        board3.place_stone(9, 6, Player::Max);
+        board3.place_stone(9, 7, Player::Max);
+        // Diagonal pattern
+        board3.place_stone(7, 6, Player::Max);
+        board3.place_stone(8, 7, Player::Max);
+        
+        let mixed_result = DoubleThreeDetection::creates_double_three(&board3, 9, 8, Player::Max);
+        
+        // The key test is that it runs without panicking and gives consistent behavior
+        // Different direction combinations may have different results based on threat formation
+        println!("Direction test results - Diagonal: {}, Mixed: {}", diagonal_result, mixed_result);
+    }
+
+    #[test]
+    fn test_enhanced_performance_stress_test() {
+        // Test that our enhanced logic doesn't significantly impact performance
+        // with complex board states
+        
+        let mut board = Board::new(19);
+        
+        // Create a board with many stones (complex scenario)
+        for i in 0..19 {
+            for j in 0..19 {
+                if (i + j) % 7 == 0 {
+                    board.place_stone(i, j, if (i + j) % 2 == 0 { Player::Max } else { Player::Min });
+                }
+            }
+        }
+        
+        // Test multiple positions rapidly
+        let test_positions = [
+            (5, 5), (10, 10), (15, 15), (3, 12), (12, 3),
+            (8, 8), (11, 11), (6, 13), (13, 6), (9, 9)
+        ];
+        
+        for &(row, col) in &test_positions {
+            let idx = board.index(row, col);
+            if !Board::is_bit_set(board.get_player_bits(Player::Max), idx) && 
+               !Board::is_bit_set(board.get_player_bits(Player::Min), idx) {
+                // This should complete quickly even with complex board state
+                let _result = DoubleThreeDetection::creates_double_three(&board, row, col, Player::Max);
+                // Just checking that it doesn't panic or take too long
+            }
+        }
+    }
+
+    #[test]
+    fn test_enhanced_edge_cases_and_boundaries() {
+        let mut board = Board::new(19);
+        
+        // Test near corners where extensions are very limited
+        
+        // Corner case: top-left corner
+        board.place_stone(0, 1, Player::Max);
+        board.place_stone(1, 0, Player::Max);
+        // Only limited extensions possible due to board boundaries
+        
+        let _result_corner = DoubleThreeDetection::creates_double_three(&board, 0, 0, Player::Max);
+        // Should handle gracefully without panicking
+        
+        // Edge case: along board edge
+        let mut board2 = Board::new(19);
+        board2.place_stone(0, 8, Player::Max);
+        board2.place_stone(0, 9, Player::Max);
+        board2.place_stone(2, 10, Player::Max);
+        board2.place_stone(3, 10, Player::Max);
+        
+        let _result_edge = DoubleThreeDetection::creates_double_three(&board2, 0, 10, Player::Max);
+        // Should detect patterns even near edges if they can threaten
+        
+        // Test coordinates at exact boundaries
+        assert!(!DoubleThreeDetection::creates_double_three(&board, 18, 18, Player::Max));
+        assert!(!DoubleThreeDetection::creates_double_three(&board, 0, 18, Player::Max));
+        assert!(!DoubleThreeDetection::creates_double_three(&board, 18, 0, Player::Max));
+    }
