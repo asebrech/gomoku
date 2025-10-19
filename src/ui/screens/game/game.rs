@@ -19,7 +19,7 @@ use crate::{
         screens::{
             game::{
                 board::{BoardRoot, BoardUtils, PreviewDot, GhostStone}, 
-                settings::{spawn_settings_panel, BackToMenuButton, ResetBoardButton, VolumeDisplay, VolumeDown, VolumeUp}
+                settings::{spawn_settings_panel, BackToMenuButton, ResetBoardButton, UndoMoveButton, VolumeDisplay, VolumeDown, VolumeUp}
             }, menu::{GameAudio, MenuState}, splash::PreloadedStones, utils::despawn_screen
         },
     }
@@ -209,6 +209,7 @@ pub fn game_plugin(app: &mut App) {
                 handle_game_volume_control,
                 update_game_volume_display,
                 handle_reset_board_button,
+                handle_undo_move_button,
                 handle_back_to_menu_button,
                 show_game_over_screen.run_if(on_event::<GameEnded>),
                 handle_game_over_actions,
@@ -1316,6 +1317,113 @@ fn handle_reset_board_button(
         if *interaction == Interaction::Pressed {
             println!("Reset Board button clicked - sending reset event...");
             reset_event.write(ResetBoard);
+        }
+    }
+}
+
+fn handle_undo_move_button(
+    button_query: Query<&Interaction, (Changed<Interaction>, With<UndoMoveButton>)>,
+    mut game_state: ResMut<GameState>,
+    game_status: Res<GameStatus>,
+    stone_query: Query<Entity, With<Stone>>,
+    mut commands: Commands,
+    mut move_played: EventWriter<MovePlayed>,
+    board_query: Query<Entity, With<BoardRoot>>,
+    config: Res<GameConfig>,
+    preloaded_stones: Option<Res<PreloadedStones>>,
+) {
+    for interaction in button_query.iter() {
+        if *interaction == Interaction::Pressed {
+            // Don't allow undo while AI is thinking
+            if *game_status == GameStatus::AIThinking {
+                println!("Cannot undo move while AI is thinking");
+                return;
+            }
+
+            // Check if there are moves to undo
+            if game_state.move_history.is_empty() {
+                println!("No moves to undo");
+                return;
+            }
+
+            println!("Undo Move button clicked - undoing last move...");
+            
+            // Get the last move
+            if let Some(&last_move) = game_state.move_history.last() {
+                // Undo the move in the game state first
+                game_state.undo_move(last_move);
+                
+                // Clear all stones and resynchronize with the board state
+                for stone_entity in stone_query.iter() {
+                    commands.entity(stone_entity).despawn();
+                }
+                
+                // Recreate all stones based on the current board state
+                if let (Ok(board_entity), Some(preloaded_stones)) = (board_query.single(), preloaded_stones.as_deref()) {
+                    let current_theme = config.get_current_theme();
+                    let is_synthwave = current_theme == "Synthwave";
+                    
+                    for x in 0..game_state.board.size {
+                        for y in 0..game_state.board.size {
+                            if let Some(player) = game_state.board.get_player(x, y) {
+                                let is_first_player = player == Player::Max;
+                                
+                                commands.entity(board_entity).with_children(|builder| {
+                                    if is_synthwave {
+                                        // Use image assets for Synthwave theme
+                                        let stone_handle = if is_first_player {
+                                            preloaded_stones.pink_stone.clone()
+                                        } else {
+                                            preloaded_stones.blue_stone.clone()
+                                        };
+                                        
+                                        builder.spawn((
+                                            BoardUtils::stone_node(x, y, BoardUtils::STONE_SIZE),
+                                            ImageNode::new(stone_handle),
+                                            Stone(player),
+                                            ZIndex(15),
+                                            OnGameScreen,
+                                            GridCell { x, y },
+                                        ));
+                                    } else {
+                                        // Use theme colors for other themes
+                                        let stone_color = if is_first_player {
+                                            Color::srgba(
+                                                config.colors.stone_player1.r,
+                                                config.colors.stone_player1.g,
+                                                config.colors.stone_player1.b,
+                                                config.colors.stone_player1.a,
+                                            )
+                                        } else {
+                                            Color::srgba(
+                                                config.colors.stone_player2.r,
+                                                config.colors.stone_player2.g,
+                                                config.colors.stone_player2.b,
+                                                config.colors.stone_player2.a,
+                                            )
+                                        };
+                                        
+                                        builder.spawn((
+                                            BoardUtils::stone_node(x, y, BoardUtils::STONE_SIZE),
+                                            BackgroundColor(stone_color),
+                                            BorderRadius::all(Val::Px(BoardUtils::STONE_SIZE / 2.0)),
+                                            Stone(player),
+                                            ZIndex(15),
+                                            OnGameScreen,
+                                            GridCell { x, y },
+                                        ));
+                                    }
+                                });
+                            }
+                        }
+                    }
+                }
+                
+                // Trigger UI updates
+                move_played.write(MovePlayed);
+                
+                println!("Successfully undid move at ({}, {})", last_move.0, last_move.1);
+            }
         }
     }
 }

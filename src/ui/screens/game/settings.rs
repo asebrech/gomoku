@@ -27,6 +27,9 @@ pub struct ResetBoardButton;
 #[derive(Component)]
 pub struct BackToMenuButton;
 
+#[derive(Component)]
+pub struct UndoMoveButton;
+
 pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &GameSettings, config: &GameConfig) {
     let colors = &config.colors;
     
@@ -130,8 +133,8 @@ pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &
                 // Volume Control Section
                 spawn_volume_control(builder, config);
 
-                // Reset Board button (inside settings panel)
-                spawn_reset_button(builder, config);
+                // Game controls (Reset Board and Undo Move buttons)
+                spawn_game_control_buttons(builder, config);
             });
 
             // Back to Menu button (outside settings panel, separate container)
@@ -436,7 +439,7 @@ fn spawn_volume_control(builder: &mut ChildSpawnerCommands, config: &GameConfig)
         });
 }
 
-fn spawn_reset_button(builder: &mut ChildSpawnerCommands, config: &GameConfig) {
+fn spawn_game_control_buttons(builder: &mut ChildSpawnerCommands, config: &GameConfig) {
     let colors = &config.colors;
     // Game control section header
     builder.spawn((
@@ -452,31 +455,69 @@ fn spawn_reset_button(builder: &mut ChildSpawnerCommands, config: &GameConfig) {
         },
     ));
 
-    // Reset Board button
+    // Buttons container (horizontal layout)
     builder.spawn((
-        Button,
-        PlayClickSound,
         Node {
+            display: Display::Flex,
+            flex_direction: FlexDirection::Row,
+            column_gap: Val::Px(10.0),
             width: Val::Percent(100.0),
-            height: Val::Px(40.0),
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            border: UiRect::all(Val::Px(2.0)),
             ..default()
         },
-        BackgroundColor(colors.button_normal.clone().into()),
-        BorderColor(colors.accent.clone().into()),
-        BorderRadius::all(Val::Px(4.0)),
-        ResetBoardButton,
     )).with_children(|builder| {
+        // Undo Move button
         builder.spawn((
-            Text::new("RESET BOARD"),
-            TextFont {
-                font_size: 16.0,
+            Button,
+            PlayClickSound,
+            Node {
+                width: Val::Percent(50.0),
+                height: Val::Px(40.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                border: UiRect::all(Val::Px(2.0)),
                 ..default()
             },
-            TextColor(colors.text_primary.clone().into()),
-        ));
+            BackgroundColor(colors.button_normal.clone().into()),
+            BorderColor(colors.accent.clone().into()),
+            BorderRadius::all(Val::Px(4.0)),
+            UndoMoveButton,
+        )).with_children(|builder| {
+            builder.spawn((
+                Text::new("UNDO"),
+                TextFont {
+                    font_size: 16.0,
+                    ..default()
+                },
+                TextColor(colors.text_primary.clone().into()),
+            ));
+        });
+
+        // Reset Board button
+        builder.spawn((
+            Button,
+            PlayClickSound,
+            Node {
+                width: Val::Percent(50.0),
+                height: Val::Px(40.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                border: UiRect::all(Val::Px(2.0)),
+                ..default()
+            },
+            BackgroundColor(colors.button_normal.clone().into()),
+            BorderColor(colors.accent.clone().into()),
+            BorderRadius::all(Val::Px(4.0)),
+            ResetBoardButton,
+        )).with_children(|builder| {
+            builder.spawn((
+                Text::new("RESET"),
+                TextFont {
+                    font_size: 16.0,
+                    ..default()
+                },
+                TextColor(colors.text_primary.clone().into()),
+            ));
+        });
     });
 }
 
