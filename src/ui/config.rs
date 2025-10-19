@@ -1,6 +1,5 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 #[derive(Resource, Debug, Clone, Serialize, Deserialize)]
 pub struct GameConfig {
@@ -97,7 +96,6 @@ impl From<ColorData> for Color {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UiConfig {
     pub window_titles: Vec<String>,
-    pub loading_messages: HashMap<String, String>,
     pub font_sizes: FontSizes,
 }
 
@@ -106,8 +104,6 @@ pub struct FontSizes {
     pub title: f32,
     pub subtitle: f32,
     pub button: f32,
-    pub loading: f32,
-    pub percentage: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -164,23 +160,7 @@ impl GameConfig {
         Ok(())
     }
 
-    pub fn get_loading_message(&self, percentage: u32) -> String {
-        let key = match percentage {
-            0..=10 => "0-10",
-            11..=25 => "11-25", 
-            26..=40 => "26-40",
-            41..=60 => "41-60",
-            61..=80 => "61-80",
-            81..=95 => "81-95",
-            96..=99 => "96-99",
-            _ => "100",
-        };
-        
-        self.ui.loading_messages
-            .get(key)
-            .cloned()
-            .unwrap_or_else(|| "Loading...".to_string())
-    }
+
 
     pub fn get_animation_frame_path(&self, frame_number: u32) -> String {
         self.assets.animations.main_menu_frames.path_pattern
@@ -391,24 +371,10 @@ impl GameConfig {
                     "Gomoku: Still better than your code!".to_string(),
                     "Gomoku: Five in a row or go home!".to_string(),
                 ],
-                loading_messages: {
-                    let mut messages = HashMap::new();
-                    messages.insert("0-10".to_string(), "Initializing...".to_string());
-                    messages.insert("11-25".to_string(), "Starting motors...".to_string());
-                    messages.insert("26-40".to_string(), "Loading assets...".to_string());
-                    messages.insert("41-60".to_string(), "Looking for neo-cat...".to_string());
-                    messages.insert("61-80".to_string(), "Smelling good code...".to_string());
-                    messages.insert("81-95".to_string(), "Finalizing...".to_string());
-                    messages.insert("96-99".to_string(), "Almost ready...".to_string());
-                    messages.insert("100".to_string(), "Complete!".to_string());
-                    messages
-                },
                 font_sizes: FontSizes {
                     title: 32.0,
                     subtitle: 18.0,
                     button: 28.0,
-                    loading: 20.0,
-                    percentage: 16.0,
                 },
             },
             game: GameSettings {

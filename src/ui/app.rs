@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use bevy::window::{PresentMode, WindowTheme, WindowMode, MonitorSelection, WindowResized};
+use bevy_gstreamer::GstreamerPlugin;
 
 use crate::core::state::GameState;
 use crate::ai::transposition::TranspositionTable;
@@ -54,36 +55,15 @@ fn setup(mut commands: Commands) {
 
 fn maintain_aspect_ratio(
 	mut resize_events: EventReader<WindowResized>,
-	mut windows: Query<&mut Window>,
+	_windows: Query<&mut Window>,
 	mut last_size: Local<Option<(f32, f32)>>,
 ) {
-	const ASPECT_RATIO: f32 = 16.0 / 9.0;
+	// Disable aspect ratio maintenance to prevent UI coordinate issues
+	// This was causing mouse click misalignment with video backgrounds
 	
+	// Just track the size changes without forcing aspect ratio
 	for event in resize_events.read() {
-		if let Ok(mut window) = windows.get_mut(event.window) {
-			let new_width = event.width;
-			let new_height = event.height;
-			
-			// Check if this resize was our correction (to avoid infinite loop)
-			if let Some((last_w, last_h)) = *last_size {
-				if (new_width - last_w).abs() < 1.0 && (new_height - last_h).abs() < 1.0 {
-					continue;
-				}
-			}
-			
-			let current_aspect = new_width / new_height;
-			
-			// Only adjust if aspect ratio is wrong
-			if (current_aspect - ASPECT_RATIO).abs() > 0.01 {
-				// Determine which dimension changed more to decide which one to keep
-				let corrected_height = new_width / ASPECT_RATIO;
-				
-				window.resolution.set(new_width, corrected_height);
-				*last_size = Some((new_width, corrected_height));
-			} else {
-				*last_size = Some((new_width, new_height));
-			}
-		}
+		*last_size = Some((event.width, event.height));
 	}
 }
 
@@ -225,7 +205,15 @@ impl GomokuApp {
                 maintain_aspect_ratio,
             ),
         )
-        .add_plugins((splash_plugin, menu_plugin, game_plugin, tutorial_plugin, config_plugin, audio_plugin));
+        .add_plugins((
+            GstreamerPlugin,
+            splash_plugin, 
+            menu_plugin, 
+            game_plugin, 
+            tutorial_plugin, 
+            config_plugin, 
+            audio_plugin
+        ));
 	}
 
 	pub fn start(&mut self) {

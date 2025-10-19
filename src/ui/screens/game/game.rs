@@ -1,8 +1,13 @@
 use std::time::Instant;
 
+
 use bevy::prelude::*;
 use bevy::tasks::{Task, AsyncComputeTaskPool};
 use futures_lite::future;
+use bevy_gstreamer::camera::BackgroundImageMarker;
+use gstreamer::prelude::*;
+use gstreamer::Element;
+use gstreamer_app::AppSink;
 use crate::{
     ai::lazy_smp::{lazy_smp_search, SearchResult},
     audio::{PlayStonePlacementSound, PlayWinSound, PlayLoseSound},
@@ -15,7 +20,7 @@ use crate::{
             game::{
                 board::{BoardRoot, BoardUtils, PreviewDot}, 
                 settings::{spawn_settings_panel, BackToMenuButton, ResetBoardButton, VolumeDisplay, VolumeDown, VolumeUp}
-            }, menu::GameAudio, splash::PreloadedStones, utils::despawn_screen
+            }, menu::{GameAudio, MenuState}, splash::PreloadedStones, utils::despawn_screen
         },
     }
 };
@@ -31,10 +36,51 @@ pub enum GameStatus {
 }
 
 #[derive(Component)]
-struct GameVideoBackground {
-    current_frame: usize,
-    timer: Timer,
-    total_frames: usize,
+struct GameGStreamerVideoBackground {
+    video_path: String,
+}
+
+#[derive(Component)]
+pub struct PersistentGameVideoBackground;
+
+#[derive(Component)]
+struct GameVideoFilePlayer {
+    pipeline: Option<Element>,
+    app_sink: Option<AppSink>,
+    initialized: bool,
+    image_handle: Option<Handle<Image>>,
+    frame_timer: f32,
+    frame_buffer: std::collections::VecDeque<Vec<u8>>,
+    video_width: u32,
+    video_height: u32,
+}
+
+impl Default for GameVideoFilePlayer {
+    fn default() -> Self {
+        Self {
+            pipeline: None,
+            app_sink: None,
+            initialized: false,
+            image_handle: None,
+            frame_timer: 0.0,
+            frame_buffer: std::collections::VecDeque::with_capacity(3),
+            video_width: 0,
+            video_height: 0,
+        }
+    }
+}
+
+impl Drop for GameVideoFilePlayer {
+    fn drop(&mut self) {
+        if let Some(ref pipeline) = self.pipeline {
+            println!("GameVideoFilePlayer being dropped - stopping pipeline (initialized: {})", self.initialized);
+            if let Err(e) = pipeline.set_state(gstreamer::State::Null) {
+                eprintln!("Failed to stop game pipeline in Drop: {}", e);
+            }
+        }
+        // Clear frame buffer to free memory
+        self.frame_buffer.clear();
+    }
 }
 
 #[derive(Component, Clone)]
@@ -43,6 +89,8 @@ pub struct OnGameScreen;
 pub struct Stone(#[allow(dead_code)] Player);
 #[derive(Component)]
 pub struct AvailableArea;
+#[derive(Component)]
+pub struct ForbiddenMarker;
 #[derive(Event)]
 pub struct StonePlacement {
     x: usize,
@@ -113,6 +161,8 @@ pub fn game_plugin(app: &mut App) {
             update_game_settings_from_config,
             setup_game_ui,
             setup_game_background,
+            show_persistent_game_video_background,
+            update_available_placement, // Initialize forbidden markers on game start
         ).chain())
         .add_systems(
             Update,
@@ -123,7 +173,10 @@ pub fn game_plugin(app: &mut App) {
                 process_next_round.run_if(on_event::<MovePlayed>),
                 start_ai_computation,  // Start async AI computation
                 poll_ai_computation,   // Poll for AI computation results
-                update_available_placement.run_if(on_event::<MovePlayed>),
+                update_available_placement.run_if(
+                    on_event::<MovePlayed>
+                        .or(resource_changed::<GameState>)
+                ),
                 update_current_player_display.run_if(
                     resource_changed::<GameState>
                         .or(resource_changed::<GameStatus>)
@@ -134,8 +187,16 @@ pub fn game_plugin(app: &mut App) {
                 reset_board.run_if(on_event::<ResetBoard>),
                 toggle_pause,
                 handle_escape_key,
-                animate_game_background,
             ).run_if(in_state(AppState::Game)),
+        )
+        .add_systems(
+            Update,
+            (
+                // These video systems run always to keep persistent video working
+                initialize_game_video_players,
+                update_game_video_players,
+                handle_game_video_looping,
+            ).chain().run_if(any_with_component::<GameVideoFilePlayer>),
         )
         .add_systems(
             Update,
@@ -152,7 +213,7 @@ pub fn game_plugin(app: &mut App) {
                 handle_game_over_actions,
             ).run_if(in_state(AppState::Game)),
         )
-        .add_systems(OnExit(AppState::Game), despawn_screen::<OnGameScreen>);
+        .add_systems(OnExit(AppState::Game), (hide_persistent_game_video_background, despawn_screen::<OnGameScreen>));
 }
 
 fn update_game_settings_from_config(
@@ -441,8 +502,21 @@ pub fn update_available_placement(
     game_state: Res<GameState>,
     parents: Query<(Entity, &Children, &GridCell), With<GridCell>>,
     mut dots: Query<(&mut BackgroundColor, &mut Visibility), With<PreviewDot>>,
+    forbidden_markers: Query<Entity, With<ForbiddenMarker>>,
+    board_query: Query<Entity, With<BoardRoot>>,
 ) {
     for _ in ev_board_update.read() {}
+
+    // Clear all existing forbidden markers
+    for marker_entity in forbidden_markers.iter() {
+        commands.entity(marker_entity).despawn();
+    }
+
+    // Get the board entity
+    let Ok(board_entity) = board_query.get_single() else {
+        error!("Failed to find board entity");
+        return;
+    };
 
     info!("Updating stone preview...");
     
@@ -474,8 +548,11 @@ pub fn update_available_placement(
             game_state.board.is_empty_position(cell.x, cell.y)
                 && !DoubleThreeDetection::creates_double_three(&game_state.board, cell.x, cell.y, game_state.current_player)
         };
+        let is_empty = game_state.board.is_empty_position(cell.x, cell.y);
+        let creates_double_three = GameRules::creates_double_three(&game_state.board, cell.x, cell.y, game_state.current_player);
         
-        if is_valid {
+        if is_empty && !creates_double_three {
+            // Valid placement - show preview dot
             for &child in children {
                 if let Ok((mut bg, mut visibility)) = dots.get_mut(child) {
                     *bg = BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.4));
@@ -483,7 +560,19 @@ pub fn update_available_placement(
                     commands.entity(entity).insert(AvailableArea);
                 }
             }
+        } else if is_empty && creates_double_three {
+            // Forbidden placement - hide preview dot and show red cross
+            for &child in children {
+                if let Ok((mut bg, mut visibility)) = dots.get_mut(child) {
+                    *bg = BackgroundColor(Color::NONE);
+                    *visibility = Visibility::Hidden;
+                    commands.entity(entity).remove::<AvailableArea>();
+                }
+            }
+            // Spawn forbidden cross marker
+            spawn_forbidden_cross(&mut commands, board_entity, cell.x, cell.y);
         } else {
+            // Occupied position - hide preview dot
             for &child in children {
                 if let Ok((mut bg, mut visibility)) = dots.get_mut(child) {
                     *bg = BackgroundColor(Color::NONE);
@@ -493,6 +582,51 @@ pub fn update_available_placement(
             }
         }
     }
+}
+
+fn spawn_forbidden_cross(commands: &mut Commands, board_entity: Entity, cell_x: usize, cell_y: usize) {
+    let line_thickness = 2.0; // Match tutorial exactly
+    let cross_size = BoardUtils::STONE_SIZE * 0.7; // Match tutorial exactly
+    
+    // Calculate position relative to board (same as stone positioning)
+    let cross_center_x = cell_x as f32 * BoardUtils::CELL_SIZE + BoardUtils::CELL_SIZE / 2.0;
+    let cross_center_y = cell_y as f32 * BoardUtils::CELL_SIZE + BoardUtils::CELL_SIZE / 2.0;
+    
+    commands.entity(board_entity).with_children(|builder| {
+        // First diagonal line (\)
+        builder.spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(cross_center_x - cross_size / 2.0),
+                top: Val::Px(cross_center_y - line_thickness / 2.0),
+                width: Val::Px(cross_size),
+                height: Val::Px(line_thickness),
+                ..default()
+            },
+            BackgroundColor(Color::srgb(1.0, 0.0, 0.0)), // Bright pure red
+            Transform::from_rotation(Quat::from_rotation_z(std::f32::consts::PI / 4.0)), // 45 degrees
+            ZIndex(20), // Above stones and board
+            ForbiddenMarker,
+            OnGameScreen,
+        ));
+        
+        // Second diagonal line (/)
+        builder.spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(cross_center_x - cross_size / 2.0),
+                top: Val::Px(cross_center_y - line_thickness / 2.0),
+                width: Val::Px(cross_size),
+                height: Val::Px(line_thickness),
+                ..default()
+            },
+            BackgroundColor(Color::srgb(1.0, 0.0, 0.0)), // Bright pure red
+            Transform::from_rotation(Quat::from_rotation_z(-std::f32::consts::PI / 4.0)), // -45 degrees
+            ZIndex(20), // Above stones and board
+            ForbiddenMarker,
+            OnGameScreen,
+        ));
+    });
 }
 
 pub fn place_stone(
@@ -951,12 +1085,14 @@ pub fn toggle_pause(
 pub fn handle_escape_key(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut app_state: ResMut<NextState<AppState>>,
+    mut menu_state: ResMut<NextState<MenuState>>,
     game_status: Res<GameStatus>,
 ) {
     if keyboard_input.just_pressed(KeyCode::Escape) {
         // Don't allow going back to menu while AI is thinking
         if *game_status != GameStatus::AIThinking {
             app_state.set(AppState::Menu);
+            menu_state.set(MenuState::Main);
         }
     }
 }
@@ -1156,11 +1292,13 @@ fn reset_board(
 fn handle_back_to_menu_button(
     button_query: Query<&Interaction, (Changed<Interaction>, With<BackToMenuButton>)>,
     mut app_state: ResMut<NextState<AppState>>,
+    mut menu_state: ResMut<NextState<MenuState>>,
 ) {
     for interaction in button_query.iter() {
         if *interaction == Interaction::Pressed {
             info!("Back to Menu button pressed!");
             app_state.set(AppState::Menu);
+            menu_state.set(MenuState::Main);
         }
     }
 }
@@ -1325,6 +1463,7 @@ fn handle_game_over_actions(
     button_query: Query<(&Interaction, &GameOverAction), (Changed<Interaction>, With<Button>)>,
     overlay_query: Query<Entity, With<GameOverOverlay>>,
     mut app_state: ResMut<NextState<AppState>>,
+    mut menu_state: ResMut<NextState<MenuState>>,
     mut reset_board: EventWriter<ResetBoard>,
 ) {
     for (interaction, action) in button_query.iter() {
@@ -1352,6 +1491,7 @@ fn handle_game_over_actions(
                 GameOverAction::BackToMenu => {
                     info!("Back to Menu button pressed from game over screen!");
                     app_state.set(AppState::Menu);
+                    menu_state.set(MenuState::Main);
                 }
             }
         }
@@ -1497,86 +1637,304 @@ fn update_captures_display(
     }
 }
 
+
+
+
+
 fn setup_game_background(
     mut commands: Commands,
     config: Res<GameConfig>,
-    game_bg_frames: Option<Res<crate::ui::screens::menu::GameBackgroundFrames>>,
+    _existing_bg_query: Query<Entity, With<PersistentGameVideoBackground>>,
+    mut existing_visibility_query: Query<&mut Visibility, With<PersistentGameVideoBackground>>,
 ) {
-    println!("[GAME BACKGROUND] Setting up game background...");
+
     
     // Skip in devMode
     if config.dev_mode {
-        println!("[GAME BACKGROUND] Skipping in devMode");
+        // Spawn a solid color background in dev mode
+        commands.spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                top: Val::Px(0.0),
+                left: Val::Px(0.0),
+                ..default()
+            },
+            ZIndex(-1000), // Behind everything
+            BackgroundColor(config.colors.background.clone().into()),
+            OnGameScreen,
+        ));
         return;
     }
 
-    // Get frames from the loading screen resource
-    let Some(bg_frames) = game_bg_frames else {
-        println!("[GAME BACKGROUND] ERROR: No background frames resource found!");
-        return;
-    };
-
-    println!("[GAME BACKGROUND] Found {} frames", bg_frames.frames.len());
-
-    if bg_frames.frames.is_empty() {
-        println!("[GAME BACKGROUND] ERROR: Frames vector is empty!");
+    // Check if we already have a persistent game video background
+    if let Ok(mut visibility) = existing_visibility_query.single_mut() {
+        *visibility = Visibility::Visible;
         return;
     }
-
-    let animation_config = &config.assets.animations.game_background_frames;
-    let fps = animation_config.fps as f32;
-    let frame_duration = 1.0 / fps;
-
-    println!("[GAME BACKGROUND] Spawning background with {} frames at {} fps", bg_frames.frames.len(), fps);
-
-    // Spawn background as a full-screen image behind everything
-    commands.spawn((
+    
+    // Spawn a persistent GStreamer video background for the game
+    let _entity = commands.spawn((
         Node {
             position_type: PositionType::Absolute,
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
             top: Val::Px(0.0),
             left: Val::Px(0.0),
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
             ..default()
         },
-        ZIndex(-1000), // Behind everything
+        ZIndex(-2000), // Behind everything including the game board
+        BackgroundColor(Color::srgb(1.0, 0.0, 0.0)), // Temporary red background for debugging
         ImageNode {
-            image: bg_frames.frames[0].clone(),
+            image_mode: NodeImageMode::Stretch,
             ..default()
+        }, // Will be updated by the video player
+        GameGStreamerVideoBackground {
+            video_path: "backgrounds/ingame-background/in-game.webm".to_string(),
         },
-        GameVideoBackground {
-            current_frame: 0,
-            timer: Timer::from_seconds(frame_duration, TimerMode::Repeating),
-            total_frames: bg_frames.frames.len(),
-        },
-        OnGameScreen,
+        GameVideoFilePlayer::default(),
+        PersistentGameVideoBackground, // Mark as persistent
+        Visibility::Visible, // Initially visible
     ));
-    
-    println!("[GAME BACKGROUND] Background entity spawned successfully!");
 }
 
-fn animate_game_background(
-    time: Res<Time>,
-    mut video_backgrounds: Query<(&mut GameVideoBackground, &mut ImageNode)>,
-    game_bg_frames: Option<Res<crate::ui::screens::menu::GameBackgroundFrames>>,
-    config: Res<GameConfig>,
+fn initialize_game_video_players(
+    mut video_players: Query<(Entity, &mut GameVideoFilePlayer, &GameGStreamerVideoBackground), (With<PersistentGameVideoBackground>, Without<BackgroundImageMarker>)>,
 ) {
-    // Skip animation in devMode
-    if config.dev_mode {
+    // Early return if no uninitialized players
+    let has_uninitialized = video_players.iter().any(|(_, player, _)| !player.initialized);
+    if !has_uninitialized {
         return;
     }
+    
+    // Try to initialize GStreamer if not already done - this is safe to call multiple times
+    if let Err(_) = gstreamer::init() {
+        return;
+    }
+    
+    for (_entity, mut player, video_bg) in video_players.iter_mut() {
+        if player.initialized {
+            continue;
+        }
 
-    if let Some(frames) = game_bg_frames {
-        for (mut video_bg, mut image_node) in video_backgrounds.iter_mut() {
-            video_bg.timer.tick(time.delta());
+        let video_path = format!("assets/{}", video_bg.video_path);
+        let file_path = std::path::Path::new(&video_path);
+        
+        if !file_path.exists() {
+            continue;
+        }
 
-            if video_bg.timer.just_finished() {
-                video_bg.current_frame = (video_bg.current_frame + 1) % video_bg.total_frames;
+        let uri = format!("file://{}", file_path.canonicalize().unwrap().to_string_lossy());
+        
+        let pipeline_description = format!(
+            "uridecodebin uri={} ! videoconvert ! videoscale method=lanczos add-borders=false ! videorate ! video/x-raw,format=RGBA,framerate=30/1 ! appsink name=appsink sync=true drop=false max-buffers=1",
+            uri
+        );
 
-                if video_bg.current_frame < frames.frames.len() {
-                    image_node.image = frames.frames[video_bg.current_frame].clone();
+        match gstreamer::parse::launch(&pipeline_description) {
+            Ok(pipeline) => {
+                let appsink = pipeline
+                    .clone()
+                    .downcast::<gstreamer::Pipeline>()
+                    .unwrap()
+                    .by_name("appsink")
+                    .unwrap()
+                    .downcast::<AppSink>()
+                    .unwrap();
+
+                player.pipeline = Some(pipeline.clone());
+                player.app_sink = Some(appsink);
+                player.initialized = true;
+
+                let _ = pipeline.set_state(gstreamer::State::Playing);
+            }
+            Err(_) => {
+                // Failed to create pipeline
+            }
+        }
+    }
+}
+
+fn update_game_video_players(
+    mut video_players: Query<(Entity, &mut GameVideoFilePlayer, &mut ImageNode), (With<GameGStreamerVideoBackground>, With<PersistentGameVideoBackground>, Without<BackgroundImageMarker>)>,
+    mut images: ResMut<Assets<Image>>,
+    time: Res<Time>,
+) {
+    for (_entity, mut player, mut image_node) in video_players.iter_mut() {
+        if !player.initialized {
+            continue;
+        }
+
+        // Stream new frames into buffer (but don't overwhelm it)
+        if let Some(app_sink) = player.app_sink.as_ref().cloned() {
+            // Fill buffer with available frames (max 3 frames)
+            while player.frame_buffer.len() < 3 {
+                if let Some(sample) = app_sink.try_pull_sample(gstreamer::ClockTime::from_mseconds(0)) {
+                    
+                    if let (Some(buffer), Some(caps)) = (sample.buffer(), sample.caps()) {
+                        if let Ok(map) = buffer.map_readable() {
+                            let data = map.as_slice();
+                            let structure = caps.structure(0).unwrap();
+                            let width = structure.get::<i32>("width").unwrap() as u32;
+                            let height = structure.get::<i32>("height").unwrap() as u32;
+                            
+                            // Store video dimensions on first frame
+                            if player.video_width == 0 {
+                                player.video_width = width;
+                                player.video_height = height;
+                            }
+                            
+                            // Data is already RGBA from the pipeline
+                            player.frame_buffer.push_back(data.to_vec());
+                        }
+                    }
+                } else {
+                    break; // No more frames available
+                }
+            }
+        }
+        
+        // OPTIMIZED: Restore frame rate limiting - now we know the real issue was texture operations
+        player.frame_timer += time.delta_secs();
+        let should_update_frame = player.frame_timer >= 0.033 && !player.frame_buffer.is_empty(); // 30 FPS limit for smooth video
+        
+        if should_update_frame {
+            player.frame_timer = 0.0; // Reset timer when updating
+        }
+        
+        if should_update_frame { // 30 FPS updates
+            
+            // Get next frame from buffer
+            if let Some(rgba_data) = player.frame_buffer.pop_front() {
+                if player.image_handle.is_none() {
+                    // Create texture for the first time
+                    let bevy_image = Image::new_fill(
+                        bevy::render::render_resource::Extent3d {
+                            width: player.video_width,
+                            height: player.video_height,
+                            depth_or_array_layers: 1,
+                        },
+                        bevy::render::render_resource::TextureDimension::D2,
+                        &rgba_data,
+                        bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
+                        bevy::render::render_asset::RenderAssetUsages::MAIN_WORLD | bevy::render::render_asset::RenderAssetUsages::RENDER_WORLD,
+                    );
+                    
+                    let new_handle = images.add(bevy_image);
+                    player.image_handle = Some(new_handle.clone());
+                    image_node.image = new_handle;
+                } else {
+                    // Update texture with buffered frame data
+                    if let Some(ref handle) = player.image_handle {
+                        let updated_image = Image::new_fill(
+                            bevy::render::render_resource::Extent3d {
+                                width: player.video_width,
+                                height: player.video_height,
+                                depth_or_array_layers: 1,
+                            },
+                            bevy::render::render_resource::TextureDimension::D2,
+                            &rgba_data,
+                            bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
+                            bevy::render::render_asset::RenderAssetUsages::MAIN_WORLD | bevy::render::render_asset::RenderAssetUsages::RENDER_WORLD,
+                        );
+                        
+                        images.insert(handle, updated_image);
+                    }
                 }
             }
         }
     }
 }
+
+fn handle_game_video_looping(
+    mut video_players: Query<&mut GameVideoFilePlayer, (With<GameGStreamerVideoBackground>, With<PersistentGameVideoBackground>)>,
+) {
+    for player in video_players.iter_mut() {
+        if !player.initialized {
+            continue;
+        }
+
+        let Some(ref pipeline) = player.pipeline else {
+            continue;
+        };
+        
+        // Check if the pipeline has reached the end
+        if let Some(bus) = pipeline.bus() {
+            while let Some(msg) = bus.timed_pop(gstreamer::ClockTime::from_mseconds(0)) {
+                match msg.view() {
+                    gstreamer::MessageView::Eos(_) => {
+                        println!("[GAME VIDEO] Video reached end, restarting...");
+                        if let Err(e) = pipeline.seek_simple(
+                            gstreamer::SeekFlags::FLUSH | gstreamer::SeekFlags::KEY_UNIT,
+                            gstreamer::ClockTime::ZERO,
+                        ) {
+                            println!("[GAME VIDEO] Failed to seek to beginning: {}", e);
+                        }
+                    }
+                    gstreamer::MessageView::Error(err) => {
+                        println!("[GAME VIDEO] Pipeline error: {}", err.error());
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+}
+
+/// Hide persistent game video background when exiting the game state
+fn hide_persistent_game_video_background(
+    mut video_query: Query<&mut Visibility, With<PersistentGameVideoBackground>>,
+) {
+    for mut visibility in video_query.iter_mut() {
+        *visibility = Visibility::Hidden;
+    }
+}
+
+fn show_persistent_game_video_background(
+    mut video_query: Query<&mut Visibility, With<PersistentGameVideoBackground>>,
+) {
+    for mut visibility in video_query.iter_mut() {
+        *visibility = Visibility::Visible;
+    }
+}
+
+/// Preload game video background during menu to avoid flash screens
+pub fn preload_game_video_background(
+    mut commands: Commands,
+    config: Res<GameConfig>,
+    existing_bg_query: Query<Entity, With<PersistentGameVideoBackground>>,
+) {
+    // Skip in devMode or if already exists
+    if config.dev_mode || !existing_bg_query.is_empty() {
+        return;
+    }
+    
+    // Spawn a hidden persistent GStreamer video background for the game
+    let _entity = commands.spawn((
+        Node {
+            position_type: PositionType::Absolute,
+            top: Val::Px(0.0),
+            left: Val::Px(0.0),
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            ..default()
+        },
+        ZIndex(-2000), // Behind everything including the game board
+        BackgroundColor(Color::srgb(1.0, 0.0, 0.0)), // Temporary red background for debugging
+        ImageNode {
+            image_mode: NodeImageMode::Stretch,
+            ..default()
+        }, // Will be updated by the video player
+        GameGStreamerVideoBackground {
+            video_path: "backgrounds/ingame-background/in-game.webm".to_string(),
+        },
+        GameVideoFilePlayer::default(),
+        PersistentGameVideoBackground, // Mark as persistent
+        Visibility::Hidden, // Initially hidden
+    ));
+}
+
+
+
+

@@ -1,0 +1,39 @@
+# Linux x86_64 target configuration
+[target.x86_64-unknown-linux-gnu]
+rustflags = [
+    "-C", "link-arg=-Wl,--as-needed",
+    "-C", "link-arg=-Wl,-rpath,$ORIGIN",
+    "-C", "link-arg=-Wl,-rpath,$ORIGIN/lib"
+]
+
+# Linux ARM64 target configuration
+[target.aarch64-unknown-linux-gnu]
+rustflags = [
+    "-C", "link-arg=-Wl,--as-needed",
+    "-C", "link-arg=-Wl,-rpath,$ORIGIN",
+    "-C", "link-arg=-Wl,-rpath,$ORIGIN/lib"
+]
+
+# macOS x86_64 target configuration
+[target.x86_64-apple-darwin]
+rustflags = [
+    "-C", "link-arg=-Wl,-rpath,@loader_path",
+    "-C", "link-arg=-Wl,-rpath,@loader_path/lib"
+]
+
+# macOS ARM64 target configuration
+[target.aarch64-apple-darwin]
+rustflags = [
+    "-C", "link-arg=-Wl,-rpath,@loader_path",
+    "-C", "link-arg=-Wl,-rpath,@loader_path/lib"
+]
+
+[env]
+PKG_CONFIG_ALLOW_SYSTEM_LIBS = "1"
+PKG_CONFIG_ALLOW_SYSTEM_CFLAGS = "1"
+# Force X11 backend on Linux, disable Wayland
+WINIT_UNIX_BACKEND = "x11"
+
+# Remove the hardcoded build target to allow native compilation
+# [build]
+# target = "x86_64-unknown-linux-gnu"
