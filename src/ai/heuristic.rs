@@ -17,6 +17,12 @@ struct PatternCounts {
     dead_three: u8,
     live_two: u8,
     half_free_two: u8,
+    gapped_live_four: u8,
+    gapped_half_free_four: u8,
+    gapped_dead_four: u8,
+    gapped_live_three: u8,
+    gapped_half_free_three: u8,
+    gapped_dead_three: u8,
 }
 impl PatternCounts {
     const fn new() -> Self {
@@ -30,12 +36,24 @@ impl PatternCounts {
             dead_three: 0,
             live_two: 0,
             half_free_two: 0,
+            gapped_live_four: 0,
+            gapped_half_free_four: 0,
+            gapped_dead_four: 0,
+            gapped_live_three: 0,
+            gapped_half_free_three: 0,
+            gapped_dead_three: 0,
         }
     }
 }
 #[derive(Debug, Clone, Copy)]
 struct PatternInfo {
     length: usize,
+    freedom: PatternFreedom,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct GappedPatternInfo {
+    stones: usize,
     freedom: PatternFreedom,
 }
 
@@ -54,6 +72,13 @@ pub const HALF_FREE_THREE_SCORE: i32 = 200;      // _XXX| or |XXX_ (one-sided th
 pub const DEAD_THREE_SCORE: i32 = 50;            // |XXX| (blocked three, minimal threat)
 pub const LIVE_TWO_SCORE: i32 = 50;              // _XX_ (open two, growth potential)
 pub const HALF_FREE_TWO_SCORE: i32 = 20;         // _XX| or |XX_ (one-sided two)
+
+pub const GAPPED_LIVE_FOUR_SCORE: i32 = 8_000;      // _XX.X_ or _X.XX_ (strong gapped threat)
+pub const GAPPED_HALF_FREE_FOUR_SCORE: i32 = 2_000;  // XX.X| or |X.XX (one-sided gapped four)
+pub const GAPPED_DEAD_FOUR_SCORE: i32 = 200;         // |XX.X| (blocked gapped four)
+pub const GAPPED_LIVE_THREE_SCORE: i32 = 300;        // _X.X_ or _XX._ (gapped three potential)
+pub const GAPPED_HALF_FREE_THREE_SCORE: i32 = 120;   // X.X| or |X.X (one-sided gapped three)
+pub const GAPPED_DEAD_THREE_SCORE: i32 = 30;         // |X.X| (blocked gapped three)
 
 impl Heuristic {
     /// Evaluates a game position returning a score from the Max player's perspective
@@ -141,8 +166,8 @@ impl Heuristic {
                 let penalty = CHECK_PENALTY + (escape_factor * CHECK_PENALTY as f32) as i32;
                 
                 match player_in_check {
-                    Player::Max => -penalty,  // Negative penalty for Max player
-                    Player::Min => penalty,   // Positive penalty for Min player
+                    Player::Max => -penalty,
+                    Player::Min => penalty,
                 }
             } else {
                 match player_in_check {
@@ -166,12 +191,17 @@ impl Heuristic {
     /// by length (2-5 stones) and freedom level (free, half-free, or flanked), which
     /// determines its strategic value and potential for creating winning sequences.
     /// 
+    /// Enhanced to also detect gapped patterns
+    /// that could form winning sequences when gaps are filled.
+    /// 
     /// Returns tuple of (max_player_patterns, min_player_patterns) containing detailed
     /// counts of each pattern type for strategic evaluation and move planning.
     fn analyze_both_players(board: &Board, win_condition: usize) -> (PatternCounts, PatternCounts) {
         let mut max_counts = PatternCounts::new();
         let mut min_counts = PatternCounts::new();
         let mut analyzed = vec![vec![0u8; board.size]; board.size];
+        let mut gapped_analyzed = vec![vec![0u8; board.size]; board.size];
+        
         for row in 0..board.size {
             for col in 0..board.size {
                 let idx = board.index(row, col);
@@ -183,8 +213,10 @@ impl Heuristic {
                 } else {
                     Player::Min
                 };
+                
                 for (dir_idx, &(dx, dy)) in DIRECTIONS.iter().enumerate() {
                     let bit_mask = 1u8 << dir_idx;
+                    
                     if analyzed[row][col] & bit_mask == 0 {
                         if let Some(pattern_info) = Self::analyze_pattern(
                             board,
@@ -200,6 +232,26 @@ impl Heuristic {
                             match player {
                                 Player::Max => Self::update_counts(&mut max_counts, pattern_info),
                                 Player::Min => Self::update_counts(&mut min_counts, pattern_info),
+                            }
+                        }
+                    }
+                    
+                    if gapped_analyzed[row][col] & bit_mask == 0 {
+                        if PatternAnalyzer::is_gapped_pattern_start(board, row, col, dx, dy, player) {
+                            if let Some((stones, _gaps, freedom)) = PatternAnalyzer::analyze_gapped_sequence(
+                                board, row, col, dx, dy, player, win_condition
+                            ) {
+                                // Mark this sequence as analyzed to avoid duplicates
+                                Self::mark_gapped_sequence_analyzed(
+                                    board, row, col, dx, dy, player, win_condition,
+                                    &mut gapped_analyzed, bit_mask
+                                );
+                                
+                                let gapped_info = GappedPatternInfo { stones, freedom };
+                                match player {
+                                    Player::Max => Self::update_gapped_counts(&mut max_counts, gapped_info),
+                                    Player::Min => Self::update_gapped_counts(&mut min_counts, gapped_info),
+                                }
                             }
                         }
                     }
@@ -340,6 +392,66 @@ impl Heuristic {
             _ => {}
         }
     }
+
+    /// Updates gapped pattern counts based on analyzed gapped pattern information.
+    /// 
+    /// This function categorizes detected gapped patterns by their stone count and freedom level,
+    /// incrementing the appropriate gapped counters in the PatternCounts structure. Gapped patterns
+    /// are stones separated by small gaps that could form threats when gaps are filled.
+    /// 
+    /// Only patterns with 3 or 4 stones are considered as gapped patterns, since 2-stone
+    /// gapped patterns have minimal threat value and 5-stone patterns would be wins.
+    fn update_gapped_counts(counts: &mut PatternCounts, pattern: GappedPatternInfo) {
+        match pattern.stones {
+            4 => match pattern.freedom {
+                PatternFreedom::Free => counts.gapped_live_four += 1,
+                PatternFreedom::HalfFree => counts.gapped_half_free_four += 1,
+                PatternFreedom::Flanked => counts.gapped_dead_four += 1,
+            },
+            3 => match pattern.freedom {
+                PatternFreedom::Free => counts.gapped_live_three += 1,
+                PatternFreedom::HalfFree => counts.gapped_half_free_three += 1,
+                PatternFreedom::Flanked => counts.gapped_dead_three += 1,
+            },
+            _ => {} // Only consider 3 and 4 stone gapped patterns
+        }
+    }
+
+    /// Marks positions in a gapped sequence as analyzed to prevent duplicate counting.
+    /// 
+    /// This function marks all stone positions that are part of a detected gapped pattern
+    /// to ensure they aren't counted again during the same directional analysis.
+    fn mark_gapped_sequence_analyzed(
+        board: &Board,
+        start_row: usize,
+        start_col: usize,
+        dx: isize,
+        dy: isize,
+        player: Player,
+        win_condition: usize,
+        analyzed: &mut [Vec<u8>],
+        bit_mask: u8,
+    ) {
+        let player_bits = board.get_player_bits(player);
+        
+        for i in 0..win_condition {
+            let check_row = start_row as isize + i as isize * dx;
+            let check_col = start_col as isize + i as isize * dy;
+            
+            if PatternAnalyzer::is_in_bounds(board, check_row, check_col) {
+                let idx = board.index(check_row as usize, check_col as usize);
+                if Board::is_bit_set(player_bits, idx) {
+                    let row = check_row as usize;
+                    let col = check_col as usize;
+                    if row < analyzed.len() && col < analyzed[0].len() {
+                        analyzed[row][col] |= bit_mask;
+                    }
+                }
+            } else {
+                break;
+            }
+        }
+    }
     /// Calculates the total strategic score from pattern counts.
     /// 
     /// This function converts pattern counts into a numerical score that reflects
@@ -352,29 +464,41 @@ impl Heuristic {
     /// - Live four: Different values for single vs multiple occurrences
     /// - Threat combinations: Special bonus for winning threat scenarios
     /// - Individual patterns: Weighted by strategic value and frequency
+    /// - Gapped patterns: Integrated scoring for stones separated by gaps
     /// 
     /// Winning threat detection identifies combinations like double live-three,
     /// mixed four-three threats, or multiple half-free fours that guarantee wins
     /// on the next move. The scoring system emphasizes both immediate threats and
     /// long-term positional advantages through balanced pattern valuation.
+
     fn calculate_pattern_score(counts: PatternCounts) -> i32 {
         let mut score = 0;
+        
         if counts.five_in_row > 0 {
             score += FIVE_IN_ROW_SCORE;
         }
+        
         score += match counts.live_four {
             1 => LIVE_FOUR_SINGLE_SCORE,
             n if n > 1 => LIVE_FOUR_MULTIPLE_SCORE,
             _ => 0,
         };
-        if counts.live_three >= 2
-            || counts.dead_four >= 2
-            || (counts.dead_four >= 1 && counts.live_three >= 1)
-            || (counts.half_free_four >= 1 && counts.live_three >= 1)
-            || (counts.half_free_four >= 2)
+        
+        let total_half_fours = counts.half_free_four + counts.gapped_half_free_four;
+        let total_dead_fours = counts.dead_four + counts.gapped_dead_four;
+        let total_live_threes = counts.live_three + counts.gapped_live_three;
+        
+        if total_live_threes >= 2
+            || total_dead_fours >= 2
+            || (total_dead_fours >= 1 && total_live_threes >= 1)
+            || (total_half_fours >= 1 && total_live_threes >= 1)
+            || (total_half_fours >= 2)
+            || (counts.gapped_live_four >= 1 && counts.live_three >= 1)
+            || (counts.live_four >= 1 && counts.gapped_live_three >= 1)
         {
             score += WINNING_THREAT_SCORE;
         }
+        
         score += (counts.half_free_four as i32) * HALF_FREE_FOUR_SCORE
             + (counts.dead_four as i32) * DEAD_FOUR_SCORE
             + (counts.live_three as i32) * LIVE_THREE_SCORE
@@ -382,6 +506,14 @@ impl Heuristic {
             + (counts.dead_three as i32) * DEAD_THREE_SCORE
             + (counts.live_two as i32) * LIVE_TWO_SCORE
             + (counts.half_free_two as i32) * HALF_FREE_TWO_SCORE;
+        
+        score += (counts.gapped_live_four as i32) * GAPPED_LIVE_FOUR_SCORE
+            + (counts.gapped_half_free_four as i32) * GAPPED_HALF_FREE_FOUR_SCORE
+            + (counts.gapped_dead_four as i32) * GAPPED_DEAD_FOUR_SCORE
+            + (counts.gapped_live_three as i32) * GAPPED_LIVE_THREE_SCORE
+            + (counts.gapped_half_free_three as i32) * GAPPED_HALF_FREE_THREE_SCORE
+            + (counts.gapped_dead_three as i32) * GAPPED_DEAD_THREE_SCORE;
+        
         score
     }
     /// Calculates capture bonus differential between players.

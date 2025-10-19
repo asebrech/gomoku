@@ -173,5 +173,118 @@ impl PatternAnalyzer {
         }
     }
 
+    /// Analyzes a sequence that may contain gaps to identify gapped patterns.
+    /// 
+    /// This function examines a sequence of positions in a direction, looking for
+    /// patterns where stones are separated by small gaps but could still form
+    /// a winning sequence. It returns information about the effective pattern
+    /// including the number of stones, gaps, and overall freedom.
+    pub fn analyze_gapped_sequence(
+        board: &Board,
+        start_row: usize,
+        start_col: usize,
+        dx: isize,
+        dy: isize,
+        player: Player,
+        win_condition: usize,
+    ) -> Option<(usize, usize, PatternFreedom)> {
+        let player_bits = board.get_player_bits(player);
+        let mut stones = Vec::new();
+        let scan_limit = win_condition;
+        
+        // Scan further if we need to find the complete gapped pattern
+        // but stop at the first blocking stone
+        for i in 0..scan_limit {
+            let check_row = start_row as isize + i as isize * dx;
+            let check_col = start_col as isize + i as isize * dy;
+            
+            if !Self::is_in_bounds(board, check_row, check_col) {
+                break;
+            }
+            
+            let idx = board.index(check_row as usize, check_col as usize);
+            if Board::is_bit_set(player_bits, idx) {
+                stones.push(i);
+            } else if Board::is_bit_set(&board.occupied, idx) {
+                // Opponent stone blocks further extension
+                break;
+            }
+            // Empty space - continue checking
+        }
+        
+        if stones.len() < 2 {
+            return None;
+        }
+        
+        // Calculate the span of the actual pattern (from first to last stone)
+        let first_stone = *stones.first().unwrap();
+        let last_stone = *stones.last().unwrap();
+        let pattern_span = last_stone - first_stone + 1;
+        
+        // Only consider patterns that fit within the win condition
+        if pattern_span > win_condition {
+            return None;
+        }
+        
+        let gaps = pattern_span - stones.len();
+        
+        // Reasonable gap ratio: gaps shouldn't exceed stones
+        if gaps > stones.len() {
+            return None;
+        }
+        
+        // Analyze freedom of the entire pattern
+        let before_row = start_row as isize - dx;
+        let before_col = start_col as isize - dy;
+        let start_open = Self::is_valid_empty(board, before_row, before_col);
+        
+        // Check freedom after the last stone
+        let end_row = start_row as isize + (last_stone as isize + 1) * dx;
+        let end_col = start_col as isize + (last_stone as isize + 1) * dy;
+        let end_open = Self::is_valid_empty(board, end_row, end_col);
+        
+        let freedom = match (start_open, end_open) {
+            (true, true) => PatternFreedom::Free,
+            (true, false) | (false, true) => PatternFreedom::HalfFree,
+            (false, false) => PatternFreedom::Flanked,
+        };
+        
+        Some((stones.len(), gaps, freedom))
+    }
+
+    /// Checks if a position is the start of a potential gapped pattern.
+    /// 
+    /// This helper function determines if we should analyze for gapped patterns
+    /// starting from this position, avoiding redundant analysis.
+    pub fn is_gapped_pattern_start(
+        board: &Board,
+        row: usize,
+        col: usize,
+        dx: isize,
+        dy: isize,
+        player: Player,
+    ) -> bool {
+        let player_bits = board.get_player_bits(player);
+        let idx = board.index(row, col);
+        
+        // Must be a stone of the player
+        if !Board::is_bit_set(player_bits, idx) {
+            return false;
+        }
+        
+        // Check if there's a stone before this position (if so, not a start)
+        let prev_row = row as isize - dx;
+        let prev_col = col as isize - dy;
+        
+        if Self::is_in_bounds(board, prev_row, prev_col) {
+            let prev_idx = board.index(prev_row as usize, prev_col as usize);
+            if Board::is_bit_set(player_bits, prev_idx) {
+                return false; // This is part of a longer pattern starting earlier
+            }
+        }
+        
+        true
+    }
+
 
 }
