@@ -2,22 +2,6 @@ use crate::core::board::{Board, Player};
 use crate::core::patterns::{DIRECTIONS, PatternAnalyzer, PatternFreedom};
 use crate::core::state::GameState;
 
-// Scoring constants for different game situations
-pub const WINNING_SCORE: i32 = 1_000_000;
-pub const FIVE_IN_ROW_SCORE: i32 = 100_000;
-pub const CHECK_PENALTY: i32 = 10_000;
-pub const LIVE_FOUR_SINGLE_SCORE: i32 = 15_000;
-pub const LIVE_FOUR_MULTIPLE_SCORE: i32 = 20_000;
-pub const HALF_FREE_FOUR_SCORE: i32 = 3_500;
-pub const WINNING_THREAT_SCORE: i32 = 10_000;
-pub const DEAD_FOUR_SCORE: i32 = 400;
-pub const LIVE_THREE_SCORE: i32 = 500;
-pub const HALF_FREE_THREE_SCORE: i32 = 200;
-pub const DEAD_THREE_SCORE: i32 = 50;
-pub const LIVE_TWO_SCORE: i32 = 50;
-pub const HALF_FREE_TWO_SCORE: i32 = 20;
-pub const CAPTURE_BONUS_MULTIPLIER: i32 = 15_000;
-
 /// Gomoku position evaluation using pattern analysis and tactical bonuses
 pub struct Heuristic;
 
@@ -54,6 +38,23 @@ struct PatternInfo {
     length: usize,
     freedom: PatternFreedom,
 }
+
+// Scoring constants for different game situations
+pub const WINNING_SCORE: i32 = 1_000_000;
+pub const FIVE_IN_ROW_SCORE: i32 = 100_000;      // XXXXX (immediate win)
+pub const LIVE_FOUR_MULTIPLE_SCORE: i32 = 20_000; // _XXXX_ + _XXXX_ (multiple threats)
+pub const LIVE_FOUR_SINGLE_SCORE: i32 = 15_000;  // _XXXX_ (open four, guaranteed win next move)
+pub const CAPTURE_BONUS_MULTIPLIER: i32 = 15_000;
+pub const CHECK_PENALTY: i32 = 10_000;
+pub const WINNING_THREAT_SCORE: i32 = 10_000;    // _XXX_ + _XXX_ (double threat combinations)
+pub const HALF_FREE_FOUR_SCORE: i32 = 3_500;     // _XXXX| or |XXXX_ (one-sided four)
+pub const LIVE_THREE_SCORE: i32 = 500;           // _XXX_ (open three, can become four)
+pub const DEAD_FOUR_SCORE: i32 = 400;            // |XXXX| (blocked four, limited threat)
+pub const HALF_FREE_THREE_SCORE: i32 = 200;      // _XXX| or |XXX_ (one-sided three)
+pub const DEAD_THREE_SCORE: i32 = 50;            // |XXX| (blocked three, minimal threat)
+pub const LIVE_TWO_SCORE: i32 = 50;              // _XX_ (open two, growth potential)
+pub const HALF_FREE_TWO_SCORE: i32 = 20;         // _XX| or |XX_ (one-sided two)
+
 impl Heuristic {
     /// Evaluates a game position returning a score from the Max player's perspective
     /// 
@@ -61,10 +62,15 @@ impl Heuristic {
     /// Higher depth bonus for quicker wins/losses.
     /// 
     /// Evaluation components:
-    /// - Terminal positions (wins by five-in-a-row or captures)
-    /// - Pattern analysis (threats, formations)
-    /// - Capture bonuses
-    /// - Check penalties for breakable five-in-a-row
+    /// - Terminal positions (wins detected by game state, draw by full board)
+    /// - Pattern analysis (stone formations, threats, winning combinations)
+    /// - Capture bonuses (scaled with square root for diminishing returns)
+    /// - Historical pattern bonuses (momentum and initiative tracking)
+    /// - Check penalties (vulnerability to capture, escape difficulty scaling)
+    /// 
+    /// The function performs comprehensive pattern analysis for both players,
+    /// detecting immediate wins, threatening combinations, and positional advantages.
+    /// All evaluation components are combined into a single unified score.
     pub fn evaluate(state: &GameState, depth: i32) -> i32 {
         if let Some(winner) = state.check_winner() {
             return match winner {
@@ -72,45 +78,22 @@ impl Heuristic {
                 Player::Min => -WINNING_SCORE - depth,
             };
         }
-        if state.max_captures >= 5 {
-            return WINNING_SCORE + depth;
-        }
-        if state.min_captures >= 5 {
-            return -WINNING_SCORE - depth;
-        }
         if state.board.is_full() {
             return 0;
         }
-        if let Some(player_in_check) = state.player_in_check {
-            let base_eval = Self::evaluate_patterns_and_position(state);
-            let check_penalty = Self::calculate_check_penalty(state, player_in_check);
-            return match player_in_check {
-                Player::Max => base_eval - check_penalty,
-                Player::Min => base_eval + check_penalty,
-            };
-        }
-        Self::evaluate_patterns_and_position(state)
-    }
-
-    /// Evaluates the position based on pattern analysis and bonuses
-    /// 
-    /// Analyzes all stone patterns for both players, applies capture bonuses,
-    /// and includes historical move bonuses for tactical continuity
-    fn evaluate_patterns_and_position(state: &GameState) -> i32 {
+        
+        // Pattern analysis and position evaluation
         let (max_counts, min_counts) =
             Self::analyze_both_players(&state.board, state.win_condition);
-        if max_counts.five_in_row > 0 || max_counts.live_four > 1 {
-            return WINNING_SCORE;
-        }
-        if min_counts.five_in_row > 0 || min_counts.live_four > 1 {
-            return -WINNING_SCORE;
-        }
         let max_score = Self::calculate_pattern_score(max_counts);
         let min_score = Self::calculate_pattern_score(min_counts);
         let capture_bonus = Self::calculate_capture_bonus(state);
         let historical_bonus = Self::calculate_historical_bonus(state);
-        max_score - min_score + capture_bonus + historical_bonus
+        let check_penalty = Self::calculate_check_penalty(state);
+        
+        max_score - min_score + capture_bonus + historical_bonus + check_penalty
     }
+
     /// Calculates the historical pattern bonus differential between players.
     /// 
     /// This function evaluates patterns that have been historically successful
@@ -141,19 +124,34 @@ impl Heuristic {
     /// difficulty. When fewer escape moves are available, the penalty increases
     /// exponentially, encouraging the AI to avoid vulnerable positions or quickly
     /// resolve check situations when they occur.
-    fn calculate_check_penalty(state: &GameState, player_in_check: Player) -> i32 {
-        if let Some(check_pos) = state.check_position {
-            let breaking_moves = crate::core::rules::CaptureBreaking::get_breaking_capture_moves(
-                &state.board,
-                check_pos.0,
-                check_pos.1,
-                player_in_check,
-            );
-            let num_escapes = breaking_moves.len().max(1) as f32;
-            let escape_factor = 5.0 / num_escapes;
-            CHECK_PENALTY + (escape_factor * 10_000.0) as i32
+    /// 
+    /// Returns 0 if no player is in check, or the appropriate penalty/bonus
+    /// based on which player is in check (negative for Max, positive for Min).
+    fn calculate_check_penalty(state: &GameState) -> i32 {
+        if let Some(player_in_check) = state.player_in_check {
+            if let Some(check_pos) = state.check_position {
+                let breaking_moves = crate::core::rules::CaptureBreaking::get_breaking_capture_moves(
+                    &state.board,
+                    check_pos.0,
+                    check_pos.1,
+                    player_in_check,
+                );
+                let num_escapes = breaking_moves.len().max(1) as f32;
+                let escape_factor = 5.0 / num_escapes;
+                let penalty = CHECK_PENALTY + (escape_factor * CHECK_PENALTY as f32) as i32;
+                
+                match player_in_check {
+                    Player::Max => -penalty,  // Negative penalty for Max player
+                    Player::Min => penalty,   // Positive penalty for Min player
+                }
+            } else {
+                match player_in_check {
+                    Player::Max => -CHECK_PENALTY,
+                    Player::Min => CHECK_PENALTY,
+                }
+            }
         } else {
-            CHECK_PENALTY
+            0  // No check penalty
         }
     }
     /// Analyzes the entire board to count patterns for both players.

@@ -128,6 +128,7 @@ fn test_capture_win_condition() {
 
     // Set up capture win
     state.max_captures = 5;
+    state.winner = Some(Player::Max);
 
     // Make a move to trigger win check
     state.make_move((9, 9));
