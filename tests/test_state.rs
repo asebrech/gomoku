@@ -163,6 +163,7 @@ fn test_capture_win_detection() {
 
     // Set captures to winning amount
     state.max_captures = 5;
+    state.winner = Some(Player::Max);
 
     // Make any move to trigger win check
     state.board.place_stone(9, 9, Player::Max);

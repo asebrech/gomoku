@@ -78,11 +78,13 @@ impl GameState {
 
     pub fn get_candidate_moves(&self) -> Vec<(usize, usize)> {
         if let Some(player_in_check) = self.player_in_check {
-            if player_in_check == self.current_player.opponent() {
+            if player_in_check == self.current_player {
                 if let Some(check_pos) = self.check_position {
                     let breaking_moves = CaptureBreaking::get_breaking_capture_moves(&self.board, check_pos.0, check_pos.1, player_in_check);
                     if !breaking_moves.is_empty() {
                         return breaking_moves;
+                    } else {
+                        return vec![];
                     }
                 }
             }
@@ -105,10 +107,14 @@ impl GameState {
         }
         
         if let Some(player_in_check) = self.player_in_check {
-            if player_in_check == self.current_player.opponent() {
+            if player_in_check == self.current_player {
                 if let Some(check_pos) = self.check_position {
                     let breaking_moves = CaptureBreaking::get_breaking_capture_moves(&self.board, check_pos.0, check_pos.1, player_in_check);
-                    return breaking_moves.contains(&mv);
+                    if !breaking_moves.is_empty() {
+                        return breaking_moves.contains(&mv);
+                    } else {
+                        return false;
+                    }
                 }
             }
         }
@@ -234,6 +240,23 @@ impl GameState {
                 self.player_in_check = None;
                 self.check_position = None;
                 return true;
+            }
+        }
+
+        if let Some(player_in_check) = self.player_in_check {
+            if let Some(check_pos) = self.check_position {
+                let (still_has_win, still_breakable) = WinDetection::check_win_and_breakable(&self.board, check_pos.0, check_pos.1, self.win_condition);
+                
+                if !still_has_win {
+                    self.player_in_check = None;
+                    self.check_position = None;
+                } else if !still_breakable {
+                    self.winner = Some(player_in_check);
+                    self.win_reason = Some(WinReason::Alignment);
+                    self.player_in_check = None;
+                    self.check_position = None;
+                    return true;
+                }
             }
         }
 
