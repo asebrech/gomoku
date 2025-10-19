@@ -549,7 +549,7 @@ pub fn update_available_placement(
                 && !DoubleThreeDetection::creates_double_three(&game_state.board, cell.x, cell.y, game_state.current_player)
         };
         let is_empty = game_state.board.is_empty_position(cell.x, cell.y);
-        let creates_double_three = GameRules::creates_double_three(&game_state.board, cell.x, cell.y, game_state.current_player);
+        let creates_double_three = DoubleThreeDetection::creates_double_three(&game_state.board, cell.x, cell.y, game_state.current_player);
         
         if is_empty && !creates_double_three {
             // Valid placement - show preview dot
