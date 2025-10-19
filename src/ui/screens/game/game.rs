@@ -350,8 +350,10 @@ fn setup_game_ui(
                         display: Display::Flex,
                         flex_direction: FlexDirection::Row,
                         align_items: AlignItems::Center,
+                        justify_content: JustifyContent::Center,
                         column_gap: Val::Px(12.0),
                         margin: UiRect::bottom(Val::Px(10.0)),
+                        width: Val::Percent(100.0),
                         ..default()
                     },
                     CurrentPlayerIndicator,
@@ -400,6 +402,7 @@ fn setup_game_ui(
                             ..default()
                         },
                         TextColor(colors.accent.clone().into()),
+                        TextLayout::new_with_justify(JustifyText::Center),
                         CurrentPlayerText,
                     ));
                 });
@@ -1554,7 +1557,7 @@ fn show_game_over_screen(
         // Determine the title and message based on winner
         let (title, message, title_color) = match event.winner {
             Some(Player::Max) => (
-                "VICTORY!",
+                "You Won",
                 if game_settings.versus_ai {
                     "You defeated the AI!"
                 } else {
@@ -1563,7 +1566,7 @@ fn show_game_over_screen(
                 colors.accent.clone(), // Victory color
             ),
             Some(Player::Min) => (
-                if game_settings.versus_ai { "DEFEAT" } else { "VICTORY!" },
+                if game_settings.versus_ai { "Game Over" } else { "You Won" },
                 if game_settings.versus_ai {
                     "The AI has won..."
                 } else {
@@ -1576,7 +1579,7 @@ fn show_game_over_screen(
                 },
             ),
             None => (
-                "DRAW",
+                "Draw",
                 "The game ended in a draw",
                 colors.text_secondary.clone(),
             ),
@@ -1760,19 +1763,19 @@ fn update_current_player_display(
             
             // Determine winner message with win reason
             let message = if let Some(winner) = game_state.winner {
-                let winner_name = match winner {
+                let winner_status = match winner {
                     Player::Max => {
                         if game_settings.versus_ai {
-                            "You Won!"
+                            "You Won"
                         } else {
-                            "Player 1 Won!"
+                            "You Won"
                         }
                     }
                     Player::Min => {
                         if game_settings.versus_ai {
-                            "AI Won"
+                            "Game Over"
                         } else {
-                            "Player 2 Won!"
+                            "You Won"
                         }
                     }
                 };
@@ -1780,17 +1783,49 @@ fn update_current_player_display(
                 // Add win reason
                 let reason = match game_state.win_reason {
                     Some(crate::core::state::WinReason::Alignment) => {
-                        format!("by {} in a row!", game_state.win_condition)
+                        let player_name = match winner {
+                            Player::Max => {
+                                if game_settings.versus_ai {
+                                    "You won"
+                                } else {
+                                    "Player 1 won"
+                                }
+                            }
+                            Player::Min => {
+                                if game_settings.versus_ai {
+                                    "AI won"
+                                } else {
+                                    "Player 2 won"
+                                }
+                            }
+                        };
+                        format!("{} by {} in a row!", player_name, game_state.win_condition)
                     }
                     Some(crate::core::state::WinReason::Captures) => {
-                        format!("by capturing {} pairs!", game_state.capture_to_win)
+                        let player_name = match winner {
+                            Player::Max => {
+                                if game_settings.versus_ai {
+                                    "You won"
+                                } else {
+                                    "Player 1 won"
+                                }
+                            }
+                            Player::Min => {
+                                if game_settings.versus_ai {
+                                    "AI won"
+                                } else {
+                                    "Player 2 won"
+                                }
+                            }
+                        };
+                        format!("{} by capturing {} pairs!", player_name, game_state.capture_to_win)
                     }
                     None => "".to_string(),
                 };
 
-                format!("Game Over - {}\n{}", winner_name, reason)
+                format!("{}\n{}", winner_status, reason)
             } else {
-                "Game Over - Draw".to_string()
+                "Draw\nThe game ended in a draw".to_string()
             };
             
             text.0 = message;
