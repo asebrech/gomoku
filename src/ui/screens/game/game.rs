@@ -119,6 +119,18 @@ pub enum GameOverAction {
     BackToMenu,
 }
 
+// AI vs AI mode components
+#[derive(Component)]
+pub struct NextMoveButton;
+
+#[derive(Component)]
+pub struct AutoPlayToggle;
+
+#[derive(Resource, Default)]
+pub struct AIvsAIState {
+    pub auto_play: bool,
+}
+
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct GridCell {
     pub x: usize,
@@ -149,6 +161,7 @@ pub fn game_plugin(app: &mut App) {
         .init_resource::<AIDepthReached>()
         .init_resource::<AINodesSearched>()
         .init_resource::<AIThinkingFrames>()
+        .init_resource::<AIvsAIState>()
         .add_event::<GameEnded>()
         .add_event::<StonePlacement>()
         .add_event::<MovePlayed>()
@@ -181,6 +194,7 @@ pub fn game_plugin(app: &mut App) {
                 update_current_player_display.run_if(
                     resource_changed::<GameState>
                         .or(resource_changed::<GameStatus>)
+                        .or(resource_changed::<AIvsAIState>)
                         .or(on_event::<UpdatePlayerDisplay>)
                 ),
                 update_round_number_display,
@@ -211,6 +225,9 @@ pub fn game_plugin(app: &mut App) {
                 handle_reset_board_button,
                 handle_undo_move_button,
                 handle_back_to_menu_button,
+                handle_next_move_button,
+                handle_auto_play_toggle,
+                handle_ai_vs_ai_auto_play,
                 show_game_over_screen.run_if(on_event::<GameEnded>),
                 handle_game_over_actions,
             ).run_if(in_state(AppState::Game)),
@@ -254,8 +271,9 @@ fn update_game_settings_from_config(
     println!("  Converted ai_depth: {}", ai_depth_value);
     println!("  Converted time_limit: {:?}", time_limit);
     
-    // Preserve the versus_ai setting (set by menu)
+    // Preserve the versus_ai and ai_vs_ai settings (set by menu)
     let current_versus_ai = game_settings.versus_ai;
+    let current_ai_vs_ai = game_settings.ai_vs_ai;
     
     // Update GameSettings resource
     *game_settings = GameSettings {
@@ -265,6 +283,7 @@ fn update_game_settings_from_config(
         ai_depth: ai_depth_value,
         alpha_beta_enabled: true,
         versus_ai: current_versus_ai,  // Preserve menu selection
+        ai_vs_ai: current_ai_vs_ai,  // Preserve menu selection
         time_limit,
     };
     
@@ -872,7 +891,7 @@ pub fn process_next_round(
     mut game_status: ResMut<GameStatus>,
     mut win_sound: EventWriter<PlayWinSound>,
     mut lose_sound: EventWriter<PlayLoseSound>,
-    mut player_text_query: Query<&mut Text, With<CurrentPlayerText>>,
+    ai_vs_ai_state: Res<AIvsAIState>,
 ) {
     for _ in move_played.read() {
         // Check for game end first
@@ -907,27 +926,24 @@ pub fn process_next_round(
         }
 
         // Handle next player's turn
-        if game_state.current_player == Player::Max || (game_state.current_player == Player::Min && !settings.versus_ai) {
+        if settings.ai_vs_ai {
+            // AI vs AI mode - both players are AI
+            // But only auto-advance if auto-play is enabled
+            if ai_vs_ai_state.auto_play {
+                info!("AI vs AI mode with auto-play - setting AIThinking status");
+                *game_status = GameStatus::AIThinking;
+            } else {
+                info!("AI vs AI mode without auto-play - awaiting next move button");
+                *game_status = GameStatus::AwaitingUserInput;
+            }
+        } else if game_state.current_player == Player::Max || (game_state.current_player == Player::Min && !settings.versus_ai) {
             info!("Awaiting user click");
             *game_status = GameStatus::AwaitingUserInput;
-            // Update display to show it's the player's turn
-            for mut text in player_text_query.iter_mut() {
-                if settings.versus_ai {
-                    text.0 = "Your Turn".to_string();
-                } else {
-                    text.0 = "Turn".to_string();
-                }
-            }
         } else if settings.versus_ai {
             // AI's turn - set status and update display
             // The actual AI computation will happen in handle_ai_turn system next frame
             info!("AI's turn - setting AIThinking status");
             *game_status = GameStatus::AIThinking;
-            
-            // Update display immediately to show AI is thinking
-            for mut text in player_text_query.iter_mut() {
-                text.0 = "AI is thinking...".to_string();
-            }
         }
     }
 }
@@ -1724,10 +1740,11 @@ fn update_current_player_display(
     game_settings: Res<GameSettings>,
     game_status: Res<GameStatus>,
     config: Res<GameConfig>,
+    ai_vs_ai_state: Res<AIvsAIState>,
     mut text_query: Query<&mut Text, With<CurrentPlayerText>>,
     mut circle_query: Query<&mut BackgroundColor, With<PlayerTurnCircle>>,
 ) {
-    if !game_state.is_changed() && !game_status.is_changed() {
+    if !game_state.is_changed() && !game_status.is_changed() && !ai_vs_ai_state.is_changed() {
         return;
     }
     
@@ -1809,7 +1826,26 @@ fn update_current_player_display(
         }
         
         // Determine the message based on current player and game mode
-        let message = if is_ai_turn {
+        let message = if game_settings.ai_vs_ai {
+            // AI vs AI mode
+            if *game_status == GameStatus::AIThinking {
+                let ai_name = match game_state.current_player {
+                    Player::Max => "AI 1",
+                    Player::Min => "AI 2",
+                };
+                format!("{} is thinking...", ai_name)
+            } else {
+                let ai_name = match game_state.current_player {
+                    Player::Max => "AI 1",
+                    Player::Min => "AI 2",
+                };
+                if ai_vs_ai_state.auto_play {
+                    format!("{}'s Turn", ai_name)
+                } else {
+                    format!("{}'s Turn (Press Next Move)", ai_name)
+                }
+            }
+        } else if is_ai_turn {
             "AI is thinking...".to_string()
         } else if game_settings.versus_ai {
             // vs AI: Just say "Your Turn" since circle shows the color
@@ -2154,6 +2190,75 @@ pub fn preload_game_video_background(
         PersistentGameVideoBackground, // Mark as persistent
         Visibility::Hidden, // Initially hidden
     ));
+}
+
+// AI vs AI button handlers
+fn handle_next_move_button(
+    button_query: Query<&Interaction, (Changed<Interaction>, With<NextMoveButton>)>,
+    game_settings: Res<GameSettings>,
+    mut game_status: ResMut<GameStatus>,
+    ai_vs_ai_state: Res<AIvsAIState>,
+) {
+    for interaction in button_query.iter() {
+        if *interaction == Interaction::Pressed && game_settings.ai_vs_ai {
+            // Only allow next move if waiting for user input and it's AI vs AI mode
+            if *game_status == GameStatus::AwaitingUserInput && !ai_vs_ai_state.auto_play {
+                // Trigger AI move by setting the status to AI thinking
+                info!("Next Move button clicked in AI vs AI mode");
+                *game_status = GameStatus::AIThinking;
+            }
+        }
+    }
+}
+
+fn handle_auto_play_toggle(
+    mut interaction_query: Query<(&Interaction, &Children), (Changed<Interaction>, With<AutoPlayToggle>)>,
+    mut text_query: Query<&mut Text>,
+    mut ai_vs_ai_state: ResMut<AIvsAIState>,
+    game_settings: Res<GameSettings>,
+    config: Res<GameConfig>,
+) {
+    for (interaction, children) in interaction_query.iter_mut() {
+        if *interaction == Interaction::Pressed && game_settings.ai_vs_ai {
+            ai_vs_ai_state.auto_play = !ai_vs_ai_state.auto_play;
+            info!("Auto Play toggled: {}", ai_vs_ai_state.auto_play);
+            
+            // Update button text
+            for child in children.iter() {
+                if let Ok(mut text) = text_query.get_mut(child) {
+                    text.0 = if ai_vs_ai_state.auto_play {
+                        "AUTO PLAY: ON".to_string()
+                    } else {
+                        "AUTO PLAY: OFF".to_string()
+                    };
+                }
+            }
+        }
+    }
+}
+
+fn handle_ai_vs_ai_auto_play(
+    game_settings: Res<GameSettings>,
+    ai_vs_ai_state: Res<AIvsAIState>,
+    mut game_status: ResMut<GameStatus>,
+    time: Res<Time>,
+    mut last_move_time: Local<f32>,
+) {
+    if game_settings.ai_vs_ai && ai_vs_ai_state.auto_play {
+        if *game_status == GameStatus::AwaitingUserInput {
+            // Wait a bit between moves for visibility
+            *last_move_time += time.delta_secs();
+            if *last_move_time >= 1.5 { // 1.5 second delay between auto moves
+                *last_move_time = 0.0;
+                // Trigger next AI move
+                *game_status = GameStatus::AIThinking;
+                info!("Auto play triggering next AI move");
+            }
+        }
+    } else {
+        // Reset timer when auto play is off
+        *last_move_time = 0.0;
+    }
 }
 
 

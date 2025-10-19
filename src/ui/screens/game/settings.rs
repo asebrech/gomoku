@@ -5,7 +5,7 @@ use crate::{
     ui::{
         app::GameSettings,
         config::GameConfig,
-        screens::game::game::{AITimeText, AIDepthText, AINodesText, RoundNumberText},
+        screens::game::game::{AITimeText, AIDepthText, AINodesText, RoundNumberText, NextMoveButton, AutoPlayToggle},
     }
 };
 
@@ -107,7 +107,13 @@ pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &
 
                 spawn_setting_row(builder, config, "Board Size", &format!("{}x{}", game_settings.board_size, game_settings.board_size));
 
-                let game_mode = if game_settings.versus_ai { "vs AI" } else { "Multiplayer" };
+                let game_mode = if game_settings.ai_vs_ai {
+                    "AI vs AI"
+                } else if game_settings.versus_ai {
+                    "vs AI"
+                } else {
+                    "Multiplayer"
+                };
                 spawn_setting_row(builder, config, "Game Mode", game_mode);
 
                 if game_settings.versus_ai {
@@ -121,6 +127,11 @@ pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &
                     spawn_timer_row(builder, config, "AI Time", "");
                     spawn_depth_row(builder, config, "Depth Reached", "");
                     spawn_nodes_row(builder, config, "Nodes Searched", "");
+                }
+
+                // AI vs AI specific controls
+                if game_settings.ai_vs_ai {
+                    spawn_ai_vs_ai_controls(builder, config);
                 }
 
                 // Time Limit
@@ -553,5 +564,88 @@ fn spawn_back_to_menu_button(builder: &mut ChildSpawnerCommands, config: &GameCo
                 linebreak: LineBreak::NoWrap,
             },
         ));
+    });
+}
+
+fn spawn_ai_vs_ai_controls(builder: &mut ChildSpawnerCommands, config: &GameConfig) {
+    let colors = &config.colors;
+    
+    // AI vs AI control section header
+    builder.spawn((
+        Text::new("AI vs AI Controls"),
+        TextFont {
+            font_size: 20.0,
+            ..default()
+        },
+        TextColor(colors.accent.clone().into()),
+        Node {
+            margin: UiRect::vertical(Val::Px(10.0)),
+            ..default()
+        },
+    ));
+
+    // Buttons container (horizontal layout)
+    builder.spawn((
+        Node {
+            display: Display::Flex,
+            flex_direction: FlexDirection::Row,
+            column_gap: Val::Px(10.0),
+            width: Val::Percent(100.0),
+            ..default()
+        },
+    )).with_children(|builder| {
+        // Next Move button
+        builder.spawn((
+            Button,
+            PlayClickSound,
+            Node {
+                width: Val::Percent(50.0),
+                height: Val::Px(40.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                border: UiRect::all(Val::Px(2.0)),
+                ..default()
+            },
+            BackgroundColor(colors.button_normal.clone().into()),
+            BorderColor(colors.accent.clone().into()),
+            BorderRadius::all(Val::Px(4.0)),
+            NextMoveButton,
+        )).with_children(|builder| {
+            builder.spawn((
+                Text::new("NEXT MOVE"),
+                TextFont {
+                    font_size: 14.0,
+                    ..default()
+                },
+                TextColor(colors.text_primary.clone().into()),
+            ));
+        });
+
+        // Auto Play toggle button
+        builder.spawn((
+            Button,
+            PlayClickSound,
+            Node {
+                width: Val::Percent(50.0),
+                height: Val::Px(40.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                border: UiRect::all(Val::Px(2.0)),
+                ..default()
+            },
+            BackgroundColor(colors.button_normal.clone().into()),
+            BorderColor(colors.accent.clone().into()),
+            BorderRadius::all(Val::Px(4.0)),
+            AutoPlayToggle,
+        )).with_children(|builder| {
+            builder.spawn((
+                Text::new("AUTO PLAY: OFF"),
+                TextFont {
+                    font_size: 14.0,
+                    ..default()
+                },
+                TextColor(colors.text_primary.clone().into()),
+            ));
+        });
     });
 }

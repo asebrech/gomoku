@@ -352,6 +352,7 @@
         Play,
         PlayVsAI,
         Play1v1,
+        PlayAIvsAI,
         HowToPlay,
         Settings,
         #[allow(dead_code)]
@@ -1515,6 +1516,34 @@ fn game_mode_select_setup(
                                     ));
                                 });
 
+                            // AI vs AI button
+                            parent
+                                .spawn((
+                                    Button,
+                                    PlayClickSound,
+                                    Node {
+                                        width: Val::Px(400.0),
+                                        height: Val::Px(80.0),
+                                        justify_content: JustifyContent::Center,
+                                        align_items: AlignItems::Center,
+                                        border: UiRect::all(Val::Px(2.0)),
+                                        ..default()
+                                    },
+                                    BackgroundColor(colors.button_normal.clone().into()),
+                                    BorderColor(colors.secondary.clone().into()),
+                                    MenuButtonAction::PlayAIvsAI,
+                                ))
+                                .with_children(|parent| {
+                                    parent.spawn((
+                                        Text::new("AI VS AI"),
+                                        TextFont {
+                                            font_size: 28.0,
+                                            ..default()
+                                        },
+                                        TextColor(colors.text_primary.clone().into()),
+                                    ));
+                                });
+
                             // Back button
                             parent
                                 .spawn((
@@ -1774,11 +1803,19 @@ fn create_menu_button_with_icon(
                     }
                     MenuButtonAction::PlayVsAI => {
                         game_settings.versus_ai = true;
+                        game_settings.ai_vs_ai = false;
                         game_state.set(AppState::Game);
                         menu_state.set(MenuState::Disabled);
                     }
                     MenuButtonAction::Play1v1 => {
                         game_settings.versus_ai = false;
+                        game_settings.ai_vs_ai = false;
+                        game_state.set(AppState::Game);
+                        menu_state.set(MenuState::Disabled);
+                    }
+                    MenuButtonAction::PlayAIvsAI => {
+                        game_settings.versus_ai = true; // Still set to true for AI logic
+                        game_settings.ai_vs_ai = true;
                         game_state.set(AppState::Game);
                         menu_state.set(MenuState::Disabled);
                     }

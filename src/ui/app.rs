@@ -32,6 +32,7 @@ pub struct GameSettings {
 	pub ai_depth: i32, //default to 2
 	pub alpha_beta_enabled: bool, //wether deep checking is enabled or not
 	pub versus_ai: bool, //if the user is against an AI or multiplayer
+	pub ai_vs_ai: bool, //if both players are AI
 	pub time_limit: Option<usize>, // time limit in milliseconds, optional
 }
 
@@ -44,6 +45,7 @@ impl GameSettings {
 			ai_depth: 10, // Increased since iterative deepening can handle higher depths
 			alpha_beta_enabled: true,
 			versus_ai: true,
+			ai_vs_ai: false,
 			time_limit: Some(500), // 500ms time limit for AI by default
 		}
 	}
@@ -166,6 +168,7 @@ impl GomokuApp {
 			ai_depth,
 			alpha_beta_enabled: true,
 			versus_ai: true,
+			ai_vs_ai: false,
 			time_limit,
 		};
 		
