@@ -7,6 +7,9 @@ pub struct BoardRoot;
 #[derive(Component)]
 pub struct PreviewDot;
 
+#[derive(Component)]
+pub struct GhostStone;
+
 pub struct BoardUtils;
 
 impl BoardUtils {
@@ -243,6 +246,7 @@ impl BoardUtils {
                         GridCell { x, y },
                     ))
                     .with_children(|builder| {
+                        // Small preview dot (existing)
                         builder.spawn((
                             Node {
                                 position_type: PositionType::Absolute,
@@ -257,6 +261,23 @@ impl BoardUtils {
                             Visibility::Hidden,
                             BackgroundColor(Color::NONE),
                             PreviewDot,
+                        ));
+                        
+                        // Ghost stone preview (new)
+                        builder.spawn((
+                            Node {
+                                position_type: PositionType::Absolute,
+                                left: Val::Px((Self::CELL_SIZE - Self::STONE_SIZE) / 2.0),
+                                top: Val::Px((Self::CELL_SIZE - Self::STONE_SIZE) / 2.0),
+                                width: Val::Px(Self::STONE_SIZE),
+                                height: Val::Px(Self::STONE_SIZE),
+                                ..default()
+                            },
+                            BorderRadius::all(Val::Percent(50.0)),
+                            ZIndex(10), // Higher than preview dot (9)
+                            Visibility::Hidden,
+                            BackgroundColor(Color::NONE),
+                            GhostStone,
                         ));
                     });
             }

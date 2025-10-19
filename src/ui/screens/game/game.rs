@@ -18,7 +18,7 @@ use crate::{
         components::button::{ButtonBuilder, ButtonStyle, ButtonSize, button_interaction_system},
         screens::{
             game::{
-                board::{BoardRoot, BoardUtils, PreviewDot}, 
+                board::{BoardRoot, BoardUtils, PreviewDot, GhostStone}, 
                 settings::{spawn_settings_panel, BackToMenuButton, ResetBoardButton, VolumeDisplay, VolumeDown, VolumeUp}
             }, menu::{GameAudio, MenuState}, splash::PreloadedStones, utils::despawn_screen
         },
@@ -177,6 +177,7 @@ pub fn game_plugin(app: &mut App) {
                     on_event::<MovePlayed>
                         .or(resource_changed::<GameState>)
                 ),
+                handle_ghost_stone_hover, // Run after update_available_placement
                 update_current_player_display.run_if(
                     resource_changed::<GameState>
                         .or(resource_changed::<GameStatus>)
@@ -513,7 +514,7 @@ pub fn update_available_placement(
     }
 
     // Get the board entity
-    let Ok(board_entity) = board_query.get_single() else {
+    let Ok(board_entity) = board_query.single() else {
         error!("Failed to find board entity");
         return;
     };
@@ -542,7 +543,7 @@ pub fn update_available_placement(
         };
     
     for (entity, children, cell) in parents.iter() {
-        let is_valid = if let Some(ref breaking_set) = breaking_moves {
+        let _is_valid = if let Some(ref breaking_set) = breaking_moves {
             breaking_set.contains(&(cell.x, cell.y))
         } else {
             game_state.board.is_empty_position(cell.x, cell.y)
@@ -744,6 +745,118 @@ pub fn handle_player_placement(
                     });
                 } else {
                     info!("Illegal move attempted at ({}, {})", cell.x, cell.y);
+                }
+            }
+        }
+    }
+}
+
+pub fn handle_ghost_stone_hover(
+    mut commands: Commands,
+    mut ghost_stones: Query<(Entity, &mut Visibility, &mut BackgroundColor), With<GhostStone>>,
+    mut preview_dots: Query<&mut Visibility, (With<PreviewDot>, Without<GhostStone>)>,
+    interaction_query: Query<
+        (&Interaction, &Children, &GridCell),
+        (With<GridCell>, Without<Stone>, Changed<Interaction>),
+    >,
+    game_state: Res<GameState>,
+    game_status: Res<GameStatus>,
+    config: Res<GameConfig>,
+    preloaded_stones: Res<PreloadedStones>,
+) {
+    if !matches!(*game_status, GameStatus::AwaitingUserInput) {
+        // Hide all ghost stones when not awaiting input
+        for (_, mut visibility, _) in ghost_stones.iter_mut() {
+            *visibility = Visibility::Hidden;
+        }
+        return;
+    }
+
+    // Check if current theme is Synthwave
+    let current_theme = config.get_current_theme();
+    let is_synthwave = current_theme == "Synthwave";
+
+    for (interaction, children, cell) in interaction_query.iter() {
+        for child in children.iter() {
+            // Handle ghost stone
+            if let Ok((entity, mut ghost_visibility, mut background_color)) = ghost_stones.get_mut(child) {
+                match *interaction {
+                    Interaction::Hovered => {
+                        // Check if this is a valid move position
+                        let is_valid_move = game_state.board.is_empty_position(cell.x, cell.y)
+                            && !DoubleThreeDetection::creates_double_three(&game_state.board, cell.x, cell.y, game_state.current_player)
+                            && game_state.is_move_legal((cell.x, cell.y));
+                        
+                        if is_valid_move {
+                            if is_synthwave {
+                                // Use image assets for Synthwave theme
+                                let stone_handle = if game_state.current_player == Player::Max {
+                                    preloaded_stones.pink_stone.clone()
+                                } else {
+                                    preloaded_stones.blue_stone.clone()
+                                };
+                                
+                                // Add ImageNode for the stone texture with transparency
+                                commands.entity(entity)
+                                    .insert(ImageNode {
+                                        image: stone_handle,
+                                        color: Color::srgba(1.0, 1.0, 1.0, 0.5), // Semi-transparent
+                                        ..default()
+                                    });
+                                
+                                // Clear background color for clean image display
+                                *background_color = BackgroundColor(Color::NONE);
+                            } else {
+                                // Remove any ImageNode for color-based themes
+                                commands.entity(entity).remove::<ImageNode>();
+                                
+                                // Use theme colors for other themes but semi-transparent
+                                let player_color = if game_state.current_player == Player::Max {
+                                    config.colors.primary.clone()
+                                } else {
+                                    config.colors.secondary.clone()
+                                };
+                                
+                                *background_color = BackgroundColor(Color::srgba(
+                                    player_color.r,
+                                    player_color.g,
+                                    player_color.b,
+                                    0.4, // Semi-transparent
+                                ));
+                            }
+                            *ghost_visibility = Visibility::Visible;
+                            
+                            // Hide the preview dot for this specific cell while showing ghost stone
+                            for preview_child in children.iter() {
+                                if let Ok(mut preview_visibility) = preview_dots.get_mut(preview_child) {
+                                    *preview_visibility = Visibility::Hidden;
+                                }
+                            }
+                        } else {
+                            // Hide ghost stone for invalid moves
+                            *ghost_visibility = Visibility::Hidden;
+                        }
+                    }
+                    _ => {
+                        // Hide ghost stone when not hovered
+                        *ghost_visibility = Visibility::Hidden;
+                        // Remove ImageNode when hiding to clean up
+                        commands.entity(entity).remove::<ImageNode>();
+                        
+                        // Restore preview dot visibility when not hovering
+                        for preview_child in children.iter() {
+                            if let Ok(mut preview_visibility) = preview_dots.get_mut(preview_child) {
+                                // Check if this position should have a preview dot
+                                let should_show_preview = game_state.board.is_empty_position(cell.x, cell.y)
+                                    && !DoubleThreeDetection::creates_double_three(&game_state.board, cell.x, cell.y, game_state.current_player)
+                                    && game_state.is_move_legal((cell.x, cell.y));
+                                
+                                if should_show_preview {
+                                    *preview_visibility = Visibility::Visible;
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
