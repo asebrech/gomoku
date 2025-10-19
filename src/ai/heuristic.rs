@@ -1,6 +1,7 @@
 use crate::core::board::{Board, Player};
 use crate::core::patterns::{DIRECTIONS, PatternAnalyzer, PatternFreedom};
 use crate::core::state::GameState;
+use crate::core::rules::DoubleThreeDetection;
 
 /// Gomoku position evaluation using pattern analysis and tactical bonuses
 pub struct Heuristic;
@@ -62,7 +63,7 @@ pub const WINNING_SCORE: i32 = 1_000_000;
 pub const FIVE_IN_ROW_SCORE: i32 = 100_000;      // XXXXX (immediate win)
 pub const LIVE_FOUR_MULTIPLE_SCORE: i32 = 20_000; // _XXXX_ + _XXXX_ (multiple threats)
 pub const LIVE_FOUR_SINGLE_SCORE: i32 = 15_000;  // _XXXX_ (open four, guaranteed win next move)
-pub const CAPTURE_BONUS_MULTIPLIER: i32 = 15_000;
+pub const CAPTURE_BONUS_MULTIPLIER: i32 = 25_000;
 pub const CHECK_PENALTY: i32 = 10_000;
 pub const WINNING_THREAT_SCORE: i32 = 10_000;    // _XXX_ + _XXX_ (double threat combinations)
 pub const HALF_FREE_FOUR_SCORE: i32 = 3_500;     // _XXXX| or |XXXX_ (one-sided four)
@@ -73,6 +74,8 @@ pub const DEAD_THREE_SCORE: i32 = 50;            // |XXX| (blocked three, minima
 pub const LIVE_TWO_SCORE: i32 = 50;              // _XX_ (open two, growth potential)
 pub const HALF_FREE_TWO_SCORE: i32 = 20;         // _XX| or |XX_ (one-sided two)
 
+// Gapped pattern scores - Only patterns that pass double-three validation are counted
+// This ensures all gapped patterns can be legally completed
 pub const GAPPED_LIVE_FOUR_SCORE: i32 = 8_000;      // _XX.X_ or _X.XX_ (strong gapped threat)
 pub const GAPPED_HALF_FREE_FOUR_SCORE: i32 = 2_000;  // XX.X| or |X.XX (one-sided gapped four)
 pub const GAPPED_DEAD_FOUR_SCORE: i32 = 200;         // |XX.X| (blocked gapped four)
@@ -179,6 +182,70 @@ impl Heuristic {
             0  // No check penalty
         }
     }
+
+    /// Validates if a gapped pattern can be completed without violating the double-three rule.
+    /// 
+    /// This function checks whether filling the gaps in a gapped pattern would create
+    /// forbidden double-three situations. It simulates placing stones in the gap positions
+    /// and uses the DoubleThreeDetection to verify if such moves would be legal.
+    /// 
+    /// # Arguments
+    /// * `board` - The current game board
+    /// * `start_row` - Starting row of the gapped pattern
+    /// * `start_col` - Starting column of the gapped pattern
+    /// * `dx` - Direction increment for rows
+    /// * `dy` - Direction increment for columns
+    /// * `player` - The player whose pattern is being validated
+    /// * `win_condition` - Length needed to win (typically 5)
+    /// 
+    /// # Returns
+    /// `true` if at least one gap can be filled without creating a double-three, `false` otherwise
+    pub fn can_complete_gapped_pattern_legally(
+        board: &Board,
+        start_row: usize,
+        start_col: usize,
+        dx: isize,
+        dy: isize,
+        player: Player,
+        win_condition: usize,
+    ) -> bool {
+        let player_bits = board.get_player_bits(player);
+        let mut gap_positions = Vec::new();
+        
+        // Find all gap positions in the pattern
+        for i in 0..win_condition {
+            let check_row = start_row as isize + i as isize * dx;
+            let check_col = start_col as isize + i as isize * dy;
+            
+            if !PatternAnalyzer::is_in_bounds(board, check_row, check_col) {
+                break;
+            }
+            
+            let idx = board.index(check_row as usize, check_col as usize);
+            if Board::is_bit_set(&board.occupied, idx) {
+                if !Board::is_bit_set(player_bits, idx) {
+                    // Opponent stone blocks the pattern
+                    break;
+                }
+                // Player's own stone - continue
+            } else {
+                // Empty position - this is a potential gap to fill
+                gap_positions.push((check_row as usize, check_col as usize));
+            }
+        }
+        
+        // Check if any gap can be filled without creating a double-three
+        for &(gap_row, gap_col) in &gap_positions {
+            if !DoubleThreeDetection::creates_double_three(board, gap_row, gap_col, player) {
+                return true; // At least one gap can be filled legally
+            }
+        }
+        
+        // If there are no gaps, it's already complete (should not happen for gapped patterns)
+        // If there are gaps but none can be filled legally, return false
+        gap_positions.is_empty()
+    }
+
     /// Analyzes the entire board to count patterns for both players.
     /// 
     /// This function performs a comprehensive scan of the board to identify and count
@@ -248,9 +315,18 @@ impl Heuristic {
                                 );
                                 
                                 let gapped_info = GappedPatternInfo { stones, freedom };
-                                match player {
-                                    Player::Max => Self::update_gapped_counts(&mut max_counts, gapped_info),
-                                    Player::Min => Self::update_gapped_counts(&mut min_counts, gapped_info),
+                                
+                                // Check if this gapped pattern can be completed legally
+                                let is_legally_completable = Self::can_complete_gapped_pattern_legally(
+                                    board, row, col, dx, dy, player, win_condition
+                                );
+                                
+                                // Only count gapped patterns when they can be completed legally
+                                if is_legally_completable {
+                                    match player {
+                                        Player::Max => Self::update_gapped_counts(&mut max_counts, gapped_info),
+                                        Player::Min => Self::update_gapped_counts(&mut min_counts, gapped_info),
+                                    }
                                 }
                             }
                         }
@@ -484,6 +560,7 @@ impl Heuristic {
             _ => 0,
         };
         
+        // Gapped patterns are now pre-validated against double-three rule during analysis
         let total_half_fours = counts.half_free_four + counts.gapped_half_free_four;
         let total_dead_fours = counts.dead_four + counts.gapped_dead_four;
         let total_live_threes = counts.live_three + counts.gapped_live_three;
@@ -507,6 +584,7 @@ impl Heuristic {
             + (counts.live_two as i32) * LIVE_TWO_SCORE
             + (counts.half_free_two as i32) * HALF_FREE_TWO_SCORE;
         
+        // Gapped patterns are now pre-validated (only legally completable patterns are counted)
         score += (counts.gapped_live_four as i32) * GAPPED_LIVE_FOUR_SCORE
             + (counts.gapped_half_free_four as i32) * GAPPED_HALF_FREE_FOUR_SCORE
             + (counts.gapped_dead_four as i32) * GAPPED_DEAD_FOUR_SCORE

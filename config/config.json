@@ -137,14 +137,14 @@
       "Gomoku: Professional time waster since 2025!"
     ],
     "loading_messages": {
-      "96-99": "Changing headers names...",
-      "26-40": "Cloning heuristic...",
-      "61-80": "Importing neo-cat...",
       "100": "Complete!",
-      "81-95": "Renaming variables...",
-      "41-60": "Using Minimax Algorithm...",
       "0-10": "Initializing...",
-      "11-25": "Loading songs..."
+      "96-99": "Changing headers names...",
+      "81-95": "Renaming variables...",
+      "26-40": "Cloning heuristic...",
+      "11-25": "Loading songs...",
+      "61-80": "Importing neo-cat...",
+      "41-60": "Using Minimax Algorithm..."
     },
     "font_sizes": {
       "title": 32.0,
@@ -163,8 +163,8 @@
   },
   "settings": {
     "audio": {
-      "volume": 0.1,
-      "muted": false
+      "volume": 0.0,
+      "muted": true
     },
     "display": {
       "fullscreen": false,
