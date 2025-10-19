@@ -163,7 +163,8 @@ impl CaptureBreaking {
     ///
     /// This function analyzes if the opponent has any moves available that would
     /// result in capturing the stone at the given position. A capture occurs when
-    /// the opponent can create a pattern like O-X-O where O is opponent and X is player.
+    /// the opponent can create a pattern like O-X-X-O where O is opponent and X is player.
+    /// The stone can be captured if it's part of a pair that can be flanked by opponent stones.
     ///
     /// # Arguments
     /// * `board` - The game board
@@ -174,46 +175,57 @@ impl CaptureBreaking {
     /// # Returns
     /// `true` if the opponent can capture this stone, `false` otherwise
     fn can_opponent_capture_stone(board: &Board, row: usize, col: usize, opponent: Player) -> bool {
+        let player = opponent.opponent();
+        let opponent_bits = board.get_player_bits(opponent);
+        let player_bits = board.get_player_bits(player);
+        
         for &(dx, dy) in &DIRECTIONS {
-            for &multiplier in &[1, -1] {
-                let actual_dx = dx * multiplier;
-                let actual_dy = dy * multiplier;
+            // Check both directions for capture patterns
+            for &dir_multiplier in &[1, -1] {
+                let actual_dx = (dx * dir_multiplier) as isize;
+                let actual_dy = (dy * dir_multiplier) as isize;
                 
-                // Check for opponent stone adjacent to our stone
-                let cap_row = row as isize - actual_dx;
-                let cap_col = col as isize - actual_dy;
+                // Look for adjacent player stone (forming X-X pattern)
+                let adj_row = row as isize + actual_dx;
+                let adj_col = col as isize + actual_dy;
                 
-                if !PatternAnalyzer::is_in_bounds(board, cap_row, cap_col) {
+                if !PatternAnalyzer::is_in_bounds(board, adj_row, adj_col) {
                     continue;
                 }
                 
-                let cap_idx = board.index(cap_row as usize, cap_col as usize);
-                let opponent_bits = board.get_player_bits(opponent);
-                if !Board::is_bit_set(opponent_bits, cap_idx) {
+                let adj_idx = board.index(adj_row as usize, adj_col as usize);
+                if !Board::is_bit_set(player_bits, adj_idx) {
                     continue;
                 }
                 
-                // Check for our stone on the other side (forming -O-X- pattern)
-                let next_row = row as isize + actual_dx;
-                let next_col = col as isize + actual_dy;
+                // Check if opponent can place on one side (O-X-X-?)
+                let place1_row = row as isize - actual_dx;
+                let place1_col = col as isize - actual_dy;
                 
-                if !PatternAnalyzer::is_in_bounds(board, next_row, next_col) {
-                    continue;
+                // Check if opponent can place on the other side (?-X-X-O)
+                let place2_row = adj_row + actual_dx;
+                let place2_col = adj_col + actual_dy;
+                
+                // Case 1: Opponent already has a stone on one side, can place on the other
+                if PatternAnalyzer::is_in_bounds(board, place1_row, place1_col) {
+                    let place1_idx = board.index(place1_row as usize, place1_col as usize);
+                    if Board::is_bit_set(opponent_bits, place1_idx) {
+                        // Opponent stone exists at place1, check if place2 is empty
+                        if PatternAnalyzer::is_valid_empty(board, place2_row, place2_col) {
+                            return true;
+                        }
+                    }
                 }
                 
-                let next_idx = board.index(next_row as usize, next_col as usize);
-                let player_bits = board.get_player_bits(opponent.opponent());
-                
-                if !Board::is_bit_set(player_bits, next_idx) {
-                    continue;
-                }
-                
-                // Check if opponent can place a stone to complete the capture (O-X-O)
-                let place_row = next_row + actual_dx;
-                let place_col = next_col + actual_dy;
-                
-                if PatternAnalyzer::is_valid_empty(board, place_row, place_col) {
-                    return true;
+                // Case 2: Opponent already has a stone on the other side, can place on first side
+                if PatternAnalyzer::is_in_bounds(board, place2_row, place2_col) {
+                    let place2_idx = board.index(place2_row as usize, place2_col as usize);
+                    if Board::is_bit_set(opponent_bits, place2_idx) {
+                        // Opponent stone exists at place2, check if place1 is empty
+                        if PatternAnalyzer::is_valid_empty(board, place1_row, place1_col) {
+                            return true;
+                        }
+                    }
                 }
             }
         }
@@ -224,8 +236,8 @@ impl CaptureBreaking {
     /// Get all moves that would capture a specific stone.
     ///
     /// This function finds all positions where the opponent can place a stone
-    /// to capture the stone at the given position. This is useful for finding
-    /// all possible capture threats.
+    /// to capture the stone at the given position. A capture requires the pattern
+    /// O-X-X-O where the opponent can complete the flanking.
     ///
     /// # Arguments
     /// * `board` - The game board
@@ -237,48 +249,52 @@ impl CaptureBreaking {
     /// Vector of (row, col) positions where the opponent can move to capture the stone
     fn get_moves_that_capture_stone(board: &Board, row: usize, col: usize, opponent: Player) -> Vec<(usize, usize)> {
         let mut moves = Vec::new();
+        let player = opponent.opponent();
+        let opponent_bits = board.get_player_bits(opponent);
+        let player_bits = board.get_player_bits(player);
         
         for &(dx, dy) in &DIRECTIONS {
-            for &multiplier in &[1, -1] {
-                let actual_dx = dx * multiplier;
-                let actual_dy = dy * multiplier;
+            for &dir_multiplier in &[1, -1] {
+                let actual_dx = (dx * dir_multiplier) as isize;
+                let actual_dy = (dy * dir_multiplier) as isize;
                 
-                // Look for our stone adjacent to the target stone
-                let next_row = row as isize + actual_dx;
-                let next_col = col as isize + actual_dy;
+                // Look for adjacent player stone (forming X-X pattern)
+                let adj_row = row as isize + actual_dx;
+                let adj_col = col as isize + actual_dy;
                 
-                if !PatternAnalyzer::is_in_bounds(board, next_row, next_col) {
+                if !PatternAnalyzer::is_in_bounds(board, adj_row, adj_col) {
                     continue;
                 }
                 
-                let next_idx = board.index(next_row as usize, next_col as usize);
-                let player_bits = board.get_player_bits(opponent.opponent());
-                
-                if !Board::is_bit_set(player_bits, next_idx) {
+                let adj_idx = board.index(adj_row as usize, adj_col as usize);
+                if !Board::is_bit_set(player_bits, adj_idx) {
                     continue;
                 }
                 
-                // Check if there's an empty space for the opponent to place
-                let place_row = next_row + actual_dx;
-                let place_col = next_col + actual_dy;
+                // Check possible opponent moves to complete O-X-X-O pattern
+                let place1_row = row as isize - actual_dx;
+                let place1_col = col as isize - actual_dy;
+                let place2_row = adj_row + actual_dx;
+                let place2_col = adj_col + actual_dy;
                 
-                if !PatternAnalyzer::is_valid_empty(board, place_row, place_col) {
-                    continue;
+                // Case 1: Opponent has stone at place1, can move to place2
+                if PatternAnalyzer::is_in_bounds(board, place1_row, place1_col) {
+                    let place1_idx = board.index(place1_row as usize, place1_col as usize);
+                    if Board::is_bit_set(opponent_bits, place1_idx) {
+                        if PatternAnalyzer::is_valid_empty(board, place2_row, place2_col) {
+                            moves.push((place2_row as usize, place2_col as usize));
+                        }
+                    }
                 }
                 
-                // Check if there's an opponent stone on the other side to complete capture
-                let opp_row = row as isize - actual_dx;
-                let opp_col = col as isize - actual_dy;
-                
-                if !PatternAnalyzer::is_in_bounds(board, opp_row, opp_col) {
-                    continue;
-                }
-                
-                let opp_idx = board.index(opp_row as usize, opp_col as usize);
-                let opponent_bits = board.get_player_bits(opponent);
-                
-                if Board::is_bit_set(opponent_bits, opp_idx) {
-                    moves.push((place_row as usize, place_col as usize));
+                // Case 2: Opponent has stone at place2, can move to place1
+                if PatternAnalyzer::is_in_bounds(board, place2_row, place2_col) {
+                    let place2_idx = board.index(place2_row as usize, place2_col as usize);
+                    if Board::is_bit_set(opponent_bits, place2_idx) {
+                        if PatternAnalyzer::is_valid_empty(board, place1_row, place1_col) {
+                            moves.push((place1_row as usize, place1_col as usize));
+                        }
+                    }
                 }
             }
         }

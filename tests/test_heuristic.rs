@@ -32,7 +32,9 @@ fn test_heuristic_winner_min() {
 #[test]
 fn test_heuristic_capture_win_max() {
     let mut state = GameState::new(19, 5);
+    // Simulate a capture win scenario
     state.max_captures = 5; // 5 pairs captured = win
+    state.winner = Some(Player::Max); // Properly set the winner
 
     let score = Heuristic::evaluate(&state, 1);
     assert_eq!(score, 1_000_001);
@@ -41,7 +43,9 @@ fn test_heuristic_capture_win_max() {
 #[test]
 fn test_heuristic_capture_win_min() {
     let mut state = GameState::new(19, 5);
+    // Simulate a capture win scenario
     state.min_captures = 5; // 5 pairs captured = win
+    state.winner = Some(Player::Min); // Properly set the winner
 
     let score = Heuristic::evaluate(&state, 1);
     assert_eq!(score, -1_000_001);
