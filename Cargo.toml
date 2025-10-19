@@ -31,10 +31,19 @@ debug = true
 opt-level = 3
 debug = false
 
-# Release profile (unchanged)
+# Fast release profile for development (quick compilation, good performance)
+[profile.release-dev]
+inherits = "release"
+opt-level = 2           # Good optimization, but faster than 3
+debug = false
+lto = false             # No LTO for fast builds
+codegen-units = 16      # Parallel compilation
+panic = "abort"
+
+# Full release profile (maximum optimization, slow compilation)
 [profile.release]
 opt-level = 3
 debug = false
-lto = true
-codegen-units = 1
+lto = true              # Full LTO for maximum optimization
+codegen-units = 1       # Single codegen unit for best optimization
 panic = "abort"

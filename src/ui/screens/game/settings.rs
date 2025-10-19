@@ -129,8 +129,8 @@ pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &
                     spawn_nodes_row(builder, config, "Nodes Searched", "");
                 }
 
-                // AI vs AI specific controls
-                if game_settings.ai_vs_ai {
+                // AI controls (for both AI vs AI and Human vs AI modes)
+                if game_settings.ai_vs_ai || game_settings.versus_ai {
                     spawn_ai_vs_ai_controls(builder, config);
                 }
 
@@ -570,9 +570,9 @@ fn spawn_back_to_menu_button(builder: &mut ChildSpawnerCommands, config: &GameCo
 fn spawn_ai_vs_ai_controls(builder: &mut ChildSpawnerCommands, config: &GameConfig) {
     let colors = &config.colors;
     
-    // AI vs AI control section header
+    // AI control section header
     builder.spawn((
-        Text::new("AI vs AI Controls"),
+        Text::new("AI Controls"),
         TextFont {
             font_size: 20.0,
             ..default()

@@ -524,6 +524,7 @@ pub fn update_available_placement(
     mut commands: Commands,
     mut ev_board_update: EventReader<MovePlayed>,
     game_state: Res<GameState>,
+    game_settings: Res<GameSettings>,
     parents: Query<(Entity, &Children, &GridCell), With<GridCell>>,
     mut dots: Query<(&mut BackgroundColor, &mut Visibility), With<PreviewDot>>,
     forbidden_markers: Query<Entity, With<ForbiddenMarker>>,
@@ -755,8 +756,26 @@ pub fn handle_player_placement(
     >,
     game_state: ResMut<GameState>,
     game_status: Res<GameStatus>,
+    game_settings: Res<GameSettings>,
+    ai_vs_ai_state: Res<AIvsAIState>,
 ) {
     if matches!(*game_status, GameStatus::AwaitingUserInput) && buttons.just_pressed(MouseButton::Left) {
+        // Check if it's actually the human's turn
+        let is_human_turn = if game_settings.ai_vs_ai {
+            // In AI vs AI mode, only allow placement if auto-play is off (manual mode)
+            !ai_vs_ai_state.auto_play
+        } else if game_settings.versus_ai {
+            // In Human vs AI mode, only allow placement if it's the human's turn (Player::Max)
+            game_state.current_player == Player::Max
+        } else {
+            // In Human vs Human mode, always allow placement
+            true
+        };
+
+        if !is_human_turn {
+            return;
+        }
+
         for (interaction, cell) in interaction_query.iter_mut() {
             if *interaction == Interaction::Pressed
                 && game_state.board.get_player(cell.x, cell.y).is_none()
@@ -784,11 +803,21 @@ pub fn handle_ghost_stone_hover(
     >,
     game_state: Res<GameState>,
     game_status: Res<GameStatus>,
+    game_settings: Res<GameSettings>,
     config: Res<GameConfig>,
     preloaded_stones: Res<PreloadedStones>,
 ) {
     if !matches!(*game_status, GameStatus::AwaitingUserInput) {
         // Hide all ghost stones when not awaiting input
+        for (_, mut visibility, _) in ghost_stones.iter_mut() {
+            *visibility = Visibility::Hidden;
+        }
+        return;
+    }
+
+    // Don't show ghost stones if it's AI's turn in Human vs AI mode
+    if game_settings.versus_ai && game_state.current_player == Player::Min {
+        // Hide all ghost stones when it's AI's turn
         for (_, mut visibility, _) in ghost_stones.iter_mut() {
             *visibility = Visibility::Hidden;
         }
@@ -943,10 +972,15 @@ pub fn process_next_round(
             info!("Awaiting user click");
             *game_status = GameStatus::AwaitingUserInput;
         } else if settings.versus_ai {
-            // AI's turn - set status and update display
-            // The actual AI computation will happen in handle_ai_turn system next frame
-            info!("AI's turn - setting AIThinking status");
-            *game_status = GameStatus::AIThinking;
+            // Human vs AI mode: AI's turn
+            // Only auto-trigger AI if auto-play is enabled, otherwise wait for Next Move button
+            if ai_vs_ai_state.auto_play {
+                info!("Human vs AI mode with auto-play - setting AIThinking status");
+                *game_status = GameStatus::AIThinking;
+            } else {
+                info!("Human vs AI mode without auto-play - awaiting Next Move button");
+                *game_status = GameStatus::AwaitingUserInput;
+            }
         }
     }
 }
@@ -2231,15 +2265,20 @@ pub fn preload_game_video_background(
 fn handle_next_move_button(
     button_query: Query<&Interaction, (Changed<Interaction>, With<NextMoveButton>)>,
     game_settings: Res<GameSettings>,
+    game_state: Res<GameState>,
     mut game_status: ResMut<GameStatus>,
     ai_vs_ai_state: Res<AIvsAIState>,
 ) {
     for interaction in button_query.iter() {
-        if *interaction == Interaction::Pressed && game_settings.ai_vs_ai {
-            // Only allow next move if waiting for user input and it's AI vs AI mode
-            if *game_status == GameStatus::AwaitingUserInput && !ai_vs_ai_state.auto_play {
-                // Trigger AI move by setting the status to AI thinking
+        if *interaction == Interaction::Pressed {
+            // Allow next move in AI vs AI mode when not on auto-play
+            if game_settings.ai_vs_ai && *game_status == GameStatus::AwaitingUserInput && !ai_vs_ai_state.auto_play {
                 info!("Next Move button clicked in AI vs AI mode");
+                *game_status = GameStatus::AIThinking;
+            }
+            // Allow next move in Human vs AI mode when it's AI's turn and waiting for user input
+            else if game_settings.versus_ai && *game_status == GameStatus::AwaitingUserInput && game_state.current_player == Player::Min {
+                info!("Next Move button clicked in Human vs AI mode - triggering AI");
                 *game_status = GameStatus::AIThinking;
             }
         }
@@ -2254,7 +2293,7 @@ fn handle_auto_play_toggle(
     config: Res<GameConfig>,
 ) {
     for (interaction, children) in interaction_query.iter_mut() {
-        if *interaction == Interaction::Pressed && game_settings.ai_vs_ai {
+        if *interaction == Interaction::Pressed && (game_settings.ai_vs_ai || game_settings.versus_ai) {
             ai_vs_ai_state.auto_play = !ai_vs_ai_state.auto_play;
             info!("Auto Play toggled: {}", ai_vs_ai_state.auto_play);
             

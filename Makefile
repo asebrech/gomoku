@@ -1,4 +1,4 @@
-.PHONY: dev release clean up up-dev fast help setup check-assets all-build deploy
+.PHONY: dev release release-fast clean up up-dev fast help setup check-assets all-build deploy
 
 # Default target - show help
 all: help
@@ -7,12 +7,13 @@ help:
 	@echo "Gomoku Build System - Simple Commands"
 	@echo ""
 	@echo "Main targets:"
-	@echo "  make release  - Setup libs + build optimized release version"
-	@echo "  make dev      - Setup libs + build development version (fast compile, optimized deps)"
-	@echo "  make up       - Build and run the release executable"
-	@echo "  make up-dev   - Build and run the development executable (faster startup)"
-	@echo "  make fast     - Ultra-fast development mode (no video, instant startup)"
-	@echo "  make clean    - Clean everything (cargo + deps)"
+	@echo "  make release      - Setup libs + build maximum optimized release version (slow build)"
+	@echo "  make release-fast - Setup libs + build fast release version (quick build, good performance)"
+	@echo "  make dev          - Setup libs + build development version (unoptimized, fastest build)"
+	@echo "  make up           - Build and run the maximum optimized release executable"
+	@echo "  make up-dev       - Build and run the fast release executable"
+	@echo "  make fast         - Ultra-fast development mode (no video, instant startup)"
+	@echo "  make clean        - Clean everything (cargo + deps)"
 	@echo ""
 	@echo "Advanced targets:"
 	@echo "  setup         - Only setup dependencies"
@@ -20,16 +21,16 @@ help:
 	@echo "  deploy        - Create complete distribution package"
 	@echo ""
 	@echo "For new users: make release && make up"
-	@echo "For development: make dev && make up-dev (faster)"
+	@echo "For development: make release-fast && make up-dev (faster)"
 	@echo "For instant testing: make fast (no video, ultra-fast)"
 	@echo ""
 	@echo "Note: GStreamer dependencies are downloaded automatically."
 
 # Main targets - Simple and clear
 
-# Setup libs + build optimized release version
+# Setup libs + build maximum optimized release version (slow build, best performance)
 release: setup
-	@echo "Building optimized release version..."
+	@echo "Building maximum optimized release version (this will be slow)..."
 	@echo "Setting devMode to false for release..."
 	@if [ "$$(uname -s)" = "Darwin" ]; then \
 		sed -i '' 's/"devMode": true/"devMode": false/g' config/config.json; \
@@ -37,12 +38,25 @@ release: setup
 		sed -i 's/"devMode": true/"devMode": false/g' config/config.json; \
 	fi
 	export PKG_CONFIG_PATH=$(PWD)/deps/lib/pkgconfig:$$PKG_CONFIG_PATH && cargo build --release
-	@echo "✅ Release build complete!"
+	@echo "✅ Maximum optimized release build complete!"
 	@echo "Run with: make up"
 
-# Setup libs + build development version (fast compile, optimized deps)
+# Setup libs + build fast release version (quick build, good performance)
+release-fast: setup
+	@echo "Building fast release version..."
+	@echo "Setting devMode to false for release..."
+	@if [ "$$(uname -s)" = "Darwin" ]; then \
+		sed -i '' 's/"devMode": true/"devMode": false/g' config/config.json; \
+	else \
+		sed -i 's/"devMode": true/"devMode": false/g' config/config.json; \
+	fi
+	export PKG_CONFIG_PATH=$(PWD)/deps/lib/pkgconfig:$$PKG_CONFIG_PATH && cargo build --profile release-dev
+	@echo "✅ Fast release build complete!"
+	@echo "Run with: make up-dev"
+
+# Setup libs + build development version (unoptimized, fastest build)
 dev: setup
-	@echo "Building development version with optimized dependencies..."
+	@echo "Building development version (unoptimized, fastest compilation)..."
 	@echo "Setting devMode to true for development..."
 	@if [ "$$(uname -s)" = "Darwin" ]; then \
 		sed -i '' 's/"devMode": false/"devMode": true/g' config/config.json; \
@@ -51,11 +65,11 @@ dev: setup
 	fi
 	export PKG_CONFIG_PATH=$(PWD)/deps/lib/pkgconfig:$$PKG_CONFIG_PATH && cargo build
 	@echo "✅ Development build complete!"
-	@echo "Run with: make up-dev"
+	@echo "Run with: make fast"
 
-# Build and run the executable
+# Build and run the maximum optimized release executable
 up: release check-assets
-	@echo "Running Gomoku..."
+	@echo "Running Gomoku (maximum optimized release)..."
 	@if [ "$$(uname -s)" = "Darwin" ]; then \
 		export DYLD_LIBRARY_PATH=$(PWD)/deps/lib:$$DYLD_LIBRARY_PATH && \
 		export GST_PLUGIN_PATH=$(PWD)/deps/lib:$$GST_PLUGIN_PATH && \
@@ -82,34 +96,38 @@ up: release check-assets
 		./target/release/gomoku; \
 	fi
 
-# Build and run the development executable (faster startup)
-up-dev: dev check-assets
-	@echo "Running Gomoku (development version)..."
+# Build and run the fast release executable
+up-dev: release-fast check-assets
+	@echo "Running Gomoku (fast release version)..."
+	@if [ ! -L target/release-dev/assets ]; then \
+		ln -sf ../../assets target/release-dev/assets; \
+		ln -sf ../../config target/release-dev/config; \
+	fi
+	@if [ "$$(uname -s)" = "Darwin" ]; then \
+		export DYLD_LIBRARY_PATH=$(PWD)/deps/lib:$$DYLD_LIBRARY_PATH && \
+		export GST_PLUGIN_PATH=$(PWD)/deps/lib:$$GST_PLUGIN_PATH && \
+		export GST_PLUGIN_SYSTEM_PATH="" && \
+		export GST_REGISTRY=$(PWD)/deps/lib/registry.bin && \
+		export GST_REGISTRY_FORK=no && \
+		export GST_REGISTRY_UPDATE=no && \
+		./target/release-dev/gomoku; \
+	else \
+		export LD_LIBRARY_PATH=$(PWD)/deps/lib:$$LD_LIBRARY_PATH && \
+		export GST_PLUGIN_PATH=$(PWD)/deps/lib/gstreamer-1.0:$$GST_PLUGIN_PATH && \
+		export GST_PLUGIN_SYSTEM_PATH="" && \
+		export GST_REGISTRY=$(PWD)/deps/lib/registry.bin && \
+		export GST_REGISTRY_FORK=no && \
+		export GST_REGISTRY_UPDATE=no && \
+		./target/release-dev/gomoku; \
+	fi
+
+# Ultra-fast development mode (debug build, no video, instant startup)
+fast: dev check-assets
+	@echo "Running Gomoku (ultra-fast debug mode - no video)..."
 	@if [ ! -L target/debug/assets ]; then \
 		ln -sf ../../assets target/debug/assets; \
 		ln -sf ../../config target/debug/config; \
 	fi
-	@if [ "$$(uname -s)" = "Darwin" ]; then \
-		export DYLD_LIBRARY_PATH=$(PWD)/deps/lib:$$DYLD_LIBRARY_PATH && \
-		export GST_PLUGIN_PATH=$(PWD)/deps/lib:$$GST_PLUGIN_PATH && \
-		export GST_PLUGIN_SYSTEM_PATH="" && \
-		export GST_REGISTRY=$(PWD)/deps/lib/registry.bin && \
-		export GST_REGISTRY_FORK=no && \
-		export GST_REGISTRY_UPDATE=no && \
-		./target/debug/gomoku; \
-	else \
-		export LD_LIBRARY_PATH=$(PWD)/deps/lib:$$LD_LIBRARY_PATH && \
-		export GST_PLUGIN_PATH=$(PWD)/deps/lib/gstreamer-1.0:$$GST_PLUGIN_PATH && \
-		export GST_PLUGIN_SYSTEM_PATH="" && \
-		export GST_REGISTRY=$(PWD)/deps/lib/registry.bin && \
-		export GST_REGISTRY_FORK=no && \
-		export GST_REGISTRY_UPDATE=no && \
-		./target/debug/gomoku; \
-	fi
-
-# Ultra-fast development mode (no video, instant startup)
-fast: dev check-assets
-	@echo "Running Gomoku (ultra-fast mode - no video)..."
 	@if [ "$$(uname -s)" = "Darwin" ]; then \
 		export DYLD_LIBRARY_PATH=$(PWD)/deps/lib:$$DYLD_LIBRARY_PATH && \
 		export GST_PLUGIN_PATH="" && \

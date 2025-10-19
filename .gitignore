@@ -44,3 +44,6 @@ node_modules/
 .env
 .env.local
 .env.*.local
+
+# Configuration files
+config/config.json
