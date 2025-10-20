@@ -1,6 +1,7 @@
 use crate::core::board::{Board, Player};
 use crate::core::patterns::{DIRECTIONS, PatternAnalyzer, PatternFreedom};
 use crate::core::state::GameState;
+use crate::ai::config::AIConfig;
 
 /// Gomoku position evaluation using pattern analysis and tactical bonuses
 pub struct Heuristic;
@@ -39,22 +40,6 @@ struct PatternInfo {
     freedom: PatternFreedom,
 }
 
-// Scoring constants for different game situations
-pub const WINNING_SCORE: i32 = 1_000_000;
-pub const FIVE_IN_ROW_SCORE: i32 = 100_000;      // XXXXX (immediate win)
-pub const LIVE_FOUR_MULTIPLE_SCORE: i32 = 20_000; // _XXXX_ + _XXXX_ (multiple threats)
-pub const LIVE_FOUR_SINGLE_SCORE: i32 = 15_000;  // _XXXX_ (open four, guaranteed win next move)
-pub const CAPTURE_BONUS_MULTIPLIER: i32 = 15_000;
-pub const CHECK_PENALTY: i32 = 10_000;
-pub const WINNING_THREAT_SCORE: i32 = 10_000;    // _XXX_ + _XXX_ (double threat combinations)
-pub const HALF_FREE_FOUR_SCORE: i32 = 3_500;     // _XXXX| or |XXXX_ (one-sided four)
-pub const LIVE_THREE_SCORE: i32 = 500;           // _XXX_ (open three, can become four)
-pub const DEAD_FOUR_SCORE: i32 = 400;            // |XXXX| (blocked four, limited threat)
-pub const HALF_FREE_THREE_SCORE: i32 = 200;      // _XXX| or |XXX_ (one-sided three)
-pub const DEAD_THREE_SCORE: i32 = 50;            // |XXX| (blocked three, minimal threat)
-pub const LIVE_TWO_SCORE: i32 = 50;              // _XX_ (open two, growth potential)
-pub const HALF_FREE_TWO_SCORE: i32 = 20;         // _XX| or |XX_ (one-sided two)
-
 impl Heuristic {
     /// Evaluates a game position returning a score from the Max player's perspective
     /// 
@@ -71,11 +56,11 @@ impl Heuristic {
     /// The function performs comprehensive pattern analysis for both players,
     /// detecting immediate wins, threatening combinations, and positional advantages.
     /// All evaluation components are combined into a single unified score.
-    pub fn evaluate(state: &GameState, depth: i32) -> i32 {
+    pub fn evaluate(state: &GameState, depth: i32, ai_config: &AIConfig) -> i32 {
         if let Some(winner) = state.check_winner() {
             return match winner {
-                Player::Max => WINNING_SCORE + depth,
-                Player::Min => -WINNING_SCORE - depth,
+                Player::Max => ai_config.heuristic.scores.winning_score + depth,
+                Player::Min => -ai_config.heuristic.scores.winning_score - depth,
             };
         }
         if state.board.is_full() {
@@ -85,11 +70,11 @@ impl Heuristic {
         // Pattern analysis and position evaluation
         let (max_counts, min_counts) =
             Self::analyze_both_players(&state.board, state.win_condition);
-        let max_score = Self::calculate_pattern_score(max_counts);
-        let min_score = Self::calculate_pattern_score(min_counts);
-        let capture_bonus = Self::calculate_capture_bonus(state);
-        let historical_bonus = Self::calculate_historical_bonus(state);
-        let check_penalty = Self::calculate_check_penalty(state);
+        let max_score = Self::calculate_pattern_score(max_counts, ai_config);
+        let min_score = Self::calculate_pattern_score(min_counts, ai_config);
+        let capture_bonus = Self::calculate_capture_bonus(state, ai_config);
+        let historical_bonus = Self::calculate_historical_bonus(state, ai_config);
+        let check_penalty = Self::calculate_check_penalty(state, ai_config);
         
         max_score - min_score + capture_bonus + historical_bonus + check_penalty
     }
@@ -104,13 +89,13 @@ impl Heuristic {
     /// Returns the difference between Max player's historical bonus and Min player's
     /// historical bonus, allowing the AI to prefer moves that align with successful
     /// historical patterns while avoiding patterns that have led to losses.
-    fn calculate_historical_bonus(state: &GameState) -> i32 {
+    fn calculate_historical_bonus(state: &GameState, ai_config: &AIConfig) -> i32 {
         let max_bonus = state
             .pattern_analyzer
-            .calculate_historical_bonus(Player::Max);
+            .calculate_historical_bonus(Player::Max, ai_config);
         let min_bonus = state
             .pattern_analyzer
-            .calculate_historical_bonus(Player::Min);
+            .calculate_historical_bonus(Player::Min, ai_config);
         max_bonus - min_bonus
     }
     /// Calculates penalty for being in check (captured position vulnerability).
@@ -127,7 +112,7 @@ impl Heuristic {
     /// 
     /// Returns 0 if no player is in check, or the appropriate penalty/bonus
     /// based on which player is in check (negative for Max, positive for Min).
-    fn calculate_check_penalty(state: &GameState) -> i32 {
+    fn calculate_check_penalty(state: &GameState, ai_config: &AIConfig) -> i32 {
         if let Some(player_in_check) = state.player_in_check {
             if let Some(check_pos) = state.check_position {
                 let breaking_moves = crate::core::rules::CaptureBreaking::get_breaking_capture_moves(
@@ -138,7 +123,7 @@ impl Heuristic {
                 );
                 let num_escapes = breaking_moves.len().max(1) as f32;
                 let escape_factor = 5.0 / num_escapes;
-                let penalty = CHECK_PENALTY + (escape_factor * CHECK_PENALTY as f32) as i32;
+                let penalty = ai_config.heuristic.scores.check_penalty + (escape_factor * ai_config.heuristic.scores.check_penalty as f32) as i32;
                 
                 match player_in_check {
                     Player::Max => -penalty,  // Negative penalty for Max player
@@ -146,8 +131,8 @@ impl Heuristic {
                 }
             } else {
                 match player_in_check {
-                    Player::Max => -CHECK_PENALTY,
-                    Player::Min => CHECK_PENALTY,
+                    Player::Max => -ai_config.heuristic.scores.check_penalty,
+                    Player::Min => ai_config.heuristic.scores.check_penalty,
                 }
             }
         } else {
@@ -357,14 +342,15 @@ impl Heuristic {
     /// mixed four-three threats, or multiple half-free fours that guarantee wins
     /// on the next move. The scoring system emphasizes both immediate threats and
     /// long-term positional advantages through balanced pattern valuation.
-    fn calculate_pattern_score(counts: PatternCounts) -> i32 {
+    fn calculate_pattern_score(counts: PatternCounts, ai_config: &AIConfig) -> i32 {
+        let scores = &ai_config.heuristic.scores;
         let mut score = 0;
         if counts.five_in_row > 0 {
-            score += FIVE_IN_ROW_SCORE;
+            score += scores.five_in_row_score;
         }
         score += match counts.live_four {
-            1 => LIVE_FOUR_SINGLE_SCORE,
-            n if n > 1 => LIVE_FOUR_MULTIPLE_SCORE,
+            1 => scores.live_four_single_score,
+            n if n > 1 => scores.live_four_multiple_score,
             _ => 0,
         };
         if counts.live_three >= 2
@@ -373,15 +359,15 @@ impl Heuristic {
             || (counts.half_free_four >= 1 && counts.live_three >= 1)
             || (counts.half_free_four >= 2)
         {
-            score += WINNING_THREAT_SCORE;
+            score += scores.winning_threat_score;
         }
-        score += (counts.half_free_four as i32) * HALF_FREE_FOUR_SCORE
-            + (counts.dead_four as i32) * DEAD_FOUR_SCORE
-            + (counts.live_three as i32) * LIVE_THREE_SCORE
-            + (counts.half_free_three as i32) * HALF_FREE_THREE_SCORE
-            + (counts.dead_three as i32) * DEAD_THREE_SCORE
-            + (counts.live_two as i32) * LIVE_TWO_SCORE
-            + (counts.half_free_two as i32) * HALF_FREE_TWO_SCORE;
+        score += (counts.half_free_four as i32) * scores.half_free_four_score
+            + (counts.dead_four as i32) * scores.dead_four_score
+            + (counts.live_three as i32) * scores.live_three_score
+            + (counts.half_free_three as i32) * scores.half_free_three_score
+            + (counts.dead_three as i32) * scores.dead_three_score
+            + (counts.live_two as i32) * scores.live_two_score
+            + (counts.half_free_two as i32) * scores.half_free_two_score;
         score
     }
     /// Calculates capture bonus differential between players.
@@ -399,14 +385,15 @@ impl Heuristic {
     /// Returns the difference between Max player's capture bonus and Min player's
     /// capture bonus, allowing the evaluation to favor the player with more
     /// successful captures while maintaining proportional scaling.
-    fn calculate_capture_bonus(state: &GameState) -> i32 {
+    fn calculate_capture_bonus(state: &GameState, ai_config: &AIConfig) -> i32 {
+        let multiplier = ai_config.heuristic.scores.capture_bonus_multiplier;
         let max_bonus = if state.max_captures > 0 {
-            (CAPTURE_BONUS_MULTIPLIER as f32 * (state.max_captures as f32).sqrt()) as i32
+            (multiplier as f32 * (state.max_captures as f32).sqrt()) as i32
         } else {
             0
         };
         let min_bonus = if state.min_captures > 0 {
-            (CAPTURE_BONUS_MULTIPLIER as f32 * (state.min_captures as f32).sqrt()) as i32
+            (multiplier as f32 * (state.min_captures as f32).sqrt()) as i32
         } else {
             0
         };

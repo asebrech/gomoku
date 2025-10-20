@@ -7,10 +7,7 @@
 //! bonus/penalty applied to the heuristic evaluation.
 
 use crate::core::board::Player;
-
-const CAPTURE_MOMENTUM_BONUS: i32 = 200;
-const INITIATIVE_BONUS: i32 = 100;
-const HISTORY_WINDOW: usize = 4;
+use crate::ai::config::AIConfig;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MoveRecord {
@@ -32,7 +29,7 @@ impl PatternHistoryAnalyzer {
         }
     }
 
-    pub fn analyze_move(&mut self, player: Player, captures_made: usize) {
+    pub fn record_move(&mut self, player: Player, captures_made: usize, ai_config: &AIConfig) {
         let move_record = MoveRecord {
             player,
             captures_made,
@@ -40,25 +37,25 @@ impl PatternHistoryAnalyzer {
 
         self.recent_moves.push(move_record);
         
-        if self.recent_moves.len() > HISTORY_WINDOW {
+        if self.recent_moves.len() > ai_config.pattern_history.history_window {
             self.recent_moves.drain(0..1);
         }
 
-        self.update_initiative();
+        self.update_initiative(ai_config);
     }
 
-    pub fn calculate_historical_bonus(&self, current_player: Player) -> i32 {
+    pub fn calculate_historical_bonus(&self, current_player: Player, ai_config: &AIConfig) -> i32 {
         let mut bonus = 0;
 
         if let Some(initiative_player) = self.current_initiative {
             if initiative_player == current_player {
-                bonus += INITIATIVE_BONUS;
+                bonus += ai_config.pattern_history.initiative_bonus;
             } else {
-                bonus -= INITIATIVE_BONUS;
+                bonus -= ai_config.pattern_history.initiative_bonus;
             }
         }
 
-        bonus += self.calculate_capture_momentum_bonus(current_player);
+        bonus += self.calculate_capture_momentum_bonus(current_player, ai_config);
 
         bonus
     }
@@ -76,13 +73,13 @@ impl PatternHistoryAnalyzer {
         self.recent_moves.last()
     }
 
-    fn update_initiative(&mut self) {
+    fn update_initiative(&mut self, ai_config: &AIConfig) {
         if self.recent_moves.len() < 2 {
             self.current_initiative = None;
             return;
         }
 
-        let recent_window = self.recent_moves.iter().rev().take(HISTORY_WINDOW);
+        let recent_window = self.recent_moves.iter().rev().take(ai_config.pattern_history.history_window);
         let mut max_captures = 0;
         let mut min_captures = 0;
 
@@ -104,7 +101,7 @@ impl PatternHistoryAnalyzer {
         }
     }
 
-    fn calculate_capture_momentum_bonus(&self, player: Player) -> i32 {
+    fn calculate_capture_momentum_bonus(&self, player: Player, ai_config: &AIConfig) -> i32 {
         let recent_captures: usize = self.recent_moves
             .iter()
             .rev()
@@ -114,7 +111,7 @@ impl PatternHistoryAnalyzer {
             .sum();
 
         if recent_captures > 0 {
-            (CAPTURE_MOMENTUM_BONUS as f32 * (recent_captures as f32).sqrt()) as i32
+            (ai_config.pattern_history.capture_momentum_bonus as f32 * (recent_captures as f32).sqrt()) as i32
         } else {
             0
         }

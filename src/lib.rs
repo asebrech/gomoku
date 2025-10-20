@@ -1,4 +1,5 @@
 pub mod ai {
+    pub mod config;
     pub mod heuristic;
     pub mod lazy_smp;
     pub mod minimax;

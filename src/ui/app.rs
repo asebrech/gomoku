@@ -4,6 +4,7 @@ use bevy_gstreamer::GstreamerPlugin;
 
 use crate::core::state::GameState;
 use crate::ai::transposition::TranspositionTable;
+use crate::ai::config::AIConfig;
 use crate::audio::audio_plugin;
 use crate::ui::display::display::make_visible;
 use crate::ui::screens::game::game::game_plugin;
@@ -157,6 +158,9 @@ impl GomokuApp {
 		let mut config = GameConfig::load_from_file("config/config.json")
 			.unwrap_or_else(|_| GameConfig::default());
 		
+		// Load AI configuration
+		let ai_config = AIConfig::load_or_default("config/ai_config.toml");
+		
 		let (board_size, win_condition, ai_max_depth, ai_time_limit, pair_captures_to_win) = config.get_game_settings();
 		// Use the configured values directly
 		let ai_depth = ai_max_depth.unwrap_or(6) as i32; // Default to 6 if unlimited
@@ -185,6 +189,7 @@ impl GomokuApp {
 		.insert_resource(GameState::new(settings.board_size, settings.minimum_chain_to_win))
         .insert_resource(settings)
         .insert_resource(config)
+        .insert_resource(ai_config)
         .insert_resource(theme_manager)
         .init_resource::<TranspositionTable>();
 

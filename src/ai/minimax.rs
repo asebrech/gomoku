@@ -21,7 +21,7 @@ use crate::core::state::GameState;
 use std::cmp::{max, min};
 use std::time::{Duration, Instant};
 
-use super::{heuristic::Heuristic, transposition::{TranspositionTable, EntryType}};
+use super::{heuristic::Heuristic, transposition::{TranspositionTable, EntryType}, config::AIConfig};
 
 /// Alpha-beta search with transposition table (memory) support.
 ///
@@ -44,6 +44,7 @@ fn alpha_beta_with_memory(
     mut beta: i32,
     maximizing_player: bool,
     tt: &mut TranspositionTable,
+    ai_config: &AIConfig,
     start_time: &Instant,
     time_limit: Option<Duration>,
 ) -> (i32, u64) {
@@ -63,13 +64,13 @@ fn alpha_beta_with_memory(
         return (tt_result.value.unwrap(), nodes_visited);
     }
 
-    if depth == 0 || state.is_terminal() {
-        let eval = Heuristic::evaluate(state, depth);
+    if depth == 0 || state.is_terminal(ai_config) {
+        let eval = Heuristic::evaluate(state, depth, ai_config);
         tt.store(hash_key, eval, depth, EntryType::Exact, None);
         return (eval, nodes_visited);
     }
 
-    let mut moves = state.get_candidate_moves();
+    let mut moves = state.get_candidate_moves(ai_config);
     
     if let Some(best_move) = tt_result.best_move {
         if let Some(pos) = moves.iter().position(|&m| m == best_move) {
@@ -84,8 +85,9 @@ fn alpha_beta_with_memory(
         value = i32::MIN;
         for move_ in moves {
             state.make_move(move_);
+            state.update_pattern_analysis(ai_config);
             let (eval, child_nodes) = alpha_beta_with_memory(
-                state, depth - 1, alpha, beta, false, tt, start_time, time_limit
+                state, depth - 1, alpha, beta, false, tt, ai_config, start_time, time_limit
             );
             state.undo_move(move_);
             nodes_visited += child_nodes;
@@ -104,8 +106,9 @@ fn alpha_beta_with_memory(
         value = i32::MAX;
         for move_ in moves {
             state.make_move(move_);
+            state.update_pattern_analysis(ai_config);
             let (eval, child_nodes) = alpha_beta_with_memory(
-                state, depth - 1, alpha, beta, true, tt, start_time, time_limit
+                state, depth - 1, alpha, beta, true, tt, ai_config, start_time, time_limit
             );
             state.undo_move(move_);
             nodes_visited += child_nodes;
@@ -147,6 +150,7 @@ pub fn mtdf(
     first_guess: i32,
     depth: i32,
     tt: &mut TranspositionTable,
+    ai_config: &AIConfig,
     start_time: &Instant,
     time_limit: Option<Duration>,
 ) -> (i32, u64, Option<(usize, usize)>) {
@@ -172,6 +176,7 @@ pub fn mtdf(
             beta,
             is_maximizing,
             tt,
+            ai_config,
             start_time,
             time_limit,
         );

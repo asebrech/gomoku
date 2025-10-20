@@ -9,7 +9,7 @@ use gstreamer::prelude::*;
 use gstreamer::Element;
 use gstreamer_app::AppSink;
 use crate::{
-    ai::lazy_smp::{lazy_smp_search, SearchResult},
+    ai::{lazy_smp::{lazy_smp_search, SearchResult}, config::AIConfig},
     audio::{PlayStonePlacementSound, PlayWinSound, PlayLoseSound},
     core::{board::Player, rules::{DoubleThreeDetection, CaptureBreaking}, state::GameState}, 
     ui::{
@@ -191,6 +191,11 @@ pub fn game_plugin(app: &mut App) {
                         .or(resource_changed::<GameState>)
                 ),
                 handle_ghost_stone_hover, // Run after update_available_placement
+            ).run_if(in_state(AppState::Game)),
+        )
+        .add_systems(
+            Update,
+            (
                 update_current_player_display.run_if(
                     resource_changed::<GameState>
                         .or(resource_changed::<GameStatus>)
@@ -664,6 +669,7 @@ pub fn place_stone(
     mut move_played: EventWriter<MovePlayed>,
     mut stone_sound: EventWriter<PlayStonePlacementSound>,
     stones: Query<(Entity, &GridCell, &Stone)>,
+    ai_config: Res<AIConfig>,
 ) {
     for ev in ev_stone_placement.read() {
         info!("Stone placed at x: {}, y: {}", ev.x, ev.y);
@@ -676,6 +682,7 @@ pub fn place_stone(
         
         // Now make the move (this will switch to the next player)
         game_state.make_move((ev.x, ev.y));
+        game_state.update_pattern_analysis(&ai_config);
 
         // Despawn captured stones cleanly
         for (stone_entity, stone_cell, _) in stones.iter() {
@@ -924,10 +931,11 @@ pub fn process_next_round(
     mut win_sound: EventWriter<PlayWinSound>,
     mut lose_sound: EventWriter<PlayLoseSound>,
     ai_vs_ai_state: Res<AIvsAIState>,
+    ai_config: Res<AIConfig>,
 ) {
     for _ in move_played.read() {
         // Check for game end first
-        if game_state.is_terminal() {
+        if game_state.is_terminal(&ai_config) {
             let winner = game_state.check_winner();
             game_event.write(GameEnded { winner });
             *game_status = GameStatus::GameOver;
@@ -989,6 +997,7 @@ pub fn process_next_round(
 fn start_ai_computation(
     mut commands: Commands,
     settings: Res<GameSettings>,
+    ai_config: Res<AIConfig>,
     game_state: Res<GameState>,
     game_status: Res<GameStatus>,
     mut ai_frames: ResMut<AIThinkingFrames>,
@@ -1036,6 +1045,7 @@ fn start_ai_computation(
     
     // Clone the data we need for the task
     let game_state_clone = game_state.clone();
+    let ai_config_clone = (*ai_config).clone();
     let ai_depth = settings.ai_depth;
     let time_limit_ms = settings.time_limit.unwrap_or(500); // Default 500ms if not set
     
@@ -1044,7 +1054,7 @@ fn start_ai_computation(
     let task = thread_pool.spawn(async move {
         let mut state = game_state_clone;
         info!("AI using Lazy SMP search with {}ms time limit and max depth {}", time_limit_ms, ai_depth);
-        lazy_smp_search(&mut state, time_limit_ms as u64, ai_depth, None)
+        lazy_smp_search(&mut state, time_limit_ms as u64, ai_depth, &ai_config_clone, None)
     });
     
     // Store the task as a resource

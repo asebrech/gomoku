@@ -76,7 +76,7 @@ impl GameState {
         Self::new(board_size, win_condition)
     }
 
-    pub fn get_candidate_moves(&self) -> Vec<(usize, usize)> {
+    pub fn get_candidate_moves(&self, ai_config: &crate::ai::config::AIConfig) -> Vec<(usize, usize)> {
         if let Some(player_in_check) = self.player_in_check {
             if player_in_check == self.current_player {
                 if let Some(check_pos) = self.check_position {
@@ -90,7 +90,7 @@ impl GameState {
             }
         }
         
-        MoveGenerator::get_candidate_moves(&self.board, self.current_player)
+        crate::ai::move_generation::MoveGenerator::get_candidate_moves(&self.board, self.current_player, ai_config)
     }
 
     pub fn is_move_legal(&self, mv: (usize, usize)) -> bool {
@@ -148,10 +148,10 @@ impl GameState {
         self.move_history.push(mv);
         self.check_for_wins(mv);
         self.switch_player();
-        self.update_pattern_analysis();
     }
 
-    fn update_pattern_analysis(&mut self) {
+    /// Update pattern analysis with AI config - should be called after make_move
+    pub fn update_pattern_analysis(&mut self, ai_config: &crate::ai::config::AIConfig) {
         let current_player = self.current_player;
         let capture_history_len = self.capture_history.len();
         let last_captures = if capture_history_len > 0 {
@@ -163,7 +163,7 @@ impl GameState {
         let move_player = current_player.opponent();
         let captures_made = last_captures.len() / 2;
         
-        self.pattern_analyzer.analyze_move(move_player, captures_made);
+        self.pattern_analyzer.record_move(move_player, captures_made, ai_config);
     }
 
     pub fn undo_move(&mut self, move_: (usize, usize)) {
@@ -200,8 +200,11 @@ impl GameState {
         self.restore_captured_stones();
     }
 
-    pub fn is_terminal(&self) -> bool {
-        self.winner.is_some() || self.get_candidate_moves().is_empty()
+    pub fn is_terminal(&self, ai_config: &crate::ai::config::AIConfig) -> bool {
+        if self.winner.is_some() {
+            return true;
+        }
+        self.get_candidate_moves(ai_config).is_empty()
     }
 
     pub fn check_winner(&self) -> Option<Player> {

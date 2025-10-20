@@ -1,14 +1,8 @@
 use crate::core::board::{Board, Player};
 use crate::core::patterns::{DIRECTIONS, PatternAnalyzer, PatternFreedom};
 use crate::core::rules::DoubleThreeDetection;
-use crate::ai::heuristic::{
-    CAPTURE_BONUS_MULTIPLIER, FIVE_IN_ROW_SCORE, LIVE_FOUR_SINGLE_SCORE, 
-    HALF_FREE_FOUR_SCORE, DEAD_FOUR_SCORE, LIVE_THREE_SCORE, 
-    HALF_FREE_THREE_SCORE, DEAD_THREE_SCORE, LIVE_TWO_SCORE, HALF_FREE_TWO_SCORE
-};
+use crate::ai::config::AIConfig;
 use std::collections::HashSet;
-
-const CENTER_POSITION_BONUS: i32 = 10;
 
 /// Prioritized move generator for Gomoku AI that reduces search space
 /// by focusing on tactically relevant moves
@@ -23,7 +17,7 @@ impl MoveGenerator {
     /// 4. Zone-based moves (around existing stones)
     /// 
     /// Returns empty board center if board is empty
-    pub fn get_candidate_moves(board: &Board, player: Player) -> Vec<(usize, usize)> {
+    pub fn get_candidate_moves(board: &Board, player: Player, ai_config: &AIConfig) -> Vec<(usize, usize)> {
         if board.is_empty() {
             return vec![board.center()];
         }
@@ -40,11 +34,11 @@ impl MoveGenerator {
                 }
             }
         }
-        let threat_moves = Self::find_threat_moves(board, player);
+        let threat_moves = Self::find_threat_moves(board, player, ai_config);
         if !threat_moves.is_empty() {
             return Self::filter_double_three_moves(board, threat_moves, player);
         }
-        let zone_moves = Self::get_zone_based_moves(board, player);
+        let zone_moves = Self::get_zone_based_moves(board, player, ai_config);
         let legal_zone_moves = Self::filter_double_three_moves(board, zone_moves, player);
         
         if legal_zone_moves.is_empty() {
@@ -226,7 +220,7 @@ impl MoveGenerator {
     /// 
     /// Combines offensive moves (create our threats) and defensive moves
     /// (block opponent threats), prioritized by threat strength
-    fn find_threat_moves(board: &Board, player: Player) -> Vec<(usize, usize)> {
+    fn find_threat_moves(board: &Board, player: Player, ai_config: &AIConfig) -> Vec<(usize, usize)> {
         let mut moves = HashSet::new();
         let our_threats = Self::find_threat_creating_moves(board, player);
         moves.extend(our_threats);
@@ -236,7 +230,7 @@ impl MoveGenerator {
         let mut prioritized_moves: Vec<((usize, usize), i32)> = filtered_moves
             .into_iter()
             .map(|mv| {
-                let priority = Self::calculate_threat_priority(board, mv, player);
+                let priority = Self::calculate_threat_priority(board, mv, player, ai_config);
                 (mv, priority)
             })
             .collect();
@@ -253,22 +247,22 @@ impl MoveGenerator {
     /// - Pattern values (offensive moves weighted 2x, defensive 1x)
     /// - Capture bonus for moves creating capture opportunities
     /// - Small center position bonus decreasing with distance
-    fn calculate_threat_priority(board: &Board, mv: (usize, usize), player: Player) -> i32 {
+    fn calculate_threat_priority(board: &Board, mv: (usize, usize), player: Player, ai_config: &AIConfig) -> i32 {
         let (row, col) = mv;
         let mut priority = 0;
         for &check_player in &[player, player.opponent()] {
-            let player_priority = Self::calculate_player_threat_value(board, row, col, check_player);
+            let player_priority = Self::calculate_player_threat_value(board, row, col, check_player, ai_config);
             if check_player == player {
                 priority += player_priority * 2; 
             } else {
                 priority += player_priority; 
             }
         }
-        let capture_bonus = Self::calculate_capture_bonus(board, row, col, player);
+        let capture_bonus = Self::calculate_capture_bonus(board, row, col, player, ai_config);
         priority += capture_bonus;
         let center = board.size / 2;
         let distance = Self::manhattan_distance(row, col, center, center) as i32;
-        priority += CENTER_POSITION_BONUS - distance.min(CENTER_POSITION_BONUS);
+        priority += ai_config.move_generation.center_position_bonus - distance.min(ai_config.move_generation.center_position_bonus);
         priority
     }
 
@@ -276,7 +270,7 @@ impl MoveGenerator {
     /// 
     /// Analyzes all directions to find the strongest pattern that would be
     /// created, considering pattern length and freedom of movement
-    fn calculate_player_threat_value(board: &Board, row: usize, col: usize, player: Player) -> i32 {
+    fn calculate_player_threat_value(board: &Board, row: usize, col: usize, player: Player, ai_config: &AIConfig) -> i32 {
         let mut max_value = 0;
         for &(dx, dy) in &DIRECTIONS {
             let backward = PatternAnalyzer::count_consecutive(board, row, col, -dx, -dy, player);
@@ -308,7 +302,7 @@ impl MoveGenerator {
                 dy,
                 total_stones,
             );
-            let pattern_value = get_pattern_score(total_stones, freedom);
+            let pattern_value = get_pattern_score(total_stones, freedom, ai_config);
             max_value = max_value.max(pattern_value);
         }
         max_value
@@ -318,7 +312,7 @@ impl MoveGenerator {
     /// 
     /// Searches all directions for patterns where placing a stone would
     /// create a capture situation (our stone - opponent - opponent - our stone)
-    fn calculate_capture_bonus(board: &Board, row: usize, col: usize, player: Player) -> i32 {
+    fn calculate_capture_bonus(board: &Board, row: usize, col: usize, player: Player, ai_config: &AIConfig) -> i32 {
         let mut bonus = 0;
         let opponent = player.opponent();
         for &(dx, dy) in &DIRECTIONS {
@@ -343,7 +337,7 @@ impl MoveGenerator {
                                         let end_col = end_col as usize;
                                         if let Some(piece_player) = board.get_player(end_row, end_col) {
                                             if piece_player == player {
-                                                bonus += CAPTURE_BONUS_MULTIPLIER / 50; 
+                                                bonus += ai_config.heuristic.scores.capture_bonus_multiplier / 50; 
                                             }
                                         }
                                     }
@@ -384,7 +378,7 @@ impl MoveGenerator {
     /// 
     /// Creates a local area around placed stones, filters illegal double-three
     /// moves, and prioritizes by threat value for tactical relevance
-    fn get_zone_based_moves(board: &Board, player: Player) -> Vec<(usize, usize)> {
+    fn get_zone_based_moves(board: &Board, player: Player, ai_config: &AIConfig) -> Vec<(usize, usize)> {
         let mut candidates = HashSet::new();
         let stone_count = board.count_stones();
         let zone_radius = if stone_count < 10 { 3 } else { 2 };
@@ -404,7 +398,7 @@ impl MoveGenerator {
             }
         });
         let mut filtered_moves: Vec<(usize, usize)> = candidates.into_iter().collect();
-        filtered_moves.sort_by_key(|&mv| -Self::calculate_threat_priority(board, mv, player));
+        filtered_moves.sort_by_key(|&mv| -Self::calculate_threat_priority(board, mv, player, ai_config));
         filtered_moves.truncate(max_zone_moves);
         filtered_moves
     }
@@ -452,24 +446,25 @@ impl MoveGenerator {
 
 /// Gets the appropriate score for a pattern based on its length and freedom.
 /// 
-/// This function provides pattern scoring using the official heuristic constants
+/// This function provides pattern scoring using the configurable heuristic constants
 /// to ensure consistency between move generation and position evaluation.
-fn get_pattern_score(length: usize, freedom: PatternFreedom) -> i32 {
+fn get_pattern_score(length: usize, freedom: PatternFreedom, ai_config: &AIConfig) -> i32 {
+    let scores = &ai_config.heuristic.scores;
     match length {
-        5 => FIVE_IN_ROW_SCORE,
+        5 => scores.five_in_row_score,
         4 => match freedom {
-            PatternFreedom::Free => LIVE_FOUR_SINGLE_SCORE,
-            PatternFreedom::HalfFree => HALF_FREE_FOUR_SCORE,
-            PatternFreedom::Flanked => DEAD_FOUR_SCORE,
+            PatternFreedom::Free => scores.live_four_single_score,
+            PatternFreedom::HalfFree => scores.half_free_four_score,
+            PatternFreedom::Flanked => scores.dead_four_score,
         },
         3 => match freedom {
-            PatternFreedom::Free => LIVE_THREE_SCORE,
-            PatternFreedom::HalfFree => HALF_FREE_THREE_SCORE,
-            PatternFreedom::Flanked => DEAD_THREE_SCORE,
+            PatternFreedom::Free => scores.live_three_score,
+            PatternFreedom::HalfFree => scores.half_free_three_score,
+            PatternFreedom::Flanked => scores.dead_three_score,
         },
         2 => match freedom {
-            PatternFreedom::Free => LIVE_TWO_SCORE,
-            PatternFreedom::HalfFree => HALF_FREE_TWO_SCORE,
+            PatternFreedom::Free => scores.live_two_score,
+            PatternFreedom::HalfFree => scores.half_free_two_score,
             PatternFreedom::Flanked => 0, // Dead twos are ignored
         },
         _ => 0,

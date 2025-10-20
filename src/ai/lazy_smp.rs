@@ -25,7 +25,7 @@ use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use super::{minimax::mtdf, transposition::TranspositionTable};
+use super::{minimax::mtdf, transposition::TranspositionTable, config::AIConfig};
 
 #[derive(Debug)]
 pub struct SearchResult {
@@ -90,6 +90,7 @@ impl SharedSearchState {
 fn lazy_smp_worker(
     state: &GameState,
     max_depth: i32,
+    ai_config: &AIConfig,
     shared_state: Arc<SharedSearchState>,
     worker_id: usize,
     start_time: Instant,
@@ -141,6 +142,7 @@ fn lazy_smp_worker(
             first_guess,
             search_depth,
             &mut tt,
+            ai_config,
             &start_time,
             time_limit,
         );
@@ -181,6 +183,7 @@ pub fn lazy_smp_search(
     state: &mut GameState,
     time_limit_ms: u64,
     max_depth: i32,
+    ai_config: &AIConfig,
     num_threads: Option<usize>,
 ) -> SearchResult {
     let start_time = Instant::now();
@@ -193,7 +196,7 @@ pub fn lazy_smp_search(
             .min(8)
     });
 
-    let initial_moves = state.get_candidate_moves();
+    let initial_moves = state.get_candidate_moves(ai_config);
     if initial_moves.is_empty() {
         return SearchResult {
             best_move: None,
@@ -215,6 +218,7 @@ pub fn lazy_smp_search(
             lazy_smp_worker(
                 &state_clone,
                 max_depth,
+                ai_config,
                 shared_state_clone,
                 worker_id,
                 start_time,

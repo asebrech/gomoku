@@ -1,0 +1,35 @@
+# Gomoku AI Configuration
+# These values directly control AI behavior and playing style
+
+[heuristic.scores]
+# Core pattern values - these are the most critical for AI strength
+WINNING_SCORE = 1_000_000
+FIVE_IN_ROW_SCORE = 100_000
+LIVE_FOUR_MULTIPLE_SCORE = 20_000
+LIVE_FOUR_SINGLE_SCORE = 15_000
+CAPTURE_BONUS_MULTIPLIER = 15_000
+CHECK_PENALTY = 10_000
+WINNING_THREAT_SCORE = 10_000
+HALF_FREE_FOUR_SCORE = 3_500
+LIVE_THREE_SCORE = 500
+DEAD_FOUR_SCORE = 400
+HALF_FREE_THREE_SCORE = 200
+DEAD_THREE_SCORE = 50
+LIVE_TWO_SCORE = 50
+HALF_FREE_TWO_SCORE = 20
+
+[move_generation]
+# Move prioritization values
+CENTER_POSITION_BONUS = 10
+
+[pattern_history]
+# Momentum and initiative bonuses
+CAPTURE_MOMENTUM_BONUS = 200
+INITIATIVE_BONUS = 100
+HISTORY_WINDOW = 4
+
+[search.parallel]
+# Lazy SMP aspiration window offsets for different workers
+ASPIRATION_OFFSETS = [0, 25, -25, 75, -75]
+# Depth variation offsets for workers
+DEPTH_OFFSETS = [0, -1, 1, -2]
