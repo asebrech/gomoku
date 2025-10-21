@@ -147,7 +147,8 @@
     "win_condition": 5,
     "ai_max_depth": 21,
     "ai_time_limit": 500,
-    "pair_captures_to_win": 20
+    "pair_captures_to_win": 20,
+    "ai_vs_ai_auto_play": false
   },
   "settings": {
     "audio": {

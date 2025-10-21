@@ -176,6 +176,7 @@ pub fn game_plugin(app: &mut App) {
             setup_game_background,
             show_persistent_game_video_background,
             update_available_placement, // Initialize forbidden markers on game start
+            sync_auto_play_button_text, // Sync button text with config value
         ).chain())
         .add_systems(
             Update,
@@ -243,10 +244,14 @@ fn update_game_settings_from_config(
     mut ai_time: ResMut<AITimeTaken>,
     mut ai_depth: ResMut<AIDepthReached>,
     mut ai_nodes: ResMut<AINodesSearched>,
+    mut ai_vs_ai_state: ResMut<AIvsAIState>,
     mut move_played: EventWriter<MovePlayed>,
 ) {
     // Get current settings from config
     let (board_size, win_condition, ai_max_depth, ai_time_limit, pair_captures_to_win) = config.get_game_settings();
+    
+    // Initialize AI vs AI auto-play from config
+    ai_vs_ai_state.auto_play = config.get_auto_play();
     
     println!("======================================");
     println!("   INITIALIZING NEW GAME SESSION");
@@ -816,8 +821,9 @@ pub fn handle_ghost_stone_hover(
     }
 
     // Don't show ghost stones if it's AI's turn in Human vs AI mode
-    if game_settings.versus_ai && game_state.current_player == Player::Min {
-        // Hide all ghost stones when it's AI's turn
+    // BUT in AI vs AI mode, allow previews for both players (it's fun!)
+    if game_settings.versus_ai && !game_settings.ai_vs_ai && game_state.current_player == Player::Min {
+        // Hide all ghost stones when it's AI's turn in Human vs AI mode
         for (_, mut visibility, _) in ghost_stones.iter_mut() {
             *visibility = Visibility::Hidden;
         }
@@ -2285,17 +2291,41 @@ fn handle_next_move_button(
     }
 }
 
+fn sync_auto_play_button_text(
+    ai_vs_ai_state: Res<AIvsAIState>,
+    button_query: Query<&Children, With<AutoPlayToggle>>,
+    mut text_query: Query<&mut Text>,
+) {
+    // Update the auto-play button text to match the loaded state
+    for children in button_query.iter() {
+        for child in children.iter() {
+            if let Ok(mut text) = text_query.get_mut(child) {
+                text.0 = if ai_vs_ai_state.auto_play {
+                    "AUTO PLAY: ON".to_string()
+                } else {
+                    "AUTO PLAY: OFF".to_string()
+                };
+            }
+        }
+    }
+}
+
 fn handle_auto_play_toggle(
     mut interaction_query: Query<(&Interaction, &Children), (Changed<Interaction>, With<AutoPlayToggle>)>,
     mut text_query: Query<&mut Text>,
     mut ai_vs_ai_state: ResMut<AIvsAIState>,
     game_settings: Res<GameSettings>,
-    config: Res<GameConfig>,
+    mut config: ResMut<GameConfig>,
 ) {
     for (interaction, children) in interaction_query.iter_mut() {
         if *interaction == Interaction::Pressed && (game_settings.ai_vs_ai || game_settings.versus_ai) {
             ai_vs_ai_state.auto_play = !ai_vs_ai_state.auto_play;
             info!("Auto Play toggled: {}", ai_vs_ai_state.auto_play);
+            
+            // Save to config file
+            if let Err(e) = config.save_auto_play(ai_vs_ai_state.auto_play) {
+                error!("Failed to save auto-play setting: {}", e);
+            }
             
             // Update button text
             for child in children.iter() {
@@ -2314,11 +2344,25 @@ fn handle_auto_play_toggle(
 fn handle_ai_vs_ai_auto_play(
     game_settings: Res<GameSettings>,
     ai_vs_ai_state: Res<AIvsAIState>,
+    game_state: Res<GameState>,
     mut game_status: ResMut<GameStatus>,
     time: Res<Time>,
     mut last_move_time: Local<f32>,
 ) {
-    if game_settings.ai_vs_ai && ai_vs_ai_state.auto_play {
+    // Auto-play works for:
+    // 1. AI vs AI mode (always auto-play both sides)
+    // 2. Player vs AI mode when it's AI's turn (Player::Min)
+    let should_auto_play = if game_settings.ai_vs_ai {
+        // In AI vs AI mode, auto-play both players
+        ai_vs_ai_state.auto_play
+    } else if game_settings.versus_ai {
+        // In Player vs AI mode, only auto-play when it's AI's turn (Min)
+        ai_vs_ai_state.auto_play && game_state.current_player == crate::core::board::Player::Min
+    } else {
+        false
+    };
+    
+    if should_auto_play {
         if *game_status == GameStatus::AwaitingUserInput {
             // Wait a bit between moves for visibility
             *last_move_time += time.delta_secs();

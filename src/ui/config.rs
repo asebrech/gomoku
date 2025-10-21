@@ -113,6 +113,8 @@ pub struct GameSettings {
     pub ai_max_depth: Option<u32>,  // None = unlimited depth
     pub ai_time_limit: Option<u64>, // Time limit in milliseconds, None = no time limit
     pub pair_captures_to_win: u32,
+    #[serde(default)]
+    pub ai_vs_ai_auto_play: bool,  // Auto-play for AI vs AI mode
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -213,6 +215,17 @@ impl GameConfig {
     // Get current theme
     pub fn get_current_theme(&self) -> String {
         self.settings.theme.current_theme.clone()
+    }
+
+    // Save AI vs AI auto-play setting
+    pub fn save_auto_play(&mut self, auto_play: bool) -> Result<(), Box<dyn std::error::Error>> {
+        self.game.ai_vs_ai_auto_play = auto_play;
+        self.save_to_file("config/config.json")
+    }
+
+    // Get AI vs AI auto-play setting
+    pub fn get_auto_play(&self) -> bool {
+        self.game.ai_vs_ai_auto_play
     }
 
     // Sync colors from theme manager
@@ -383,6 +396,7 @@ impl GameConfig {
                 ai_max_depth: Some(4),      // Default depth of 4
                 ai_time_limit: Some(1000),  // Default 1 second time limit
                 pair_captures_to_win: 10,
+                ai_vs_ai_auto_play: false,  // Default auto-play off
             },
             settings: UserSettings {
                 audio: AudioSettings {
