@@ -1,4 +1,4 @@
-.PHONY: dev release release-fast clean up up-dev fast help setup check-assets all-build deploy
+.PHONY: dev release release-fast clean up up-dev fast test help setup check-assets all-build deploy
 
 # Default target - show help
 all: help
@@ -13,6 +13,7 @@ help:
 	@echo "  make up           - Build and run the maximum optimized release executable"
 	@echo "  make up-dev       - Build and run the fast release executable"
 	@echo "  make fast         - Ultra-fast development mode (no video, instant startup)"
+	@echo "  make test         - Run all tests"
 	@echo "  make clean        - Clean everything (cargo + deps)"
 	@echo ""
 	@echo "Advanced targets:"
@@ -143,6 +144,20 @@ fast: dev check-assets
 		export GST_REGISTRY_FORK=no && \
 		./target/debug/gomoku; \
 	fi
+
+# Run all tests
+test: setup
+	@echo "Running all tests..."
+	@if [ "$$(uname -s)" = "Darwin" ]; then \
+		export DYLD_LIBRARY_PATH=$(PWD)/deps/lib:$$DYLD_LIBRARY_PATH && \
+		export PKG_CONFIG_PATH=$(PWD)/deps/lib/pkgconfig:$$PKG_CONFIG_PATH && \
+		cargo test --lib --tests; \
+	else \
+		export LD_LIBRARY_PATH=$(PWD)/deps/lib:$$LD_LIBRARY_PATH && \
+		export PKG_CONFIG_PATH=$(PWD)/deps/lib/pkgconfig:$$PKG_CONFIG_PATH && \
+		cargo test --lib --tests; \
+	fi
+	@echo "✅ All tests completed!"
 
 # Clean everything (cargo + deps)
 clean:
