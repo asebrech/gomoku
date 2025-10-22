@@ -100,6 +100,7 @@ impl DoubleThreeDetection {
     ) -> bool {
         // Collect all player stones in this direction within a reasonable distance
         let mut stones_in_line = vec![(row as isize, col as isize)]; // Include the move position
+        let opponent = player.opponent();
         
         // Search in both directions along the line for stones
         for &direction_multiplier in &[1, -1] {
@@ -116,6 +117,12 @@ impl DoubleThreeDetection {
                 
                 let idx = board.index(check_row as usize, check_col as usize);
                 let player_bits = board.get_player_bits(player);
+                let opponent_bits = board.get_player_bits(opponent);
+                
+                // If we hit an opponent stone, stop searching in this direction
+                if Board::is_bit_set(opponent_bits, idx) {
+                    break;
+                }
                 
                 if Board::is_bit_set(player_bits, idx) {
                     stones_in_line.push((check_row, check_col));
@@ -139,7 +146,8 @@ impl DoubleThreeDetection {
             
             // For a free-three, we need the stones to be consecutive OR have exactly one gap
             // and have space to extend to form an open four
-            if Self::is_valid_free_three_pattern(board, three_stones, dr, dc) {
+            // Also need to check that opponent stones don't block the pattern
+            if Self::is_valid_free_three_pattern(board, three_stones, dr, dc, player) {
                 return true;
             }
         }
@@ -152,6 +160,7 @@ impl DoubleThreeDetection {
     /// A valid free-three pattern must:
     /// 1. Have stones in a valid arrangement (consecutive or with specific gaps)
     /// 2. Have space to extend on at least one end to form an open four
+    /// 3. Not be blocked by opponent stones within the pattern
     ///
     /// Valid patterns include:
     /// - XXX: Three consecutive stones
@@ -163,6 +172,7 @@ impl DoubleThreeDetection {
     /// * `three_stones` - Array of three stone positions
     /// * `dr` - Row direction
     /// * `dc` - Column direction
+    /// * `player` - The player whose pattern we're checking
     ///
     /// # Returns
     /// `true` if the pattern forms a valid free-three
@@ -171,6 +181,7 @@ impl DoubleThreeDetection {
         three_stones: &[(isize, isize)],
         dr: isize,
         dc: isize,
+        player: Player,
     ) -> bool {
         let first_stone = three_stones[0];
         let middle_stone = three_stones[1];
@@ -191,10 +202,40 @@ impl DoubleThreeDetection {
             return false;
         }
         
+        // Check for opponent stones blocking the pattern
+        // If there's a gap and it contains an opponent stone, the pattern is blocked
+        let opponent = player.opponent();
+        let opponent_bits = board.get_player_bits(opponent);
+        
+        // Check gaps for opponent stones
+        if gap1 == 2 {
+            // There's a gap between first and middle stone
+            let gap_row = (first_stone.0 + middle_stone.0) / 2;
+            let gap_col = (first_stone.1 + middle_stone.1) / 2;
+            if PatternAnalyzer::is_in_bounds(board, gap_row, gap_col) {
+                let idx = board.index(gap_row as usize, gap_col as usize);
+                if Board::is_bit_set(opponent_bits, idx) {
+                    return false; // Pattern is blocked by opponent
+                }
+            }
+        }
+        
+        if gap2 == 2 {
+            // There's a gap between middle and last stone
+            let gap_row = (middle_stone.0 + last_stone.0) / 2;
+            let gap_col = (middle_stone.1 + last_stone.1) / 2;
+            if PatternAnalyzer::is_in_bounds(board, gap_row, gap_col) {
+                let idx = board.index(gap_row as usize, gap_col as usize);
+                if Board::is_bit_set(opponent_bits, idx) {
+                    return false; // Pattern is blocked by opponent
+                }
+            }
+        }
+        
         // Check if we can extend to form a true "open four" (unblockable by opponent)
         // For a free-three to be valid, it must be able to create an open four that
         // the opponent cannot block with a single move
-        Self::can_form_open_four(board, three_stones, dr, dc)
+        Self::can_form_open_four(board, three_stones, dr, dc, player)
     }
 
     /// Check if a three-stone pattern can form a threatening four.
@@ -208,6 +249,7 @@ impl DoubleThreeDetection {
     /// * `three_stones` - Array of three stone positions
     /// * `dr` - Row direction
     /// * `dc` - Column direction
+    /// * `player` - The player whose pattern we're checking
     ///
     /// # Returns
     /// `true` if the pattern can form a threatening four
@@ -216,16 +258,28 @@ impl DoubleThreeDetection {
         three_stones: &[(isize, isize)],
         dr: isize,
         dc: isize,
+        player: Player,
     ) -> bool {
         let first_stone = three_stones[0];
         let last_stone = three_stones[2];
+        let opponent = player.opponent();
+        let opponent_bits = board.get_player_bits(opponent);
         
         // Check extension before the first stone
         let before_row = first_stone.0 - dr;
         let before_col = first_stone.1 - dc;
-        if PatternAnalyzer::is_valid_empty(board, before_row, before_col) {
+        
+        // Make sure the extension is not blocked by opponent
+        let before_valid = if PatternAnalyzer::is_in_bounds(board, before_row, before_col) {
+            let idx = board.index(before_row as usize, before_col as usize);
+            !Board::is_bit_set(opponent_bits, idx)
+        } else {
+            false
+        };
+        
+        if before_valid && PatternAnalyzer::is_valid_empty(board, before_row, before_col) {
             // Can we extend here to form a threatening four?
-            if Self::would_create_threatening_four(board, three_stones, (before_row, before_col), dr, dc) {
+            if Self::would_create_threatening_four(board, three_stones, (before_row, before_col), dr, dc, player) {
                 return true;
             }
         }
@@ -233,9 +287,18 @@ impl DoubleThreeDetection {
         // Check extension after the last stone
         let after_row = last_stone.0 + dr;
         let after_col = last_stone.1 + dc;
-        if PatternAnalyzer::is_valid_empty(board, after_row, after_col) {
+        
+        // Make sure the extension is not blocked by opponent
+        let after_valid = if PatternAnalyzer::is_in_bounds(board, after_row, after_col) {
+            let idx = board.index(after_row as usize, after_col as usize);
+            !Board::is_bit_set(opponent_bits, idx)
+        } else {
+            false
+        };
+        
+        if after_valid && PatternAnalyzer::is_valid_empty(board, after_row, after_col) {
             // Can we extend here to form a threatening four?
-            if Self::would_create_threatening_four(board, three_stones, (after_row, after_col), dr, dc) {
+            if Self::would_create_threatening_four(board, three_stones, (after_row, after_col), dr, dc, player) {
                 return true;
             }
         }
@@ -256,6 +319,7 @@ impl DoubleThreeDetection {
     /// * `fourth_stone` - The potential fourth stone position
     /// * `dr` - Row direction
     /// * `dc` - Column direction
+    /// * `player` - The player whose pattern we're checking
     ///
     /// # Returns
     /// `true` if the four would be threatening
@@ -265,6 +329,7 @@ impl DoubleThreeDetection {
         fourth_stone: (isize, isize),
         dr: isize,
         dc: isize,
+        player: Player,
     ) -> bool {
         // Create the four-stone line by combining existing stones with the new one
         let mut four_stones = three_stones.to_vec();
@@ -277,13 +342,29 @@ impl DoubleThreeDetection {
         
         let first = four_stones[0];
         let last = four_stones[3];
+        let opponent = player.opponent();
+        let opponent_bits = board.get_player_bits(opponent);
         
         // Check if we can extend to form a five (winning)
         let before_first = (first.0 - dr, first.1 - dc);
         let after_last = (last.0 + dr, last.1 + dc);
         
-        let can_extend_before = PatternAnalyzer::is_valid_empty(board, before_first.0, before_first.1);
-        let can_extend_after = PatternAnalyzer::is_valid_empty(board, after_last.0, after_last.1);
+        // Check if extension positions are not blocked by opponent
+        let can_extend_before = PatternAnalyzer::is_valid_empty(board, before_first.0, before_first.1)
+            && if PatternAnalyzer::is_in_bounds(board, before_first.0, before_first.1) {
+                let idx = board.index(before_first.0 as usize, before_first.1 as usize);
+                !Board::is_bit_set(opponent_bits, idx)
+            } else {
+                false
+            };
+            
+        let can_extend_after = PatternAnalyzer::is_valid_empty(board, after_last.0, after_last.1)
+            && if PatternAnalyzer::is_in_bounds(board, after_last.0, after_last.1) {
+                let idx = board.index(after_last.0 as usize, after_last.1 as usize);
+                !Board::is_bit_set(opponent_bits, idx)
+            } else {
+                false
+            };
         
         // A threatening four needs at least one extension possibility
         can_extend_before || can_extend_after
