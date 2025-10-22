@@ -1,4 +1,4 @@
-.PHONY: dev release release-fast clean up up-dev fast help setup check-assets all-build deploy
+.PHONY: dev release release-fast clean up up-dev fast test help setup check-assets all-build deploy
 
 # Default target - show help
 all: help
@@ -13,6 +13,7 @@ help:
 	@echo "  make up           - Build and run the maximum optimized release executable"
 	@echo "  make up-dev       - Build and run the fast release executable"
 	@echo "  make fast         - Ultra-fast development mode (no video, instant startup)"
+	@echo "  make test         - Run all tests"
 	@echo "  make clean        - Clean everything (cargo + deps)"
 	@echo ""
 	@echo "Advanced targets:"
@@ -31,12 +32,6 @@ help:
 # Setup libs + build maximum optimized release version (slow build, best performance)
 release: setup
 	@echo "Building maximum optimized release version (this will be slow)..."
-	@echo "Setting devMode to false for release..."
-	@if [ "$$(uname -s)" = "Darwin" ]; then \
-		sed -i '' 's/"devMode": true/"devMode": false/g' config/config.json; \
-	else \
-		sed -i 's/"devMode": true/"devMode": false/g' config/config.json; \
-	fi
 	export PKG_CONFIG_PATH=$(PWD)/deps/lib/pkgconfig:$$PKG_CONFIG_PATH && cargo build --release
 	@echo "✅ Maximum optimized release build complete!"
 	@echo "Run with: make up"
@@ -44,12 +39,6 @@ release: setup
 # Setup libs + build fast release version (quick build, good performance)
 release-fast: setup
 	@echo "Building fast release version..."
-	@echo "Setting devMode to false for release..."
-	@if [ "$$(uname -s)" = "Darwin" ]; then \
-		sed -i '' 's/"devMode": true/"devMode": false/g' config/config.json; \
-	else \
-		sed -i 's/"devMode": true/"devMode": false/g' config/config.json; \
-	fi
 	export PKG_CONFIG_PATH=$(PWD)/deps/lib/pkgconfig:$$PKG_CONFIG_PATH && cargo build --profile release-dev
 	@echo "✅ Fast release build complete!"
 	@echo "Run with: make up-dev"
@@ -57,12 +46,6 @@ release-fast: setup
 # Setup libs + build development version (unoptimized, fastest build)
 dev: setup
 	@echo "Building development version (unoptimized, fastest compilation)..."
-	@echo "Setting devMode to true for development..."
-	@if [ "$$(uname -s)" = "Darwin" ]; then \
-		sed -i '' 's/"devMode": false/"devMode": true/g' config/config.json; \
-	else \
-		sed -i 's/"devMode": false/"devMode": true/g' config/config.json; \
-	fi
 	export PKG_CONFIG_PATH=$(PWD)/deps/lib/pkgconfig:$$PKG_CONFIG_PATH && cargo build
 	@echo "✅ Development build complete!"
 	@echo "Run with: make fast"
@@ -143,6 +126,20 @@ fast: dev check-assets
 		export GST_REGISTRY_FORK=no && \
 		./target/debug/gomoku; \
 	fi
+
+# Run all tests
+test: setup
+	@echo "Running all tests..."
+	@if [ "$$(uname -s)" = "Darwin" ]; then \
+		export DYLD_LIBRARY_PATH=$(PWD)/deps/lib:$$DYLD_LIBRARY_PATH && \
+		export PKG_CONFIG_PATH=$(PWD)/deps/lib/pkgconfig:$$PKG_CONFIG_PATH && \
+		cargo test --lib --tests; \
+	else \
+		export LD_LIBRARY_PATH=$(PWD)/deps/lib:$$LD_LIBRARY_PATH && \
+		export PKG_CONFIG_PATH=$(PWD)/deps/lib/pkgconfig:$$PKG_CONFIG_PATH && \
+		cargo test --lib --tests; \
+	fi
+	@echo "✅ All tests completed!"
 
 # Clean everything (cargo + deps)
 clean:

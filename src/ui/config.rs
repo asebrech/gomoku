@@ -128,6 +128,12 @@ pub struct GameplaySettings {
     pub show_move_hints: bool,
     pub animation_speed: f32,
     pub auto_save: bool,
+    #[serde(default = "default_show_double_three_markers")]
+    pub show_double_three_markers: bool,
+}
+
+fn default_show_double_three_markers() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -204,6 +210,17 @@ impl GameConfig {
     // Get gameplay settings
     pub fn get_gameplay_settings(&self) -> (bool, f32, bool) {
         (self.settings.gameplay.show_move_hints, self.settings.gameplay.animation_speed, self.settings.gameplay.auto_save)
+    }
+
+    // Save double three markers visibility setting
+    pub fn save_double_three_markers_visibility(&mut self, show: bool) -> Result<(), Box<dyn std::error::Error>> {
+        self.settings.gameplay.show_double_three_markers = show;
+        self.save_to_file("config/config.json")
+    }
+
+    // Get double three markers visibility setting
+    pub fn get_double_three_markers_visibility(&self) -> bool {
+        self.settings.gameplay.show_double_three_markers
     }
 
     // Save theme preference
@@ -411,6 +428,7 @@ impl GameConfig {
                     show_move_hints: true,
                     animation_speed: 1.0,
                     auto_save: true,
+                    show_double_three_markers: true,
                 },
                 theme: ThemeSettings {
                     current_theme: "Synthwave".to_string(),

@@ -148,7 +148,7 @@
     "ai_max_depth": 21,
     "ai_time_limit": 500,
     "pair_captures_to_win": 20,
-    "ai_vs_ai_auto_play": false
+    "ai_vs_ai_auto_play": true
   },
   "settings": {
     "audio": {
@@ -162,7 +162,8 @@
     "gameplay": {
       "show_move_hints": true,
       "animation_speed": 1.0,
-      "auto_save": true
+      "auto_save": true,
+      "show_double_three_markers": true
     },
     "theme": {
       "current_theme": "Synthwave"

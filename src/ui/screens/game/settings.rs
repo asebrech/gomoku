@@ -30,6 +30,9 @@ pub struct BackToMenuButton;
 #[derive(Component)]
 pub struct UndoMoveButton;
 
+#[derive(Component)]
+pub struct DoubleThreeToggle;
+
 pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &GameSettings, config: &GameConfig) {
     let colors = &config.colors;
     
@@ -143,6 +146,9 @@ pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &
 
                 // Volume Control Section
                 spawn_volume_control(builder, config);
+
+                // Double Three Toggle
+                spawn_double_three_toggle(builder, config);
 
                 // Game controls (Reset Board and Undo Move buttons)
                 spawn_game_control_buttons(builder, config);
@@ -529,6 +535,60 @@ fn spawn_game_control_buttons(builder: &mut ChildSpawnerCommands, config: &GameC
                 TextColor(colors.text_primary.clone().into()),
             ));
         });
+    });
+}
+
+fn spawn_double_three_toggle(builder: &mut ChildSpawnerCommands, config: &GameConfig) {
+    let colors = &config.colors;
+    let show_markers = config.get_double_three_markers_visibility();
+    
+    // Double Three section header
+    builder.spawn((
+        Text::new("Visual Helpers"),
+        TextFont {
+            font_size: 20.0,
+            ..default()
+        },
+        TextColor(colors.accent.clone().into()),
+        Node {
+            margin: UiRect::vertical(Val::Px(10.0)),
+            ..default()
+        },
+    ));
+
+    // Toggle button
+    builder.spawn((
+        Button,
+        PlayClickSound,
+        Node {
+            width: Val::Percent(100.0),
+            height: Val::Px(40.0),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            border: UiRect::all(Val::Px(2.0)),
+            ..default()
+        },
+        BackgroundColor(if show_markers { 
+            colors.accent.clone() 
+        } else { 
+            colors.button_normal.clone() 
+        }.into()),
+        BorderColor(colors.accent.clone().into()),
+        BorderRadius::all(Val::Px(4.0)),
+        DoubleThreeToggle,
+    )).with_children(|builder| {
+        builder.spawn((
+            Text::new(if show_markers { 
+                "DOUBLE-THREE MARKERS: ON" 
+            } else { 
+                "DOUBLE-THREE MARKERS: OFF" 
+            }),
+            TextFont {
+                font_size: 14.0,
+                ..default()
+            },
+            TextColor(colors.text_primary.clone().into()),
+        ));
     });
 }
 
