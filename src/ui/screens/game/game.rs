@@ -704,7 +704,7 @@ fn update_ai_suggestion_marker(
 ) {
     // Remove existing markers
     for entity in existing_markers.iter() {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
     
     // Only show suggestions if enabled and game is active
@@ -718,7 +718,7 @@ fn update_ai_suggestion_marker(
     };
     
     // Get the board entity
-    let Ok(board_entity) = board_query.get_single() else {
+    let Ok(board_entity) = board_query.single() else {
         return;
     };
     
@@ -1794,20 +1794,36 @@ fn show_game_over_screen(
         // Determine the title and message based on winner
         let (title, message, title_color) = match event.winner {
             Some(Player::Max) => (
-                "You Won",
-                if game_settings.versus_ai {
+                if game_settings.ai_vs_ai {
+                    "AI 1 Won"
+                } else if game_settings.versus_ai {
+                    "You Won"
+                } else {
+                    "You Won"
+                },
+                if game_settings.ai_vs_ai {
+                    "AI 1 defeated AI 2!"
+                } else if game_settings.versus_ai {
                     "You defeated the AI!"
                 } else {
-                    "Player 1 (Pink) Wins!"
+                    "Player 1 Wins!"
                 },
                 colors.accent.clone(), // Victory color
             ),
             Some(Player::Min) => (
-                if game_settings.versus_ai { "Game Over" } else { "You Won" },
-                if game_settings.versus_ai {
+                if game_settings.ai_vs_ai {
+                    "AI 2 Won"
+                } else if game_settings.versus_ai {
+                    "Game Over"
+                } else {
+                    "You Won"
+                },
+                if game_settings.ai_vs_ai {
+                    "AI 2 defeated AI 1!"
+                } else if game_settings.versus_ai {
                     "The AI has won..."
                 } else {
-                    "Player 2 (Blue) Wins!"
+                    "Player 2 Wins!"
                 },
                 if game_settings.versus_ai {
                     colors.secondary.clone() // Use secondary color for AI defeat
