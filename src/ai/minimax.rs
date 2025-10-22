@@ -190,6 +190,20 @@ pub fn mtdf(
     let hash_key = state.hash();
     let best_move = tt.get_best_move(hash_key);
     
-    (g, total_nodes, best_move)
+    // CRITICAL: Validate that the best move from TT is actually legal
+    // This is especially important when there are move restrictions (e.g., breakable five)
+    let validated_move = if let Some(mv) = best_move {
+        let legal_moves = state.get_candidate_moves();
+        if legal_moves.contains(&mv) {
+            Some(mv)
+        } else {
+            // Move from TT is not legal in current position, return first legal move as fallback
+            legal_moves.first().copied()
+        }
+    } else {
+        None
+    };
+    
+    (g, total_nodes, validated_move)
 }
 

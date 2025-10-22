@@ -596,12 +596,17 @@ pub fn update_available_placement(
         };
     
     for (entity, children, cell) in parents.iter() {
-        let _is_valid = if let Some(ref breaking_set) = breaking_moves {
+        // CRITICAL: Check if this move is valid, considering breakable five restrictions
+        let is_valid = if let Some(ref breaking_set) = breaking_moves {
+            // When there's a breakable five, ONLY breaking moves are valid
             breaking_set.contains(&(cell.x, cell.y))
         } else {
+            // Normal move validation
             game_state.board.is_empty_position(cell.x, cell.y)
                 && !DoubleThreeDetection::creates_double_three(&game_state.board, cell.x, cell.y, game_state.current_player)
+                && game_state.is_move_legal((cell.x, cell.y))
         };
+        
         let is_empty = game_state.board.is_empty_position(cell.x, cell.y);
         
         // Check if placing a stone here would create a double-three for the current player
@@ -609,7 +614,7 @@ pub fn update_available_placement(
             &game_state.board, cell.x, cell.y, game_state.current_player
         );
         
-        if is_empty && !current_player_creates_double_three {
+        if is_valid {
             // Valid placement - show preview dot
             for &child in children {
                 if let Ok((mut bg, mut visibility)) = dots.get_mut(child) {
@@ -2092,8 +2097,29 @@ fn update_current_player_display(
             }
         }
         
+        // Check if opponent has breakable five (player must break it)
+        let must_break_five = if let Some(player_in_check) = game_state.player_in_check {
+            // If a player is in check and it's the opponent's turn
+            player_in_check != game_state.current_player
+        } else {
+            false
+        };
+        
         // Determine the message based on current player and game mode
-        let message = if game_settings.ai_vs_ai {
+        let message = if must_break_five {
+            // CRITICAL: Opponent has a breakable five - player MUST break it
+            if game_settings.ai_vs_ai {
+                let ai_name = match game_state.current_player {
+                    Player::Max => "AI 1",
+                    Player::Min => "AI 2",
+                };
+                format!("⚠️ {} MUST Break the Five!", ai_name)
+            } else if is_ai_turn {
+                "⚠️ AI MUST Break the Five!".to_string()
+            } else {
+                "⚠️ MUST Break the Five!".to_string()
+            }
+        } else if game_settings.ai_vs_ai {
             // AI vs AI mode
             if *game_status == GameStatus::AIThinking {
                 let ai_name = match game_state.current_player {

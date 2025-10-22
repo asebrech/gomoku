@@ -446,7 +446,12 @@ fn test_very_complex_board_500ms() {
     println!("Board state after setup:");
     println!("Terminal: {}", state.is_terminal());
     println!("Current player: {:?}", state.current_player);
-    println!("Candidate moves count: {}", state.get_candidate_moves().len());
+    println!("Player in check: {:?}", state.player_in_check);
+    println!("Check position: {:?}", state.check_position);
+    println!("Winner: {:?}", state.winner);
+    let valid_moves = state.get_candidate_moves();
+    println!("Candidate moves count: {}", valid_moves.len());
+    println!("Candidate moves: {:?}", valid_moves);
     if let Some(winner) = state.check_winner() {
         println!("Winner: {:?}", winner);
     }
