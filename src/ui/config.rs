@@ -212,6 +212,11 @@ impl GameConfig {
         (self.settings.gameplay.show_move_hints, self.settings.gameplay.animation_speed, self.settings.gameplay.auto_save)
     }
 
+    // Get show move hints setting
+    pub fn get_show_move_hints(&self) -> bool {
+        self.settings.gameplay.show_move_hints
+    }
+
     // Save double three markers visibility setting
     pub fn save_double_three_markers_visibility(&mut self, show: bool) -> Result<(), Box<dyn std::error::Error>> {
         self.settings.gameplay.show_double_three_markers = show;
