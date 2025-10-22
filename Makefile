@@ -32,12 +32,6 @@ help:
 # Setup libs + build maximum optimized release version (slow build, best performance)
 release: setup
 	@echo "Building maximum optimized release version (this will be slow)..."
-	@echo "Setting devMode to false for release..."
-	@if [ "$$(uname -s)" = "Darwin" ]; then \
-		sed -i '' 's/"devMode": true/"devMode": false/g' config/config.json; \
-	else \
-		sed -i 's/"devMode": true/"devMode": false/g' config/config.json; \
-	fi
 	export PKG_CONFIG_PATH=$(PWD)/deps/lib/pkgconfig:$$PKG_CONFIG_PATH && cargo build --release
 	@echo "✅ Maximum optimized release build complete!"
 	@echo "Run with: make up"
@@ -45,12 +39,6 @@ release: setup
 # Setup libs + build fast release version (quick build, good performance)
 release-fast: setup
 	@echo "Building fast release version..."
-	@echo "Setting devMode to false for release..."
-	@if [ "$$(uname -s)" = "Darwin" ]; then \
-		sed -i '' 's/"devMode": true/"devMode": false/g' config/config.json; \
-	else \
-		sed -i 's/"devMode": true/"devMode": false/g' config/config.json; \
-	fi
 	export PKG_CONFIG_PATH=$(PWD)/deps/lib/pkgconfig:$$PKG_CONFIG_PATH && cargo build --profile release-dev
 	@echo "✅ Fast release build complete!"
 	@echo "Run with: make up-dev"
@@ -58,12 +46,6 @@ release-fast: setup
 # Setup libs + build development version (unoptimized, fastest build)
 dev: setup
 	@echo "Building development version (unoptimized, fastest compilation)..."
-	@echo "Setting devMode to true for development..."
-	@if [ "$$(uname -s)" = "Darwin" ]; then \
-		sed -i '' 's/"devMode": false/"devMode": true/g' config/config.json; \
-	else \
-		sed -i 's/"devMode": false/"devMode": true/g' config/config.json; \
-	fi
 	export PKG_CONFIG_PATH=$(PWD)/deps/lib/pkgconfig:$$PKG_CONFIG_PATH && cargo build
 	@echo "✅ Development build complete!"
 	@echo "Run with: make fast"
