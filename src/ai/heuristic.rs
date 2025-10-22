@@ -120,6 +120,11 @@ impl Heuristic {
     /// The penalty increases when there are fewer available escape moves, making
     /// positions with limited escape options heavily penalized.
     /// 
+    /// SMART RULE AWARENESS: This function now filters out escape moves that would
+    /// be illegal for the opponent (e.g., double-three violations). If all or most
+    /// opponent capture moves are illegal, the check penalty is greatly reduced or
+    /// eliminated, as the threat is not real!
+    /// 
     /// The base CHECK_PENALTY is applied, with additional penalty based on escape
     /// difficulty. When fewer escape moves are available, the penalty increases
     /// exponentially, encouraging the AI to avoid vulnerable positions or quickly
@@ -136,7 +141,25 @@ impl Heuristic {
                     check_pos.1,
                     player_in_check,
                 );
-                let num_escapes = breaking_moves.len().max(1) as f32;
+                
+                // SMART IMPROVEMENT: Filter out moves that would be illegal for the opponent
+                let opponent = player_in_check.opponent();
+                let legal_opponent_captures: Vec<_> = breaking_moves
+                    .into_iter()
+                    .filter(|&(row, col)| {
+                        !crate::core::rules::DoubleThreeDetection::creates_double_three(
+                            &state.board, row, col, opponent
+                        )
+                    })
+                    .collect();
+                
+                // If opponent has no legal capture moves, there's NO THREAT!
+                if legal_opponent_captures.is_empty() {
+                    return 0;  // No penalty - the "check" is meaningless
+                }
+                
+                // Calculate penalty based on LEGAL escape options only
+                let num_escapes = legal_opponent_captures.len().max(1) as f32;
                 let escape_factor = 5.0 / num_escapes;
                 let penalty = CHECK_PENALTY + (escape_factor * CHECK_PENALTY as f32) as i32;
                 

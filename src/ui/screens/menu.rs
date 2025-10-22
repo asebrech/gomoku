@@ -288,10 +288,8 @@
                     handle_video_looping,
                 ).run_if(in_state(AppState::Menu).or(in_state(AppState::HowToPlay)).or(in_state(AppState::Splash))),
             )
-            .add_systems(
-                Update,
-                hide_persistent_video_in_game.run_if(in_state(AppState::Game)),
-            )
+            // Note: hide_persistent_video_in_game runs OnEnter(AppState::Game) only
+            // No need to run it every frame in Update
             .add_systems(
                 Update,
                 (

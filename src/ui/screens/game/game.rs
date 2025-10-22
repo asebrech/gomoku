@@ -1070,6 +1070,7 @@ fn poll_ai_computation(
     mut update_ai_depth: EventWriter<UpdateAIDepthDisplay>,
     mut update_ai_nodes: EventWriter<UpdateAINodesDisplay>,
     task: Option<ResMut<AIComputeTask>>,
+    game_state: Res<GameState>,
 ) {
     // Only run if we have an active task
     let Some(mut task_res) = task else {
@@ -1091,6 +1092,16 @@ fn poll_ai_computation(
         // Handle the result
         if let Some((x, y)) = result.best_move {
             info!("AI chose move: ({}, {})", x, y);
+            
+            // Check if this position would be illegal for the opponent (double-three)
+            let opponent = game_state.current_player; // Current player is opponent after AI's turn
+            if DoubleThreeDetection::creates_double_three(&game_state.board, x, y, opponent) {
+                warn!("⚠️  AI PLACED STONE AT ILLEGAL OPPONENT POSITION: ({}, {}) - This position would create double-three for {:?}", x, y, opponent);
+                warn!("   This means AI is blocking a position the opponent can't legally play!");
+            } else {
+                info!("✓ AI move ({}, {}) is NOT an illegal position for opponent {:?}", x, y, opponent);
+            }
+            
             stone_placement.write(StonePlacement { x, y });
             *game_status = GameStatus::AwaitingUserInput;
         } else {

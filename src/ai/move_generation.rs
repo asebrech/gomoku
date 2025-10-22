@@ -7,6 +7,7 @@ use crate::ai::heuristic::{
     HALF_FREE_THREE_SCORE, DEAD_THREE_SCORE, LIVE_TWO_SCORE, HALF_FREE_TWO_SCORE
 };
 use std::collections::HashSet;
+use bevy::prelude::info;
 
 const CENTER_POSITION_BONUS: i32 = 10;
 
@@ -32,17 +33,71 @@ impl MoveGenerator {
                 return vec![winning_move];
             }
         }
-        if let Some(block_moves) = Self::find_must_block_moves(board, player.opponent()) {
-            if !block_moves.is_empty() {
-                let legal_blocks = Self::filter_double_three_moves(board, block_moves, player);
-                if !legal_blocks.is_empty() {
-                    return legal_blocks;
+        
+        // Get both offensive and defensive moves, then sort by priority
+        let mut all_candidate_moves = Vec::new();
+        
+        // Check must-block moves (opponent threats)
+        let block_moves = Self::find_must_block_moves(board, player.opponent());
+        
+        // CRITICAL: If opponent has open-four threats, ONLY return blocking moves
+        // Don't even consider offensive moves - we must block or lose immediately
+        if let Some(ref blocks) = block_moves {
+            let opponent_open_fours = Self::find_open_four_threats(board, player.opponent());
+            if !opponent_open_fours.is_empty() && !blocks.is_empty() {
+                // Filter to only open-four blocks
+                let critical_blocks: Vec<_> = blocks.iter()
+                    .filter(|&&mv| opponent_open_fours.contains(&mv))
+                    .copied()
+                    .collect();
+                if !critical_blocks.is_empty() {
+                    let legal_blocks = Self::filter_double_three_moves(board, critical_blocks, player);
+                    // Only return early if we found legal blocks
+                    // If all blocks are illegal, fall through to find other moves
+                    if !legal_blocks.is_empty() {
+                        return legal_blocks;
+                    }
                 }
             }
         }
+        
+        // No critical threats, continue with normal move generation
+        if let Some(blocks) = block_moves {
+            all_candidate_moves.extend(blocks);
+        }
+        
+        // Check our offensive threat moves (includes trap bonuses)
         let threat_moves = Self::find_threat_moves(board, player);
-        if !threat_moves.is_empty() {
-            return Self::filter_double_three_moves(board, threat_moves, player);
+        all_candidate_moves.extend(threat_moves);
+        
+        // Filter out illegal double-three moves
+        all_candidate_moves = Self::filter_double_three_moves(board, all_candidate_moves, player);
+        
+        if !all_candidate_moves.is_empty() {
+            // CRITICAL: Sort ALL moves by priority (trap bonuses included!)
+            // Must-block moves need to be evaluated with calculate_threat_priority
+            // to ensure trap moves get their huge bonus and beat regular blocks
+            
+            // Get opponent's open-four threats for absolute priority
+            let opponent_open_fours = Self::find_open_four_threats(board, player.opponent());
+            
+            let mut prioritized: Vec<((usize, usize), i32)> = all_candidate_moves
+                .into_iter()
+                .map(|mv| {
+                    let mut priority = Self::calculate_threat_priority(board, mv, player);
+                    
+                    // ABSOLUTE PRIORITY: Blocking opponent's open-four must beat EVERYTHING
+                    // Including our own trap moves! Defense first when facing immediate loss
+                    if opponent_open_fours.contains(&mv) {
+                        priority += 1_000_000; // Add 1 million to ensure it's always first
+                    }
+                    
+                    (mv, priority)
+                })
+                .collect();
+            
+            prioritized.sort_by_key(|(_, priority)| -priority);
+            return prioritized.into_iter().map(|(mv, _)| mv).collect();
         }
         let zone_moves = Self::get_zone_based_moves(board, player);
         let legal_zone_moves = Self::filter_double_three_moves(board, zone_moves, player);
@@ -140,7 +195,11 @@ impl MoveGenerator {
     /// Finds positions that block opponent's open four threats
     /// 
     /// An open four is a line of four stones with empty spaces on both ends,
-    /// creating an immediate winning threat that must be blocked
+    /// creating an immediate winning threat that must be blocked.
+    /// 
+    /// SMART RULE AWARENESS: This function now filters out threat positions that
+    /// would be illegal for the opponent (e.g., double-three violations), preventing
+    /// the AI from worrying about threats the opponent cannot actually execute.
     fn find_open_four_threats(board: &Board, player: Player) -> Vec<(usize, usize)> {
         let mut threats = HashSet::new();
         let player_bits = board.get_player_bits(player);
@@ -155,10 +214,18 @@ impl MoveGenerator {
                     let fwd_row = row as isize + dx * (forward as isize + 1);
                     let fwd_col = col as isize + dy * (forward as isize + 1);
                     if PatternAnalyzer::is_valid_empty(board, back_row, back_col) {
-                        threats.insert((back_row as usize, back_col as usize));
+                        let pos = (back_row as usize, back_col as usize);
+                        // Only add if this position is legal for the player
+                        if !DoubleThreeDetection::creates_double_three(board, pos.0, pos.1, player) {
+                            threats.insert(pos);
+                        }
                     }
                     if PatternAnalyzer::is_valid_empty(board, fwd_row, fwd_col) {
-                        threats.insert((fwd_row as usize, fwd_col as usize));
+                        let pos = (fwd_row as usize, fwd_col as usize);
+                        // Only add if this position is legal for the player
+                        if !DoubleThreeDetection::creates_double_three(board, pos.0, pos.1, player) {
+                            threats.insert(pos);
+                        }
                     }
                 }
             }
@@ -169,7 +236,11 @@ impl MoveGenerator {
     /// Finds positions that block opponent's gapped threats
     /// 
     /// Gapped threats are patterns like X.X.X or XX.X where stones are
-    /// separated by gaps but could form five-in-a-row if gaps are filled
+    /// separated by gaps but could form five-in-a-row if gaps are filled.
+    /// 
+    /// SMART RULE AWARENESS: This function now filters out threat positions that
+    /// would be illegal for the opponent (e.g., double-three violations), preventing
+    /// the AI from worrying about threats the opponent cannot actually execute.
     fn find_gapped_threats(board: &Board, player: Player) -> Vec<(usize, usize)> {
         let mut threats = HashSet::new();
         let player_bits = board.get_player_bits(player);
@@ -190,7 +261,8 @@ impl MoveGenerator {
                         break;
                     }
                 }
-                if stones_found.len() >= 3 {
+                // Check for 2+ stones to find threat extensions (X X _ patterns)
+                if stones_found.len() >= 2 {
                     let first = stones_found.first().unwrap();
                     let last = stones_found.last().unwrap();
                     let start_row = first.0 as isize;
@@ -210,9 +282,14 @@ impl MoveGenerator {
                                 threat_positions.push((gap_row as usize, gap_col as usize));
                             }
                         }
+                        // Only include gapped threats (X.X patterns) - don't add simple 2-stone extensions here
+                        // The find_threat_creating_moves function handles simple extensions better
                         if empty_gaps > 0 && stones_found.len() + empty_gaps >= 5 && empty_gaps <= 2 {
                             for pos in threat_positions {
-                                threats.insert(pos);
+                                // Only add if this position is legal for the player
+                                if !DoubleThreeDetection::creates_double_three(board, pos.0, pos.1, player) {
+                                    threats.insert(pos);
+                                }
                             }
                         }
                     }
@@ -225,13 +302,27 @@ impl MoveGenerator {
     /// Finds moves that create or block tactical threats
     /// 
     /// Combines offensive moves (create our threats) and defensive moves
-    /// (block opponent threats), prioritized by threat strength
+    /// (block opponent threats), prioritized by threat strength.
+    /// 
+    /// CRITICAL FIX: Opponent threat positions are now filtered to exclude
+    /// illegal double-three moves. There's no point blocking a position the
+    /// opponent can't legally play!
     fn find_threat_moves(board: &Board, player: Player) -> Vec<(usize, usize)> {
         let mut moves = HashSet::new();
         let our_threats = Self::find_threat_creating_moves(board, player);
         moves.extend(our_threats);
+        
+        // Get opponent threats but FILTER OUT illegal double-three positions
         let opp_threats = Self::find_threat_creating_moves(board, player.opponent());
-        moves.extend(opp_threats);
+        let opponent = player.opponent();
+        
+        // Only include opponent threats that are actually legal for them
+        let legal_opp_threats = opp_threats
+            .into_iter()
+            .filter(|&(row, col)| !DoubleThreeDetection::creates_double_three(board, row, col, opponent));
+        
+        moves.extend(legal_opp_threats);
+        
         let filtered_moves: Vec<(usize, usize)> = moves.into_iter().collect();
         let mut prioritized_moves: Vec<((usize, usize), i32)> = filtered_moves
             .into_iter()
@@ -253,8 +344,12 @@ impl MoveGenerator {
     /// - Pattern values (offensive moves weighted 2x, defensive 1x)
     /// - Capture bonus for moves creating capture opportunities
     /// - Small center position bonus decreasing with distance
+    /// 
+    /// SMART RULE AWARENESS: Adds bonus if this move creates threats in positions
+    /// where opponent cannot legally respond (e.g., double-three restrictions).
     fn calculate_threat_priority(board: &Board, mv: (usize, usize), player: Player) -> i32 {
         let (row, col) = mv;
+        
         let mut priority = 0;
         for &check_player in &[player, player.opponent()] {
             let player_priority = Self::calculate_player_threat_value(board, row, col, check_player);
@@ -264,12 +359,111 @@ impl MoveGenerator {
                 priority += player_priority; 
             }
         }
+        
         let capture_bonus = Self::calculate_capture_bonus(board, row, col, player);
         priority += capture_bonus;
+        
+        // SMART IMPROVEMENT: Illegal response bonus temporarily disabled to avoid
+        // over-prioritizing moves in positions surrounded by opponent stones
+        // TODO: Re-enable with better heuristic that only applies to forcing moves
+        let illegal_response_bonus = 0;
+        
+        // ADVANCED TACTIC: "Double-Three Trap"
+        // Award huge bonus if this move creates a threat that FORCES opponent to respond,
+        // but all response positions would create illegal double-three for them!
+        // This is a devastating tactical weapon - opponent must choose between:
+        // 1. Ignore our threat and let us win
+        // 2. Respond and create illegal double-three (forfeit/invalid move)
+        let trap_bonus = Self::calculate_double_three_trap_bonus(board, row, col, player);
+        priority += trap_bonus;
+        
         let center = board.size / 2;
         let distance = Self::manhattan_distance(row, col, center, center) as i32;
         priority += CENTER_POSITION_BONUS - distance.min(CENTER_POSITION_BONUS);
         priority
+    }
+
+    /// Calculates bonus for creating a "Double-Three Trap"
+    /// 
+    /// This advanced tactic creates a forcing threat where the opponent MUST respond,
+    /// but all natural blocking positions would create illegal double-three for them.
+    /// 
+    /// The trap works by:
+    /// 1. Our move creates a strong threat (3 or 4 in a row)
+    /// 2. Opponent needs to block to prevent our win
+    /// 3. All blocking positions create double-three for opponent (illegal!)
+    /// 4. Result: Opponent is paralyzed - can't ignore, can't respond legally
+    /// 
+    /// Returns: Large bonus if trap is detected (200+ points)
+    fn calculate_double_three_trap_bonus(board: &Board, row: usize, col: usize, player: Player) -> i32 {
+        let opponent = player.opponent();
+        let mut bonus = 0;
+        
+        // Simulate placing our stone
+        let mut test_board = board.clone();
+        test_board.place_stone(row, col, player);
+        
+        // Check each direction for threats we create
+        for &(dx, dy) in &DIRECTIONS {
+            let backward = PatternAnalyzer::count_consecutive(&test_board, row, col, -dx, -dy, player);
+            let forward = PatternAnalyzer::count_consecutive(&test_board, row, col, dx, dy, player);
+            let total_stones = backward + forward + 1;
+            
+            // We need at least 3 in a row to create a forcing threat
+            if total_stones >= 3 {
+                // Find all positions opponent would want to block
+                let mut blocking_positions = Vec::new();
+                
+                // Check extensions on both ends of our line
+                let back_row = row as isize - dx * (backward as isize + 1);
+                let back_col = col as isize - dy * (backward as isize + 1);
+                if PatternAnalyzer::is_valid_empty(&test_board, back_row, back_col) {
+                    blocking_positions.push((back_row as usize, back_col as usize));
+                }
+                
+                let fwd_row = row as isize + dx * (forward as isize + 1);
+                let fwd_col = col as isize + dy * (forward as isize + 1);
+                if PatternAnalyzer::is_valid_empty(&test_board, fwd_row, fwd_col) {
+                    blocking_positions.push((fwd_row as usize, fwd_col as usize));
+                }
+                
+                // Check if ALL blocking positions are illegal for opponent
+                if !blocking_positions.is_empty() {
+                    let all_illegal = blocking_positions.iter().all(|&(br, bc)| {
+                        DoubleThreeDetection::creates_double_three(&test_board, br, bc, opponent)
+                    });
+                    
+                    if all_illegal {
+                        // JACKPOT! Opponent can't block without creating double-three!
+                        if total_stones == 4 {
+                            // 4 in a row with all blocks illegal = GAME OVER (undefendable)
+                            // This should beat ANY regular 4-in-a-row because it's undefendable
+                            bonus += 50_000;
+                        } else if total_stones == 3 {
+                            // 3 in a row with all blocks illegal = extremely strong
+                            // Better than a defendable 4-in-a-row because it leads to certain win!
+                            // The opponent literally cannot stop this without creating illegal double-three
+                            bonus += 40_000;
+                        }
+                    } else {
+                        // Partial trap: Some blocks are illegal
+                        let illegal_count = blocking_positions.iter()
+                            .filter(|&&(br, bc)| {
+                                DoubleThreeDetection::creates_double_three(&test_board, br, bc, opponent)
+                            })
+                            .count();
+                        
+                        if illegal_count > 0 {
+                            // Award proportional bonus
+                            let ratio = illegal_count as f32 / blocking_positions.len() as f32;
+                            bonus += (100.0 * ratio) as i32;
+                        }
+                    }
+                }
+            }
+        }
+        
+        bonus
     }
 
     /// Calculates the threat value of placing a stone for a specific player
@@ -317,7 +511,10 @@ impl MoveGenerator {
     /// Calculates bonus points for moves that create capture opportunities
     /// 
     /// Searches all directions for patterns where placing a stone would
-    /// create a capture situation (our stone - opponent - opponent - our stone)
+    /// create a capture situation (our stone - opponent - opponent - our stone).
+    /// 
+    /// SMART RULE AWARENESS: Provides extra bonus if the capture spot would be
+    /// illegal for the opponent (e.g., double-three), making it a safe advantage.
     fn calculate_capture_bonus(board: &Board, row: usize, col: usize, player: Player) -> i32 {
         let mut bonus = 0;
         let opponent = player.opponent();
@@ -343,7 +540,11 @@ impl MoveGenerator {
                                         let end_col = end_col as usize;
                                         if let Some(piece_player) = board.get_player(end_row, end_col) {
                                             if piece_player == player {
-                                                bonus += CAPTURE_BONUS_MULTIPLIER / 50; 
+                                                bonus += CAPTURE_BONUS_MULTIPLIER / 50;
+                                                // Extra bonus if opponent cannot legally capture back
+                                                if DoubleThreeDetection::creates_double_three(board, row, col, opponent) {
+                                                    bonus += CAPTURE_BONUS_MULTIPLIER / 25;
+                                                }
                                             }
                                         }
                                     }
