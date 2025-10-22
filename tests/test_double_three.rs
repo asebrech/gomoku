@@ -851,24 +851,23 @@ fn test_creates_double_three_diagonal() {
     fn test_enhanced_complex_blocking_scenario() {
         let mut board = Board::new(19);
         
-        // Complex scenario with multiple stones and blocking attempts
+        // Complex scenario with multiple stones
+        // Opponent stone in the middle DOES break the pattern
         
-        // Create a pattern where opponent has tried to block but failed
-        // Horizontal: X O X _ with extension possibility
+        // Create valid patterns without opponent stones in between
+        // Horizontal: X X _ with extension possibility
         board.place_stone(10, 8, Player::Max);
-        board.place_stone(10, 9, Player::Min);  // Opponent tried to block
-        board.place_stone(10, 10, Player::Max);
-        // Can extend at (10, 12) to form X O X X with threat at (10, 13)
+        board.place_stone(10, 9, Player::Max);
+        // Playing at (10, 10) would form X X X
         
         // Vertical: X X _ with clear extensions
-        board.place_stone(8, 11, Player::Max);
-        board.place_stone(9, 11, Player::Max);
-        // Extensions at (7, 11) and (12, 11)
+        board.place_stone(8, 10, Player::Max);
+        board.place_stone(9, 10, Player::Max);
+        // Extensions at (7, 10) and (11, 10)
         
-        // Playing at (10, 11) should create double-three
-        // The horizontal pattern X O X X can still threaten
-        // The vertical pattern X X X can threaten in both directions
-        assert!(DoubleThreeDetection::creates_double_three(&board, 10, 11, Player::Max));
+        // Playing at (10, 10) should create double-three
+        // Both horizontal and vertical form valid free-threes
+        assert!(DoubleThreeDetection::creates_double_three(&board, 10, 10, Player::Max));
     }
 
     #[test]
@@ -965,22 +964,21 @@ fn test_creates_double_three_diagonal() {
     fn test_enhanced_opponent_stone_interference() {
         let mut board = Board::new(19);
         
-        // Test that opponent stones in the middle don't prevent threat formation
-        // if the pattern can still form a threatening four
+        // Test that opponent stones in the middle DO prevent free-three formation
+        // because they break the continuity of the pattern
         
-        // Pattern: X O _ X with extensions
+        // Pattern: X O _ X with opponent in between
         board.place_stone(10, 8, Player::Max);
-        board.place_stone(10, 9, Player::Min);  // Opponent stone
+        board.place_stone(10, 9, Player::Min);  // Opponent stone breaks the pattern
         board.place_stone(10, 11, Player::Max);
-        // Extension at (10, 12) would create X O X X, threatening at (10, 13)
         
         // Vertical pattern: clear X X _
         board.place_stone(8, 10, Player::Max);
         board.place_stone(9, 10, Player::Max);
-        // Extensions at (7, 10) and (12, 10)
         
-        // This should create double-three because both patterns can threaten
-        assert!(DoubleThreeDetection::creates_double_three(&board, 10, 10, Player::Max));
+        // This should NOT create double-three because horizontal is broken by opponent
+        // Only vertical forms a valid free-three (need 2 for double-three)
+        assert!(!DoubleThreeDetection::creates_double_three(&board, 10, 10, Player::Max));
     }
 
     #[test]
@@ -1170,4 +1168,190 @@ fn test_creates_double_three_diagonal() {
         assert!(!DoubleThreeDetection::creates_double_three(&board, 18, 18, Player::Max));
         assert!(!DoubleThreeDetection::creates_double_three(&board, 0, 18, Player::Max));
         assert!(!DoubleThreeDetection::creates_double_three(&board, 18, 0, Player::Max));
+    }
+
+    #[test]
+    fn test_blocked_pattern_not_double_three_horizontal() {
+        let mut board = Board::new(19);
+        
+        // Create pattern: XX?X where ? is blocked by opponent
+        // Horizontal pattern with opponent stone blocking
+        board.place_stone(9, 8, Player::Max);   // First X
+        board.place_stone(9, 9, Player::Max);   // Second X
+        board.place_stone(9, 11, Player::Max);  // Fourth X
+        board.place_stone(9, 10, Player::Min);  // Opponent blocking at position 10
+        
+        // Vertical pattern
+        board.place_stone(8, 12, Player::Max);
+        board.place_stone(10, 12, Player::Max);
+        
+        // Placing at (9, 12) should NOT create double-three because horizontal is blocked
+        // Only vertical would be a free-three, so we need just 1, not 2
+        assert!(!DoubleThreeDetection::creates_double_three(&board, 9, 12, Player::Max));
+    }
+
+    #[test]
+    fn test_blocked_pattern_not_double_three_vertical() {
+        let mut board = Board::new(19);
+        
+        // Create pattern where vertical is blocked by opponent
+        // Vertical: X X O X (opponent blocks the pattern)
+        board.place_stone(8, 9, Player::Max);
+        board.place_stone(9, 9, Player::Max);
+        board.place_stone(10, 9, Player::Min);  // Opponent blocking
+        board.place_stone(11, 9, Player::Max);
+        
+        // Horizontal pattern
+        board.place_stone(12, 8, Player::Max);
+        board.place_stone(12, 10, Player::Max);
+        
+        // Placing at (12, 9) should NOT create double-three because vertical is blocked
+        assert!(!DoubleThreeDetection::creates_double_three(&board, 12, 9, Player::Max));
+    }
+
+    #[test]
+    fn test_screenshot_scenario_exact() {
+        // Recreate the exact scenario from the screenshot
+        // Pink stones (Player::Max) and Blue stones (Player::Min)
+        let mut board = Board::new(19);
+        
+        // From the screenshot, I can see:
+        // - Several pink stones forming potential patterns
+        // - A blue stone blocking one of the patterns
+        // - The cursor position where placement is forbidden (but shouldn't be)
+        
+        // Let me recreate the pattern visible in screenshot:
+        // Pink stone at top-left area
+        board.place_stone(5, 6, Player::Max);
+        
+        // Pink stones forming a diagonal
+        board.place_stone(6, 7, Player::Max);
+        board.place_stone(7, 8, Player::Max);
+        
+        // Blue stone blocking horizontal extension
+        board.place_stone(7, 9, Player::Min);
+        
+        // Pink stone on right
+        board.place_stone(8, 10, Player::Max);
+        
+        // Another pink stone below
+        board.place_stone(8, 8, Player::Max);
+        
+        // The position being tested (around 7, 7 based on screenshot)
+        // This should NOT be a double-three because one pattern is blocked by blue
+        assert!(!DoubleThreeDetection::creates_double_three(&board, 7, 7, Player::Max));
+    }
+
+    #[test]
+    fn test_opponent_stone_breaks_free_three() {
+        let mut board = Board::new(19);
+        
+        // Pattern: X X O ? X
+        // The opponent stone O breaks the continuity
+        board.place_stone(10, 5, Player::Max);
+        board.place_stone(10, 6, Player::Max);
+        board.place_stone(10, 7, Player::Min);  // Opponent in the middle
+        board.place_stone(10, 9, Player::Max);
+        
+        // Another direction
+        board.place_stone(9, 8, Player::Max);
+        board.place_stone(11, 8, Player::Max);
+        
+        // Placing at (10, 8) should not create double-three
+        // because horizontal is broken by opponent
+        assert!(!DoubleThreeDetection::creates_double_three(&board, 10, 8, Player::Max));
+    }
+
+    #[test]
+    fn test_opponent_blocks_extension_space() {
+        let mut board = Board::new(19);
+        
+        // Create a three that cannot extend to open four due to BOTH ends blocked
+        // Pattern: O X X ? X O
+        board.place_stone(10, 5, Player::Min);  // Opponent blocks left end
+        board.place_stone(10, 6, Player::Max);
+        board.place_stone(10, 7, Player::Max);
+        board.place_stone(10, 9, Player::Max);
+        board.place_stone(10, 10, Player::Min); // Opponent blocks right end
+        
+        // Other direction (valid free-three)
+        board.place_stone(9, 8, Player::Max);
+        board.place_stone(11, 8, Player::Max);
+        
+        // Placing at (10, 8) creates horizontal X X X X but both ends are blocked
+        // so horizontal is NOT a free-three (cannot form open four)
+        // Only vertical is a valid free-three, so NOT a double-three
+        let result = DoubleThreeDetection::creates_double_three(&board, 10, 8, Player::Max);
+        
+        // This should be false because horizontal is completely blocked
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_both_ends_need_checking() {
+        let mut board = Board::new(19);
+        
+        // Pattern where BOTH ends are blocked: O X X ? X O
+        board.place_stone(10, 5, Player::Min);   // Left blocker
+        board.place_stone(10, 6, Player::Max);
+        board.place_stone(10, 7, Player::Max);
+        board.place_stone(10, 9, Player::Max);
+        board.place_stone(10, 10, Player::Min);  // Right blocker
+        
+        // Another direction
+        board.place_stone(9, 8, Player::Max);
+        board.place_stone(11, 8, Player::Max);
+        
+        // Should NOT be double-three - horizontal is completely blocked
+        assert!(!DoubleThreeDetection::creates_double_three(&board, 10, 8, Player::Max));
+    }
+
+    #[test]
+    fn test_diagonal_blocked_by_opponent() {
+        let mut board = Board::new(19);
+        
+        // Diagonal pattern blocked by opponent
+        board.place_stone(7, 7, Player::Max);
+        board.place_stone(8, 8, Player::Max);
+        board.place_stone(9, 9, Player::Min);  // Opponent blocks diagonal
+        board.place_stone(10, 10, Player::Max);
+        
+        // Horizontal pattern (valid)
+        board.place_stone(11, 10, Player::Max);
+        board.place_stone(11, 12, Player::Max);
+        
+        // Should NOT be double-three - diagonal is blocked
+        assert!(!DoubleThreeDetection::creates_double_three(&board, 11, 11, Player::Max));
+    }
+
+    #[test]
+    fn test_mixed_blocking_scenarios() {
+        let mut board = Board::new(19);
+        
+        // Scenario 1: One direction blocked in middle
+        board.place_stone(5, 5, Player::Max);
+        board.place_stone(5, 6, Player::Max);
+        board.place_stone(5, 7, Player::Min);  // Blocks horizontal
+        board.place_stone(5, 8, Player::Max);
+        
+        board.place_stone(6, 7, Player::Max);
+        board.place_stone(7, 7, Player::Max);
+        
+        // Vertical is valid free-three, horizontal is blocked
+        assert!(!DoubleThreeDetection::creates_double_three(&board, 4, 7, Player::Max));
+        
+        // Scenario 2: Both directions completely blocked (both ends)
+        let mut board2 = Board::new(19);
+        board2.place_stone(10, 9, Player::Min);  // Blocks horizontal left
+        board2.place_stone(10, 10, Player::Max);
+        board2.place_stone(10, 11, Player::Max);
+        board2.place_stone(10, 13, Player::Min);  // Blocks horizontal right
+        
+        board2.place_stone(9, 12, Player::Min);  // Blocks vertical up
+        board2.place_stone(11, 12, Player::Max);
+        board2.place_stone(12, 12, Player::Max);
+        board2.place_stone(13, 12, Player::Min);  // Blocks vertical down
+        
+        // Both directions completely blocked at BOTH ends - definitely not double-three
+        assert!(!DoubleThreeDetection::creates_double_three(&board2, 10, 12, Player::Max));
     }
