@@ -243,8 +243,24 @@ pub fn lazy_smp_search(
         best_move = shared_move;
     }
 
+    // CRITICAL: Validate that the best move is actually legal in the CURRENT position
+    // This is essential when there are move restrictions (e.g., player must respond to breakable five)
+    // The search may have been done on cloned states, but the final move must be valid for the original state
+    let validated_best_move = if let Some(mv) = best_move {
+        let legal_moves = state.get_candidate_moves();
+        if legal_moves.contains(&mv) {
+            Some(mv)
+        } else {
+            // The move from search is not legal in current position
+            // Return the first legal move as a safe fallback
+            legal_moves.first().copied()
+        }
+    } else {
+        None
+    };
+
     SearchResult {
-        best_move,
+        best_move: validated_best_move,
         score: best_score,
         depth_reached: shared_state
             .depth_reached

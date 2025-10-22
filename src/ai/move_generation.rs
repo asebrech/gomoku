@@ -99,6 +99,7 @@ impl MoveGenerator {
             prioritized.sort_by_key(|(_, priority)| -priority);
             return prioritized.into_iter().map(|(mv, _)| mv).collect();
         }
+        
         let zone_moves = Self::get_zone_based_moves(board, player);
         let legal_zone_moves = Self::filter_double_three_moves(board, zone_moves, player);
         

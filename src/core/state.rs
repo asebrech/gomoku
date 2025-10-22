@@ -78,7 +78,10 @@ impl GameState {
 
     pub fn get_candidate_moves(&self) -> Vec<(usize, usize)> {
         if let Some(player_in_check) = self.player_in_check {
-            if player_in_check == self.current_player {
+            // If a player is in check (has a breakable five), the OPPONENT must break it
+            // player_in_check = player who HAS the breakable five
+            // current_player = player whose turn it is (the opponent)
+            if player_in_check != self.current_player {
                 if let Some(check_pos) = self.check_position {
                     let breaking_moves = CaptureBreaking::get_breaking_capture_moves(&self.board, check_pos.0, check_pos.1, player_in_check);
                     if !breaking_moves.is_empty() {
@@ -107,7 +110,10 @@ impl GameState {
         }
         
         if let Some(player_in_check) = self.player_in_check {
-            if player_in_check == self.current_player {
+            // If a player is in check (has a breakable five), the OPPONENT must break it
+            // player_in_check = player who HAS the breakable five
+            // current_player = player whose turn it is (the opponent)
+            if player_in_check != self.current_player {
                 if let Some(check_pos) = self.check_position {
                     let breaking_moves = CaptureBreaking::get_breaking_capture_moves(&self.board, check_pos.0, check_pos.1, player_in_check);
                     if !breaking_moves.is_empty() {
