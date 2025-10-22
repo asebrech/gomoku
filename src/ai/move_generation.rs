@@ -42,8 +42,13 @@ impl MoveGenerator {
         }
         let threat_moves = Self::find_threat_moves(board, player);
         if !threat_moves.is_empty() {
-            return Self::filter_double_three_moves(board, threat_moves, player);
+            let legal_threats = Self::filter_double_three_moves(board, threat_moves, player);
+            if !legal_threats.is_empty() {
+                return legal_threats;
+            }
+            // If all threat moves are illegal, fall through to zone-based moves
         }
+        
         let zone_moves = Self::get_zone_based_moves(board, player);
         let legal_zone_moves = Self::filter_double_three_moves(board, zone_moves, player);
         
