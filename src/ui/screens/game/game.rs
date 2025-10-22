@@ -19,7 +19,7 @@ use crate::{
         screens::{
             game::{
                 board::{BoardRoot, BoardUtils, PreviewDot, GhostStone}, 
-                settings::{spawn_settings_panel, BackToMenuButton, ResetBoardButton, UndoMoveButton, VolumeDisplay, VolumeDown, VolumeUp}
+                settings::{spawn_settings_panel, BackToMenuButton, ResetBoardButton, UndoMoveButton, VolumeDisplay, VolumeDown, VolumeUp, DoubleThreeToggle}
             }, menu::{GameAudio, MenuState}, splash::PreloadedStones, utils::despawn_screen
         },
     }
@@ -187,6 +187,11 @@ pub fn game_plugin(app: &mut App) {
                 process_next_round.run_if(on_event::<MovePlayed>),
                 start_ai_computation,  // Start async AI computation
                 poll_ai_computation,   // Poll for AI computation results
+            ).chain()
+        )
+        .add_systems(
+            Update,
+            (
                 update_available_placement.run_if(
                     on_event::<MovePlayed>
                         .or(resource_changed::<GameState>)
@@ -228,6 +233,7 @@ pub fn game_plugin(app: &mut App) {
                 handle_back_to_menu_button,
                 handle_next_move_button,
                 handle_auto_play_toggle,
+                handle_double_three_toggle,
                 handle_ai_vs_ai_auto_play,
                 show_game_over_screen.run_if(on_event::<GameEnded>),
                 handle_game_over_actions,
@@ -529,7 +535,7 @@ pub fn update_available_placement(
     mut commands: Commands,
     mut ev_board_update: EventReader<MovePlayed>,
     game_state: Res<GameState>,
-    game_settings: Res<GameSettings>,
+    config: Res<GameConfig>,
     parents: Query<(Entity, &Children, &GridCell), With<GridCell>>,
     mut dots: Query<(&mut BackgroundColor, &mut Visibility), With<PreviewDot>>,
     forbidden_markers: Query<Entity, With<ForbiddenMarker>>,
@@ -549,6 +555,9 @@ pub fn update_available_placement(
     };
 
     info!("Updating stone preview...");
+    
+    // Get the double three markers visibility setting
+    let show_double_three_markers = config.get_double_three_markers_visibility();
     
     let breaking_moves: Option<std::collections::HashSet<(usize, usize)>> = 
         if let Some(player_in_check) = game_state.player_in_check {
@@ -579,9 +588,13 @@ pub fn update_available_placement(
                 && !DoubleThreeDetection::creates_double_three(&game_state.board, cell.x, cell.y, game_state.current_player)
         };
         let is_empty = game_state.board.is_empty_position(cell.x, cell.y);
-        let creates_double_three = DoubleThreeDetection::creates_double_three(&game_state.board, cell.x, cell.y, game_state.current_player);
         
-        if is_empty && !creates_double_three {
+        // Check if placing a stone here would create a double-three for the current player
+        let current_player_creates_double_three = DoubleThreeDetection::creates_double_three(
+            &game_state.board, cell.x, cell.y, game_state.current_player
+        );
+        
+        if is_empty && !current_player_creates_double_three {
             // Valid placement - show preview dot
             for &child in children {
                 if let Ok((mut bg, mut visibility)) = dots.get_mut(child) {
@@ -590,8 +603,8 @@ pub fn update_available_placement(
                     commands.entity(entity).insert(AvailableArea);
                 }
             }
-        } else if is_empty && creates_double_three {
-            // Forbidden placement - hide preview dot and show red cross
+        } else if is_empty && current_player_creates_double_three {
+            // Forbidden placement for current player - hide preview dot and show red cross
             for &child in children {
                 if let Ok((mut bg, mut visibility)) = dots.get_mut(child) {
                     *bg = BackgroundColor(Color::NONE);
@@ -599,8 +612,10 @@ pub fn update_available_placement(
                     commands.entity(entity).remove::<AvailableArea>();
                 }
             }
-            // Spawn forbidden cross marker
-            spawn_forbidden_cross(&mut commands, board_entity, cell.x, cell.y);
+            // Show forbidden cross marker if enabled (only for current player's forbidden moves)
+            if show_double_three_markers {
+                spawn_forbidden_cross(&mut commands, board_entity, cell.x, cell.y);
+            }
         } else {
             // Occupied position - hide preview dot
             for &child in children {
@@ -2337,6 +2352,49 @@ fn handle_auto_play_toggle(
                     };
                 }
             }
+        }
+    }
+}
+
+fn handle_double_three_toggle(
+    mut interaction_query: Query<(&Interaction, &Children, &mut BackgroundColor), (Changed<Interaction>, With<DoubleThreeToggle>)>,
+    mut text_query: Query<&mut Text>,
+    mut config: ResMut<GameConfig>,
+    mut move_played: EventWriter<MovePlayed>,
+) {
+    for (interaction, children, mut bg_color) in interaction_query.iter_mut() {
+        if *interaction == Interaction::Pressed {
+            let current_state = config.get_double_three_markers_visibility();
+            let new_state = !current_state;
+            
+            info!("Double Three Markers toggled: {}", new_state);
+            
+            // Save to config file
+            if let Err(e) = config.save_double_three_markers_visibility(new_state) {
+                error!("Failed to save double-three markers setting: {}", e);
+            }
+            
+            // Update button appearance
+            let colors = &config.colors;
+            *bg_color = BackgroundColor(if new_state { 
+                colors.accent.clone() 
+            } else { 
+                colors.button_normal.clone() 
+            }.into());
+            
+            // Update button text
+            for child in children.iter() {
+                if let Ok(mut text) = text_query.get_mut(child) {
+                    text.0 = if new_state {
+                        "DOUBLE-THREE MARKERS: ON".to_string()
+                    } else {
+                        "DOUBLE-THREE MARKERS: OFF".to_string()
+                    };
+                }
+            }
+            
+            // Trigger board update to refresh markers
+            move_played.write(MovePlayed);
         }
     }
 }
