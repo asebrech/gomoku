@@ -19,7 +19,7 @@ use crate::{
         screens::{
             game::{
                 board::{BoardRoot, BoardUtils, PreviewDot, GhostStone}, 
-                settings::{spawn_settings_panel, BackToMenuButton, ResetBoardButton, UndoMoveButton, VolumeDisplay, VolumeDown, VolumeUp, DoubleThreeToggle}
+                settings::{spawn_settings_panel, BackToMenuButton, ResetBoardButton, UndoMoveButton, VolumeDisplay, VolumeDown, VolumeUp, DoubleThreeToggle, AISuggestionToggle}
             }, menu::{GameAudio, MenuState}, splash::PreloadedStones, utils::despawn_screen
         },
     }
@@ -162,6 +162,7 @@ pub fn game_plugin(app: &mut App) {
         .init_resource::<AINodesSearched>()
         .init_resource::<AIThinkingFrames>()
         .init_resource::<AIvsAIState>()
+        .init_resource::<AISuggestedMove>()
         .add_event::<GameEnded>()
         .add_event::<StonePlacement>()
         .add_event::<MovePlayed>()
@@ -187,7 +188,15 @@ pub fn game_plugin(app: &mut App) {
                 process_next_round.run_if(on_event::<MovePlayed>),
                 start_ai_computation,  // Start async AI computation
                 poll_ai_computation,   // Poll for AI computation results
+                poll_ai_suggestion,    // Poll for AI suggestion results (needs to run every frame to check task)
             ).chain()
+        )
+        .add_systems(
+            Update,
+            compute_ai_suggestion.run_if(
+                on_event::<MovePlayed>
+                    .or(resource_changed::<GameConfig>)
+            ),
         )
         .add_systems(
             Update,
@@ -197,6 +206,11 @@ pub fn game_plugin(app: &mut App) {
                         .or(resource_changed::<GameState>)
                 ),
                 handle_ghost_stone_hover, // Run after update_available_placement
+                update_ai_suggestion_marker.run_if(
+                    resource_changed::<AISuggestedMove>
+                        .or(resource_changed::<GameStatus>)
+                        .or(on_event::<MovePlayed>)
+                ),
                 update_current_player_display.run_if(
                     resource_changed::<GameState>
                         .or(resource_changed::<GameStatus>)
@@ -234,6 +248,7 @@ pub fn game_plugin(app: &mut App) {
                 handle_next_move_button,
                 handle_auto_play_toggle,
                 handle_double_three_toggle,
+                handle_ai_suggestion_toggle,
                 handle_ai_vs_ai_auto_play,
                 show_game_over_screen.run_if(on_event::<GameEnded>),
                 handle_game_over_actions,
@@ -674,6 +689,58 @@ fn spawn_forbidden_cross(commands: &mut Commands, board_entity: Entity, cell_x: 
     });
 }
 
+fn update_ai_suggestion_marker(
+    mut commands: Commands,
+    config: Res<GameConfig>,
+    suggested_move: Res<AISuggestedMove>,
+    game_status: Res<GameStatus>,
+    board_query: Query<Entity, With<BoardRoot>>,
+    existing_markers: Query<Entity, With<AISuggestionMarker>>,
+) {
+    // Remove existing markers
+    for entity in existing_markers.iter() {
+        commands.entity(entity).despawn_recursive();
+    }
+    
+    // Only show suggestions if enabled and game is active
+    if !config.get_show_move_hints() || *game_status != GameStatus::AwaitingUserInput {
+        return;
+    }
+    
+    // Only show if we have a suggested move
+    let Some((x, y)) = suggested_move.position else {
+        return;
+    };
+    
+    // Get the board entity
+    let Ok(board_entity) = board_query.get_single() else {
+        return;
+    };
+    
+    // Spawn the suggestion marker (a pulsing circle)
+    let marker_size = BoardUtils::STONE_SIZE * 0.4;
+    let marker_center_x = x as f32 * BoardUtils::CELL_SIZE + BoardUtils::CELL_SIZE / 2.0;
+    let marker_center_y = y as f32 * BoardUtils::CELL_SIZE + BoardUtils::CELL_SIZE / 2.0;
+    
+    commands.entity(board_entity).with_children(|builder| {
+        builder.spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(marker_center_x - marker_size / 2.0),
+                top: Val::Px(marker_center_y - marker_size / 2.0),
+                width: Val::Px(marker_size),
+                height: Val::Px(marker_size),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.0, 1.0, 0.5, 0.6)), // Semi-transparent cyan-green
+            BorderRadius::all(Val::Percent(50.0)), // Make it circular
+            ZIndex(15), // Below forbidden markers but above stones
+            AISuggestionMarker,
+            OnGameScreen,
+        ));
+    });
+}
+
 pub fn place_stone(
     mut commands: Commands,
     config: Res<GameConfig>,
@@ -683,6 +750,7 @@ pub fn place_stone(
     mut ev_stone_placement: EventReader<StonePlacement>,
     mut move_played: EventWriter<MovePlayed>,
     mut stone_sound: EventWriter<PlayStonePlacementSound>,
+    mut suggested_move: ResMut<AISuggestedMove>,
     stones: Query<(Entity, &GridCell, &Stone)>,
 ) {
     for ev in ev_stone_placement.read() {
@@ -690,6 +758,9 @@ pub fn place_stone(
         
         // Play stone placement sound (randomized)
         stone_sound.write(PlayStonePlacementSound);
+        
+        // Clear AI suggestion when a move is played
+        suggested_move.position = None;
         
         // Get the player BEFORE making the move (they're the one placing the stone)
         let player = game_state.current_player;
@@ -1132,6 +1203,94 @@ fn poll_ai_computation(
     }
 }
 
+/// Start AI suggestion computation as an async task
+fn compute_ai_suggestion(
+    mut commands: Commands,
+    settings: Res<GameSettings>,
+    game_state: Res<GameState>,
+    game_status: Res<GameStatus>,
+    config: Res<GameConfig>,
+    existing_task: Option<Res<AISuggestionTask>>,
+) {
+    // Only compute suggestions if enabled in config
+    if !config.get_show_move_hints() {
+        return;
+    }
+    
+    // Don't compute suggestions in AI vs AI mode (it's useless there)
+    if settings.ai_vs_ai {
+        return;
+    }
+    
+    // Only compute when game is active and waiting for input
+    if *game_status != GameStatus::AwaitingUserInput {
+        return;
+    }
+    
+    // Don't start a new task if one is already running
+    if existing_task.is_some() {
+        return;
+    }
+    
+    // In vs AI mode, only suggest when it's the human player's turn (Player::Max)
+    // In multiplayer mode, always suggest (help both players)
+    if settings.versus_ai {
+        let current_player = game_state.current_player;
+        if current_player == Player::Min {
+            // It's AI's turn, not human's turn
+            return;
+        }
+    }
+    
+    info!("Starting AI suggestion computation...");
+
+    
+    // Clone the data we need for the task
+    let game_state_clone = game_state.clone();
+    let ai_depth = settings.ai_depth;
+    let time_limit_ms = settings.time_limit.unwrap_or(500); // Default 500ms if not set
+    
+    // Spawn the AI suggestion computation on the async compute thread pool
+    let thread_pool = AsyncComputeTaskPool::get();
+    let task = thread_pool.spawn(async move {
+        let mut state = game_state_clone;
+        info!("AI suggestion using Lazy SMP search with {}ms time limit and max depth {}", time_limit_ms, ai_depth);
+        lazy_smp_search(&mut state, time_limit_ms as u64, ai_depth, None)
+    });
+    
+    // Store the task as a resource
+    commands.insert_resource(AISuggestionTask(task));
+}
+
+/// Poll the AI suggestion computation task for results
+fn poll_ai_suggestion(
+    mut commands: Commands,
+    mut suggested_move: ResMut<AISuggestedMove>,
+    task: Option<ResMut<AISuggestionTask>>,
+) {
+    // Only run if we have an active task
+    let Some(mut task_res) = task else {
+        return;
+    };
+    
+    // Poll the task to see if it's complete
+    if let Some(result) = future::block_on(future::poll_once(&mut task_res.0)) {
+        info!("AI suggestion computation complete!");
+        
+        // Store the suggested move
+        if let Some((x, y)) = result.best_move {
+            info!("AI suggests move: ({}, {})", x, y);
+            suggested_move.position = Some((x, y));
+        } else {
+            info!("AI has no suggested moves");
+            suggested_move.position = None;
+        }
+        
+        // Remove the task resource now that it's complete
+        commands.remove_resource::<AISuggestionTask>();
+    }
+}
+
 pub fn update_ai_time_display(
     mut query: Query<&mut Text, With<AITimeText>>,
     ai_time: Res<AITimeTaken>,
@@ -1253,6 +1412,20 @@ pub struct AIComputeTask(Task<SearchResult>);
 /// Resource to track when AI started thinking (for real-time timer)
 #[derive(Resource)]
 pub struct AIThinkingStartTime(Instant);
+
+/// Resource to hold the AI suggestion computation task
+#[derive(Resource)]
+pub struct AISuggestionTask(Task<SearchResult>);
+
+/// Resource to store the suggested move position
+#[derive(Resource, Default)]
+pub struct AISuggestedMove {
+    pub position: Option<(usize, usize)>,
+}
+
+/// Component marker for the visual indicator of the AI suggestion
+#[derive(Component)]
+pub struct AISuggestionMarker;
 
 #[derive(Event)]
 pub struct UpdateAIDepthDisplay;
@@ -1520,6 +1693,7 @@ fn reset_board(
     mut game_status: ResMut<GameStatus>,
     mut ai_time_taken: ResMut<AITimeTaken>,
     mut ai_depth_reached: ResMut<AIDepthReached>,
+    mut suggested_move: ResMut<AISuggestedMove>,
     stone_query: Query<Entity, With<Stone>>,
     mut move_played: EventWriter<MovePlayed>,
     mut update_ai_time: EventWriter<UpdateAITimeDisplay>,
@@ -1566,6 +1740,9 @@ fn reset_board(
     // Reset AI tracking
     ai_time_taken.micros = 0;
     ai_depth_reached.depth = 0;
+    
+    // Clear AI suggestion
+    suggested_move.position = None;
     
     // Trigger UI updates for AI stats
     update_ai_time.write(UpdateAITimeDisplay);
@@ -2406,6 +2583,56 @@ fn handle_double_three_toggle(
             
             // Trigger board update to refresh markers
             move_played.write(MovePlayed);
+        }
+    }
+}
+
+fn handle_ai_suggestion_toggle(
+    mut interaction_query: Query<(&Interaction, &Children, &mut BackgroundColor), (Changed<Interaction>, With<AISuggestionToggle>)>,
+    mut text_query: Query<&mut Text>,
+    mut config: ResMut<GameConfig>,
+    mut suggested_move: ResMut<AISuggestedMove>,
+    _commands: Commands,
+) {
+    for (interaction, children, mut bg_color) in interaction_query.iter_mut() {
+        if *interaction == Interaction::Pressed {
+            let current_state = config.get_show_move_hints();
+            let new_state = !current_state;
+            
+            info!("AI Suggestion toggled: {}", new_state);
+            
+            // Extract values before mutable borrow
+            let animation_speed = config.settings.gameplay.animation_speed;
+            let auto_save = config.settings.gameplay.auto_save;
+            
+            // Save to config file
+            if let Err(e) = config.save_gameplay_settings(new_state, animation_speed, auto_save) {
+                error!("Failed to save AI suggestion setting: {}", e);
+            }
+            
+            // Update button appearance
+            let colors = &config.colors;
+            *bg_color = BackgroundColor(if new_state { 
+                colors.accent.clone() 
+            } else { 
+                colors.button_normal.clone() 
+            }.into());
+            
+            // Update button text
+            for child in children.iter() {
+                if let Ok(mut text) = text_query.get_mut(child) {
+                    text.0 = if new_state {
+                        "AI SUGGESTION: ON".to_string()
+                    } else {
+                        "AI SUGGESTION: OFF".to_string()
+                    };
+                }
+            }
+            
+            // Clear any existing suggestion when toggling off
+            if !new_state {
+                suggested_move.position = None;
+            }
         }
     }
 }

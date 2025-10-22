@@ -33,6 +33,9 @@ pub struct UndoMoveButton;
 #[derive(Component)]
 pub struct DoubleThreeToggle;
 
+#[derive(Component)]
+pub struct AISuggestionToggle;
+
 pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &GameSettings, config: &GameConfig) {
     let colors = &config.colors;
     
@@ -149,6 +152,11 @@ pub fn spawn_settings_panel(builder: &mut ChildSpawnerCommands, game_settings: &
 
                 // Double Three Toggle
                 spawn_double_three_toggle(builder, config);
+
+                // AI Suggestion Toggle (show for 1v1 and vs AI, but not AI vs AI)
+                if !game_settings.ai_vs_ai {
+                    spawn_ai_suggestion_toggle(builder, config);
+                }
 
                 // Game controls (Reset Board and Undo Move buttons)
                 spawn_game_control_buttons(builder, config);
@@ -582,6 +590,47 @@ fn spawn_double_three_toggle(builder: &mut ChildSpawnerCommands, config: &GameCo
                 "DOUBLE-THREE MARKERS: ON" 
             } else { 
                 "DOUBLE-THREE MARKERS: OFF" 
+            }),
+            TextFont {
+                font_size: 14.0,
+                ..default()
+            },
+            TextColor(colors.text_primary.clone().into()),
+        ));
+    });
+}
+
+fn spawn_ai_suggestion_toggle(builder: &mut ChildSpawnerCommands, config: &GameConfig) {
+    let colors = &config.colors;
+    let show_suggestion = config.get_show_move_hints();
+    
+    // Toggle button
+    builder.spawn((
+        Button,
+        PlayClickSound,
+        Node {
+            width: Val::Percent(100.0),
+            height: Val::Px(40.0),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            border: UiRect::all(Val::Px(2.0)),
+            margin: UiRect::top(Val::Px(8.0)),
+            ..default()
+        },
+        BackgroundColor(if show_suggestion { 
+            colors.accent.clone() 
+        } else { 
+            colors.button_normal.clone() 
+        }.into()),
+        BorderColor(colors.accent.clone().into()),
+        BorderRadius::all(Val::Px(4.0)),
+        AISuggestionToggle,
+    )).with_children(|builder| {
+        builder.spawn((
+            Text::new(if show_suggestion { 
+                "AI SUGGESTION: ON" 
+            } else { 
+                "AI SUGGESTION: OFF" 
             }),
             TextFont {
                 font_size: 14.0,
