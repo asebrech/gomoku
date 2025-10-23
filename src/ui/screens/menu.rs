@@ -2915,7 +2915,7 @@ fn create_menu_button_with_icon(
                 
                 // Use a more robust pipeline with proper frame rate control and scaling
                 let pipeline_description = format!(
-                    "uridecodebin uri=file://{} ! videoconvert ! videoscale ! videorate ! video/x-raw,format=RGB,framerate=30/1 ! appsink name=appsink sync=true drop=false max-buffers=3",
+                    "uridecodebin uri=file://{} ! videoconvert ! videoscale method=lanczos add-borders=false ! videorate ! video/x-raw,format=RGBA,framerate=30/1 ! appsink name=appsink sync=true drop=false max-buffers=1",
                     std::path::Path::new(&video_file_path).canonicalize().unwrap_or_else(|_| std::path::PathBuf::from(&video_file_path)).display()
                 );
                 
@@ -2991,18 +2991,8 @@ fn create_menu_button_with_icon(
                                     player.video_height = height;
                                 }
                                 
-                                // Convert RGB to RGBA and buffer it
-                                let rgba_data: Vec<u8> = data.chunks(3)
-                                    .flat_map(|chunk| {
-                                        if chunk.len() == 3 {
-                                            [chunk[0], chunk[1], chunk[2], 255u8]
-                                        } else {
-                                            [0, 0, 0, 255u8]
-                                        }
-                                    })
-                                    .collect();
-                                
-                                player.frame_buffer.push_back(rgba_data);
+                                // Data is already RGBA from the pipeline
+                                player.frame_buffer.push_back(data.to_vec());
                             }
                         }
                     } else {
@@ -3037,28 +3027,21 @@ fn create_menu_button_with_icon(
                         image_node.image = image_handle;
                         println!("Video streaming started with buffered frames!");
                     } else {
-                        // OPTIMIZED: Reduce frequency of expensive texture operations
+                        // Update texture with buffered frame data
                         if let Some(ref handle) = player.image_handle {
-                            // Only update texture every few frames to reduce GPU load
-                            static MENU_FRAME_COUNTER: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
-                            let frame_count = MENU_FRAME_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            let updated_image = Image::new_fill(
+                                bevy::render::render_resource::Extent3d {
+                                    width: player.video_width,
+                                    height: player.video_height,
+                                    depth_or_array_layers: 1,
+                                },
+                                bevy::render::render_resource::TextureDimension::D2,
+                                &rgba_data,
+                                bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
+                                bevy::asset::RenderAssetUsages::all(),
+                            );
                             
-                            // Update every 2nd frame instead of every frame (reduces load by 50%)
-                            if frame_count % 2 == 0 {
-                                let updated_image = Image::new_fill(
-                                    bevy::render::render_resource::Extent3d {
-                                        width: player.video_width,
-                                        height: player.video_height,
-                                        depth_or_array_layers: 1,
-                                    },
-                                    bevy::render::render_resource::TextureDimension::D2,
-                                    &rgba_data,
-                                    bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
-                                    bevy::asset::RenderAssetUsages::all(),
-                                );
-                                
-                                images.insert(handle, updated_image);
-                            }
+                            images.insert(handle, updated_image);
                         }
                     }
                 }
