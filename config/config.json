@@ -160,7 +160,7 @@
       "vsync": false
     },
     "gameplay": {
-      "show_move_hints": true,
+      "show_move_hints": false,
       "animation_speed": 1.0,
       "auto_save": true,
       "show_double_three_markers": true
