@@ -18,7 +18,9 @@ fi
 # Set environment variables
 export PKG_CONFIG_PATH="$PWD/deps/lib/pkgconfig:$PKG_CONFIG_PATH"
 export LD_LIBRARY_PATH="$PWD/deps/lib:$LD_LIBRARY_PATH"
-export WINIT_UNIX_BACKEND=x11
+
+# Allow both Wayland and X11 backends (comment out to force X11)
+# export WINIT_UNIX_BACKEND=x11
 
 echo "Starting Gomoku..."
 cargo run --release

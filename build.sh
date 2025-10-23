@@ -20,10 +20,11 @@ fi
 export PKG_CONFIG_PATH="$PWD/deps/lib/pkgconfig:$PKG_CONFIG_PATH"
 export LD_LIBRARY_PATH="$PWD/deps/lib:$LD_LIBRARY_PATH"
 
-# Disable Wayland to force X11-only builds
-export WINIT_UNIX_BACKEND=x11
-export WAYLAND_DISPLAY=""
-unset WAYLAND_DISPLAY
+# Allow both Wayland and X11 backends (Wayland preferred on modern systems)
+# Comment out the next lines if you want to force X11-only
+# export WINIT_UNIX_BACKEND=x11
+# export WAYLAND_DISPLAY=""
+# unset WAYLAND_DISPLAY
 
 # macOS specific settings
 if [[ "$OS" == "Darwin" ]]; then
