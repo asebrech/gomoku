@@ -170,13 +170,14 @@ impl MoveGenerator {
     /// 
     /// Gapped threats are patterns like X.X.X or XX.X where stones are
     /// separated by gaps but could form five-in-a-row if gaps are filled
-    fn find_gapped_threats(board: &Board, player: Player) -> Vec<(usize, usize)> {
+    pub fn find_gapped_threats(board: &Board, player: Player) -> Vec<(usize, usize)> {
         let mut threats = HashSet::new();
         let player_bits = board.get_player_bits(player);
         board.iterate_bits(player_bits, |row, col| {
             for &(dx, dy) in &DIRECTIONS {
                 let mut stones_found = vec![(row, col)];
-                for dist in 2..=6 {
+                // Look in positive direction (forward)
+                for dist in 1..=6 {
                     let check_row = row as isize + dx * dist;
                     let check_col = col as isize + dy * dist;
                     if PatternAnalyzer::is_in_bounds(board, check_row, check_col) {
@@ -190,6 +191,28 @@ impl MoveGenerator {
                         break;
                     }
                 }
+                // Look in negative direction (backward) and prepend to stones_found
+                let mut backward_stones = Vec::new();
+                for dist in 1..=6 {
+                    let check_row = row as isize - dx * dist;
+                    let check_col = col as isize - dy * dist;
+                    if PatternAnalyzer::is_in_bounds(board, check_row, check_col) {
+                        let idx = board.index(check_row as usize, check_col as usize);
+                        if Board::is_bit_set(&player_bits, idx) {
+                            backward_stones.push((check_row as usize, check_col as usize));
+                        } else if Board::is_bit_set(&board.occupied, idx) {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                // Reverse backward stones and prepend them
+                backward_stones.reverse();
+                backward_stones.append(&mut stones_found);
+                stones_found = backward_stones;
+                
+                // Require at least 3 stones for a meaningful gapped threat
                 if stones_found.len() >= 3 {
                     let first = stones_found.first().unwrap();
                     let last = stones_found.last().unwrap();
@@ -197,8 +220,11 @@ impl MoveGenerator {
                     let start_col = first.1 as isize;
                     let end_row = last.0 as isize;
                     let end_col = last.1 as isize;
-                    let total_span = ((end_row - start_row).abs() + (end_col - start_col).abs()) + 1;
-                    if total_span <= 5 {
+                    // Fixed: use max instead of sum for span calculation
+                    // This correctly handles diagonals where both dimensions change equally
+                    let total_span = ((end_row - start_row).abs().max((end_col - start_col).abs())) + 1;
+                    // Allow span up to 7 to catch patterns like X.X.X.X (4 stones with 3 gaps)
+                    if total_span <= 7 {
                         let steps = ((end_row - start_row) / dx.max(1)).max((end_col - start_col) / dy.max(1));
                         let mut empty_gaps = 0;
                         let mut threat_positions = Vec::new();
@@ -210,7 +236,10 @@ impl MoveGenerator {
                                 threat_positions.push((gap_row as usize, gap_col as usize));
                             }
                         }
-                        if empty_gaps > 0 && stones_found.len() + empty_gaps >= 5 && empty_gaps <= 2 {
+                        // Changed from >= 5 to >= 4: patterns like XX.X (4 total) are dangerous
+                        // and should be detected as threats
+                        // Allow up to 3 gaps for patterns like X.X.X.X
+                        if empty_gaps > 0 && stones_found.len() + empty_gaps >= 4 && empty_gaps <= 3 {
                             for pos in threat_positions {
                                 threats.insert(pos);
                             }
