@@ -129,6 +129,7 @@ pub struct AutoPlayToggle;
 #[derive(Resource, Default)]
 pub struct AIvsAIState {
     pub auto_play: bool,
+    pub undo_just_performed: bool,
 }
 
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -704,7 +705,7 @@ fn update_ai_suggestion_marker(
 ) {
     // Remove existing markers
     for entity in existing_markers.iter() {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
     
     // Only show suggestions if enabled and game is active
@@ -718,7 +719,7 @@ fn update_ai_suggestion_marker(
     };
     
     // Get the board entity
-    let Ok(board_entity) = board_query.get_single() else {
+    let Ok(board_entity) = board_query.single() else {
         return;
     };
     
@@ -757,9 +758,13 @@ pub fn place_stone(
     mut stone_sound: EventWriter<PlayStonePlacementSound>,
     mut suggested_move: ResMut<AISuggestedMove>,
     stones: Query<(Entity, &GridCell, &Stone)>,
+    mut ai_vs_ai_state: ResMut<AIvsAIState>,
 ) {
     for ev in ev_stone_placement.read() {
         info!("Stone placed at x: {}, y: {}", ev.x, ev.y);
+        
+        // Clear undo flag when user places a stone manually
+        ai_vs_ai_state.undo_just_performed = false;
         
         // Play stone placement sound (randomized)
         stone_sound.write(PlayStonePlacementSound);
@@ -1057,12 +1062,12 @@ pub fn process_next_round(
         // Handle next player's turn
         if settings.ai_vs_ai {
             // AI vs AI mode - both players are AI
-            // But only auto-advance if auto-play is enabled
-            if ai_vs_ai_state.auto_play {
+            // But only auto-advance if auto-play is enabled and undo wasn't just performed
+            if ai_vs_ai_state.auto_play && !ai_vs_ai_state.undo_just_performed {
                 info!("AI vs AI mode with auto-play - setting AIThinking status");
                 *game_status = GameStatus::AIThinking;
             } else {
-                info!("AI vs AI mode without auto-play - awaiting next move button");
+                info!("AI vs AI mode without auto-play or after undo - awaiting next move button");
                 *game_status = GameStatus::AwaitingUserInput;
             }
         } else if game_state.current_player == Player::Max || (game_state.current_player == Player::Min && !settings.versus_ai) {
@@ -1070,12 +1075,12 @@ pub fn process_next_round(
             *game_status = GameStatus::AwaitingUserInput;
         } else if settings.versus_ai {
             // Human vs AI mode: AI's turn
-            // Only auto-trigger AI if auto-play is enabled, otherwise wait for Next Move button
-            if ai_vs_ai_state.auto_play {
+            // Only auto-trigger AI if auto-play is enabled and undo wasn't just performed
+            if ai_vs_ai_state.auto_play && !ai_vs_ai_state.undo_just_performed {
                 info!("Human vs AI mode with auto-play - setting AIThinking status");
                 *game_status = GameStatus::AIThinking;
             } else {
-                info!("Human vs AI mode without auto-play - awaiting Next Move button");
+                info!("Human vs AI mode without auto-play or after undo - awaiting Next Move button");
                 *game_status = GameStatus::AwaitingUserInput;
             }
         }
@@ -1594,6 +1599,7 @@ fn handle_undo_move_button(
     board_query: Query<Entity, With<BoardRoot>>,
     config: Res<GameConfig>,
     preloaded_stones: Option<Res<PreloadedStones>>,
+    mut ai_vs_ai_state: ResMut<AIvsAIState>,
 ) {
     for interaction in button_query.iter() {
         if *interaction == Interaction::Pressed {
@@ -1682,6 +1688,9 @@ fn handle_undo_move_button(
                     }
                 }
                 
+                // Set flag to prevent AI from auto-playing after undo
+                ai_vs_ai_state.undo_just_performed = true;
+                
                 // Trigger UI updates
                 move_played.write(MovePlayed);
                 
@@ -1703,10 +1712,14 @@ fn reset_board(
     mut move_played: EventWriter<MovePlayed>,
     mut update_ai_time: EventWriter<UpdateAITimeDisplay>,
     mut update_ai_depth: EventWriter<UpdateAIDepthDisplay>,
+    mut ai_vs_ai_state: ResMut<AIvsAIState>,
 ) {
     println!("======================================");
     println!("       RESETTING GAME BOARD");
     println!("======================================");
+    
+    // Clear undo flag when board is reset
+    ai_vs_ai_state.undo_just_performed = false;
     
     // Print state BEFORE reset
     println!("\n[STATE BEFORE RESET]");
@@ -1805,20 +1818,36 @@ fn show_game_over_screen(
         // Determine the title and message based on winner
         let (title, message, title_color) = match event.winner {
             Some(Player::Max) => (
-                "You Won",
-                if game_settings.versus_ai {
+                if game_settings.ai_vs_ai {
+                    "AI 1 Won"
+                } else if game_settings.versus_ai {
+                    "You Won"
+                } else {
+                    "You Won"
+                },
+                if game_settings.ai_vs_ai {
+                    "AI 1 defeated AI 2!"
+                } else if game_settings.versus_ai {
                     "You defeated the AI!"
                 } else {
-                    "Player 1 (Pink) Wins!"
+                    "Player 1 Wins!"
                 },
                 colors.accent.clone(), // Victory color
             ),
             Some(Player::Min) => (
-                if game_settings.versus_ai { "Game Over" } else { "You Won" },
-                if game_settings.versus_ai {
+                if game_settings.ai_vs_ai {
+                    "AI 2 Won"
+                } else if game_settings.versus_ai {
+                    "Game Over"
+                } else {
+                    "You Won"
+                },
+                if game_settings.ai_vs_ai {
+                    "AI 2 defeated AI 1!"
+                } else if game_settings.versus_ai {
                     "The AI has won..."
                 } else {
-                    "Player 2 (Blue) Wins!"
+                    "Player 2 Wins!"
                 },
                 if game_settings.versus_ai {
                     colors.secondary.clone() // Use secondary color for AI defeat
@@ -2502,10 +2531,13 @@ fn handle_next_move_button(
     game_settings: Res<GameSettings>,
     game_state: Res<GameState>,
     mut game_status: ResMut<GameStatus>,
-    ai_vs_ai_state: Res<AIvsAIState>,
+    mut ai_vs_ai_state: ResMut<AIvsAIState>,
 ) {
     for interaction in button_query.iter() {
         if *interaction == Interaction::Pressed {
+            // Clear undo flag when user manually triggers next move
+            ai_vs_ai_state.undo_just_performed = false;
+            
             // Allow next move in AI vs AI mode when not on auto-play
             if game_settings.ai_vs_ai && *game_status == GameStatus::AwaitingUserInput && !ai_vs_ai_state.auto_play {
                 info!("Next Move button clicked in AI vs AI mode");
@@ -2684,7 +2716,7 @@ fn handle_ai_vs_ai_auto_play(
         false
     };
     
-    if should_auto_play {
+    if should_auto_play && !ai_vs_ai_state.undo_just_performed {
         if *game_status == GameStatus::AwaitingUserInput {
             // Wait a bit between moves for visibility
             *last_move_time += time.delta_secs();
@@ -2696,7 +2728,7 @@ fn handle_ai_vs_ai_auto_play(
             }
         }
     } else {
-        // Reset timer when auto play is off
+        // Reset timer when auto play is off or undo was just performed
         *last_move_time = 0.0;
     }
 }

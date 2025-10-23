@@ -204,6 +204,10 @@ impl GameState {
         }
 
         self.restore_captured_stones();
+        
+        // CRITICAL: After undo, we need to re-check if there's a breakable five on the board
+        // that the current player must break
+        self.recalculate_check_state();
     }
 
     pub fn is_terminal(&self) -> bool {
@@ -316,6 +320,39 @@ impl GameState {
                         if self.min_captures >= pairs_captured {
                             self.min_captures -= pairs_captured;
                         }
+                    }
+                }
+            }
+        }
+    }
+    
+    /// Recalculate the check state after an undo operation
+    /// Scans the board for any breakable fives that the current player must break
+    fn recalculate_check_state(&mut self) {
+        // Clear the current check state
+        self.player_in_check = None;
+        self.check_position = None;
+        
+        // Scan the entire board for breakable fives
+        // We need to check if the OPPONENT (not current player) has a breakable five
+        let opponent = self.current_player.opponent();
+        
+        for x in 0..self.board.size {
+            for y in 0..self.board.size {
+                if self.board.get_player(x, y) == Some(opponent) {
+                    // Check if this position is part of a breakable five
+                    let (has_win, is_breakable) = WinDetection::check_win_and_breakable(
+                        &self.board, 
+                        x, 
+                        y, 
+                        self.win_condition
+                    );
+                    
+                    if has_win && is_breakable {
+                        // Found a breakable five! The opponent has it, current player must break it
+                        self.player_in_check = Some(opponent);
+                        self.check_position = Some((x, y));
+                        return;
                     }
                 }
             }

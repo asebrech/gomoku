@@ -1,8 +1,29 @@
-.PHONY: dev release release-fast clean up up-dev fast test help setup check-assets all-build deploy
+.PHONY: all dev release release-fast clean fclean re up up-dev fast test help setup check-assets all-build deploy
 
-# Default target - show help
-all: help
+# 42 School Required Rules
+# Default target - Build the project (42 standard)
+all: release
+	@echo "✅ Default build complete! (release version)"
+	@echo "Run with: make up"
 
+# Clean object files and cargo artifacts (42 standard)
+clean:
+	@echo "Cleaning build artifacts..."
+	cargo clean
+	@echo "✅ Clean completed!"
+
+# Full clean including dependencies (42 standard)
+fclean: clean
+	@echo "Cleaning dependencies..."
+	rm -rf deps
+	rm -rf dist
+	@echo "✅ Full clean completed!"
+
+# Rebuild everything from scratch (42 standard)
+re: fclean all
+	@echo "✅ Complete rebuild finished!"
+
+# Help target
 help:
 	@echo "Gomoku Build System - Simple Commands"
 	@echo ""
@@ -21,9 +42,15 @@ help:
 	@echo "  all-build     - Complete build pipeline with distribution"
 	@echo "  deploy        - Create complete distribution package"
 	@echo ""
-	@echo "For new users: make release && make up"
+	@echo "For new users: make && make up (or just: make all && make up)"
 	@echo "For development: make release-fast && make up-dev (faster)"
 	@echo "For instant testing: make fast (no video, ultra-fast)"
+	@echo ""
+	@echo "42 School Standard Rules:"
+	@echo "  make all          - Build the project (same as 'make')"
+	@echo "  make clean        - Clean build artifacts"
+	@echo "  make fclean       - Full clean (artifacts + dependencies)"
+	@echo "  make re           - Rebuild everything from scratch"
 	@echo ""
 	@echo "Note: GStreamer dependencies are downloaded automatically."
 
@@ -140,14 +167,6 @@ test: setup
 		cargo test --lib --tests; \
 	fi
 	@echo "✅ All tests completed!"
-
-# Clean everything (cargo + deps)
-clean:
-	@echo "Cleaning everything..."
-	cargo clean
-	rm -rf deps
-	rm -rf dist
-	@echo "✅ Complete cleanup finished!"
 
 # Advanced targets
 
