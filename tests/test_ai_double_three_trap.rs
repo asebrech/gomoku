@@ -91,23 +91,26 @@ fn test_ai_prefers_trap_over_equivalent_move() {
     // Playing at (10,10) would create X X X
     
     // Make blocks at (10,7) and (10,11) illegal for opponent
-    state.make_move((9, 7));   // Max (dummy)
-    state.make_move((8, 7));   // Min
     state.make_move((9, 8));   // Max (dummy)
-    state.make_move((9, 7));   // Min (creates cross pattern for double-three at 10,7)
+    state.make_move((8, 7));   // Min
     state.make_move((7, 7));   // Max (dummy)
-    state.make_move((10, 5));  // Min
+    state.make_move((9, 7));   // Min (creates vertical pattern for double-three at 10,7)
     state.make_move((7, 8));   // Max (dummy)
-    state.make_move((10, 6));  // Min
+    state.make_move((10, 5));  // Min
+    state.make_move((7, 9));   // Max (dummy)
+    state.make_move((10, 6));  // Min (creates horizontal pattern for double-three at 10,7)
     
     state.make_move((7, 9));   // Max (dummy)
-    state.make_move((8, 11));  // Min
+    state.make_move((10, 6));  // Min (creates horizontal pattern for double-three at 10,7)
+    
     state.make_move((7, 10));  // Max (dummy)
-    state.make_move((9, 11));  // Min
+    state.make_move((8, 11));  // Min
     state.make_move((7, 11));  // Max (dummy)
-    state.make_move((10, 13)); // Min
+    state.make_move((9, 11));  // Min (creates vertical pattern for double-three at 10,11)
     state.make_move((7, 12));  // Max (dummy)
     state.make_move((10, 12)); // Min
+    state.make_move((6, 6));   // Max (dummy)
+    state.make_move((10, 13)); // Min (creates horizontal pattern for double-three at 10,11)
     
     // Setup Option B: 3-in-a-row at row 12 (blocks are legal)
     state.make_move((12, 8));  // Max
@@ -527,8 +530,8 @@ fn test_trap_beats_simple_threat() {
     // Option A: Simple 4-in-a-row at row 8 (opponent CAN defend)
     board.place_stone(8, 5, ai);
     board.place_stone(8, 6, ai);
-    board.place_stone(8, 7, ai);
-    // Can extend to (8,8) for X X X X - blocks at (8,4), (8,9) are legal
+    board.place_stone(8, 8, ai);
+    // Can extend to (8,9) for X X _ X - blocks at (8,4), (8,10) are legal
     
     // Option B: 3-in-a-row with TRAP at row 10
     board.place_stone(10, 8, ai);

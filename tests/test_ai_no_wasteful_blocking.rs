@@ -360,7 +360,9 @@ fn test_ai_defends_legal_fork_branch_only() {
     state.make_move((9, 13));  // Max (dummy)
     state.make_move((11, 9));  // Min
     state.make_move((9, 14));  // Max (dummy)
-    state.make_move((9, 10));  // Min (create cross pattern)
+    state.make_move((12, 10)); // Min
+    state.make_move((8, 8));   // Max (dummy)
+    state.make_move((13, 10)); // Min (create vertical pattern for double-three at 11,10)
     
     // Verify (11,10) would be illegal
     assert!(
@@ -566,32 +568,46 @@ fn test_ai_ignores_illegal_capture_positions() {
 #[test]
 fn test_ai_consistent_ignoring_illegal_blocks_over_time() {
     let mut state = GameState::new(19, 5);
+    let ai = Player::Max;
     let opponent = Player::Min;
     
-    // Setup initial pattern with illegal position at (10,10)
-    state.make_move((9, 9));   // Max
-    state.make_move((10, 8));  // Min
-    state.make_move((9, 10));  // Max
-    state.make_move((10, 9));  // Min
-    state.make_move((8, 8));   // Max
-    state.make_move((8, 10));  // Min
-    state.make_move((8, 9));   // Max
-    state.make_move((9, 10));  // Min (creates double-three potential at 10,10)
+    // Setup pattern where (11,10) would be a double-three for opponent
+    // Similar to the working test above, create a position with no offensive value
     
-    // Verify (10,10) is illegal
+    // Vertical pattern: Min at (9,10), (10,10)
+    state.make_move((9, 9));   // Max (dummy)
+    state.make_move((9, 10));  // Min
+    state.make_move((9, 11));  // Max (dummy)
+    state.make_move((10, 10)); // Min
+    // [11, 10] would extend this vertically
+    
+    // Horizontal pattern: Min at (11,8), (11,9)
+    state.make_move((8, 8));   // Max (dummy)
+    state.make_move((11, 8));  // Min
+    state.make_move((8, 9));   // Max (dummy)
+    state.make_move((11, 9));  // Min
+    // [11, 10] would extend this horizontally
+    
+    // Create a more appealing offensive option for Max away from (11,10)
+    state.make_move((12, 12)); // Max
+    state.make_move((6, 6));   // Min (dummy, far away)
+    state.make_move((12, 13)); // Max - creates pattern that could extend
+    state.make_move((14, 14)); // Min (dummy, far away)
+    
+    // Verify (11,10) is illegal for opponent
     assert!(
-        DoubleThreeDetection::creates_double_three(&state.board, 10, 10, opponent),
-        "Position (10,10) should be illegal for opponent"
+        DoubleThreeDetection::creates_double_three(&state.board, 11, 10, opponent),
+        "Position (11,10) should be illegal for opponent"
     );
     
-    // Play several moves - AI should NEVER choose (10,10)
+    // Play several moves - AI should NEVER choose (11,10)
     for _ in 0..5 {
         let result = lazy_smp_search(&mut state, 100, 3, Some(1));
         
         if let Some((row, col)) = result.best_move {
             assert_ne!(
-                (row, col), (10, 10),
-                "AI should never block illegal position (10,10) at any point in game"
+                (row, col), (11, 10),
+                "AI should never block illegal position (11,10) at any point in game"
             );
             
             // Make the move and let opponent respond

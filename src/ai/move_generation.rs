@@ -364,11 +364,6 @@ impl MoveGenerator {
         let capture_bonus = Self::calculate_capture_bonus(board, row, col, player);
         priority += capture_bonus;
         
-        // SMART IMPROVEMENT: Illegal response bonus temporarily disabled to avoid
-        // over-prioritizing moves in positions surrounded by opponent stones
-        // TODO: Re-enable with better heuristic that only applies to forcing moves
-        let illegal_response_bonus = 0;
-        
         // ADVANCED TACTIC: "Double-Three Trap"
         // Award huge bonus if this move creates a threat that FORCES opponent to respond,
         // but all response positions would create illegal double-three for them!
