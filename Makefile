@@ -1,4 +1,4 @@
-.PHONY: all dev release clean fclean re run test help
+.PHONY: all dev release clean fclean re run test setup help
 
 # 42 School Required Rules
 # Default target - Build the project (42 standard)
@@ -26,6 +26,9 @@ re: fclean all
 help:
 	@echo "Gomoku Build System - Simple Cargo Commands"
 	@echo ""
+	@echo "🚀 First time setup:"
+	@echo "  ./setup.sh        - Install all dependencies (GStreamer, etc.)"
+	@echo ""
 	@echo "Main targets:"
 	@echo "  make / make all   - Build release version"
 	@echo "  make dev          - Build development version"
@@ -42,7 +45,7 @@ help:
 	@echo "  cargo build --release        - Build release version"
 	@echo "  cargo test                   - Run tests"
 	@echo ""
-	@echo "Note: Assumes all dependencies (GStreamer, etc.) are already installed on the system."
+	@echo "💡 If you get GStreamer errors, run: ./setup.sh"
 
 # Main targets - Simple and clear
 
@@ -68,3 +71,9 @@ test:
 	@echo "Running all tests..."
 	cargo test
 	@echo "✅ All tests completed!"
+
+# Setup development environment
+setup:
+	@echo "Setting up development environment..."
+	./setup.sh
+	@echo "✅ Setup completed!"
