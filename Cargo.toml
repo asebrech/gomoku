@@ -8,19 +8,9 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = []
-native = ["bevy", "gstreamer-support", "image", "rayon", "futures-lite"]
-gstreamer-support = ["bevy_gstreamer", "gstreamer", "gstreamer-app", "gstreamer-video"]
 wasm = ["wasm-bindgen", "serde-wasm-bindgen", "wasm-bindgen-futures", "js-sys", "getrandom", "getrandom/js"]
 
 [dependencies]
-# Bevy dependencies - only for native builds
-bevy = { version = "0.16.1", features = ["bevy_render", "bevy_core_pipeline", "bevy_sprite", "bevy_audio", "png", "jpeg", "mp3", "wav"], optional = true }
-bevy_gstreamer = { version = "0.7", optional = true }
-gstreamer = { version = "0.23", optional = true }
-gstreamer-app = { version = "0.23", optional = true }
-gstreamer-video = { version = "0.23", optional = true }
-image = { version = "0.25", optional = true }
-
 # Core dependencies - always available
 rand = "0.8"
 rand_chacha = "0.3"
@@ -43,7 +33,6 @@ futures-lite = { version = "2.5", optional = true }
 [[bin]]
 name = "gomoku"
 path = "src/main.rs"
-required-features = ["bevy", "image", "rayon", "futures-lite"]
 
 # Optimized dev profile: Fast compilation for your code, optimized dependencies
 [profile.dev]
