@@ -1,0 +1,45 @@
+{
+  "home": {
+    "title": "Gomoku",
+    "subtitle": "Jeu de Stratégie avec IA",
+    "play": "Jouer",
+    "settings": "Paramètres",
+    "credits": "Crédits",
+    "techStack": "Créé avec Rust, WASM & Svelte"
+  },
+  "game": {
+    "title": "Plateau de Jeu",
+    "menu": {
+      "title": "Sélectionner le Mode de Jeu",
+      "playerVsAi": "Joueur vs IA",
+      "playerVsPlayer": "Joueur vs Joueur",
+      "aiVsAi": "IA vs IA",
+      "back": "Retour au Menu"
+    },
+    "yourTurn": "Votre Tour",
+    "aiTurn": "L'IA réfléchit...",
+    "youWin": "Vous avez gagné !",
+    "youLose": "L'IA a gagné !",
+    "draw": "Match Nul !",
+    "newGame": "Nouvelle Partie",
+    "undo": "Annuler",
+    "settings": "Paramètres"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "theme": "Thème",
+    "language": "Langue",
+    "volume": "Volume",
+    "save": "Sauvegarder",
+    "cancel": "Annuler"
+  },
+  "themes": {
+    "synthwave": "Synthwave",
+    "blackwhite": "Noir & Blanc"
+  },
+  "languages": {
+    "en": "English",
+    "fr": "Français",
+    "es": "Español"
+  }
+}

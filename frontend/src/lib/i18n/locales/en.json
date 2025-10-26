@@ -1,0 +1,45 @@
+{
+  "home": {
+    "title": "Gomoku",
+    "subtitle": "AI-Powered Strategy Game",
+    "play": "Play Game",
+    "settings": "Settings",
+    "credits": "Credits",
+    "techStack": "Built with Rust, WASM & Svelte"
+  },
+  "game": {
+    "title": "Game Board",
+    "menu": {
+      "title": "Select Game Mode",
+      "playerVsAi": "Player vs AI",
+      "playerVsPlayer": "Player vs Player",
+      "aiVsAi": "AI vs AI",
+      "back": "Back to Menu"
+    },
+    "yourTurn": "Your Turn",
+    "aiTurn": "AI is thinking...",
+    "youWin": "You Win!",
+    "youLose": "AI Wins!",
+    "draw": "Draw!",
+    "newGame": "New Game",
+    "undo": "Undo",
+    "settings": "Settings"
+  },
+  "settings": {
+    "title": "Settings",
+    "theme": "Theme",
+    "language": "Language",
+    "volume": "Volume",
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+  "themes": {
+    "synthwave": "Synthwave",
+    "blackwhite": "Black & White"
+  },
+  "languages": {
+    "en": "English",
+    "fr": "Français",
+    "es": "Español"
+  }
+}

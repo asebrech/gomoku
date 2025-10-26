@@ -1,5 +1,6 @@
 pub mod ai {
     pub mod heuristic;
+    #[cfg(feature = "rayon")]
     pub mod lazy_smp;
     pub mod minimax;
     pub mod move_generation;
@@ -7,6 +8,7 @@ pub mod ai {
     pub mod transposition;
 }
 
+#[cfg(feature = "bevy")]
 pub mod audio;
 
 pub mod core {
@@ -18,6 +20,7 @@ pub mod core {
     pub mod zobrist;
 }
 
+#[cfg(feature = "bevy")]
 pub mod ui {
     pub mod app;
     pub mod config;
@@ -40,3 +43,7 @@ pub mod ui {
         pub mod utils;
     }
 }
+
+// WASM bindings
+#[cfg(feature = "wasm")]
+pub mod wasm;
