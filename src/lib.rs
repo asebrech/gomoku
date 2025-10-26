@@ -16,7 +16,3 @@ pub mod core {
     pub mod state;
     pub mod zobrist;
 }
-
-// WASM bindings
-#[cfg(feature = "wasm")]
-pub mod wasm;

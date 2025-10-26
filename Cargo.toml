@@ -4,11 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
-
-[features]
-default = []
-wasm = ["wasm-bindgen", "serde-wasm-bindgen", "wasm-bindgen-futures", "js-sys", "getrandom", "getrandom/js"]
+crate-type = ["cdylib", "rlib"]  # WASM + tests
 
 [dependencies]
 # Core dependencies - always available
@@ -17,22 +13,21 @@ rand_chacha = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
-# Optional dependencies
-getrandom = { version = "0.2", optional = true }
-
 # WASM-specific dependencies
-wasm-bindgen = { version = "0.2", optional = true }
-serde-wasm-bindgen = { version = "0.6", optional = true }
-wasm-bindgen-futures = { version = "0.4", optional = true }
-js-sys = { version = "0.3", optional = true }
+wasm-bindgen = "0.2.100"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+getrandom = { version = "0.2", features = ["js"] }
+serde-wasm-bindgen = "0.6"
+web-sys = "0.3"
 
-# Conditional dependencies
+# Optional dependencies for parallel search
 rayon = { version = "1.8", optional = true }
 futures-lite = { version = "2.5", optional = true }
 
-[[bin]]
-name = "gomoku"
-path = "src/main.rs"
+[features]
+default = []
+parallel = ["rayon", "futures-lite"]
 
 # Optimized dev profile: Fast compilation for your code, optimized dependencies
 [profile.dev]
