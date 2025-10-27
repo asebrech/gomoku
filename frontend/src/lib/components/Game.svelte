@@ -48,6 +48,7 @@
   let lastMoveTime = $state(0);
   let player1Captures = $state(0);
   let player2Captures = $state(0);
+  let aiMoveCount = $state(0); // Track number of AI moves separately
   
   const isFullAI = player1Type === 'ai' && player2Type === 'ai';
   const hasHuman = player1Type === 'human' || player2Type === 'human';
@@ -127,20 +128,15 @@
   }
   
   async function handleCellClick(row: number, col: number) {
-    console.log('Cell clicked:', { row, col, waitingForHumanMove, isGameOver, gameInstance: !!gameInstance, isPlaying });
-    
     if (!gameInstance || isGameOver || !waitingForHumanMove) {
-      console.log('Click rejected:', { gameInstance: !!gameInstance, isGameOver, waitingForHumanMove });
       return;
     }
     
     // Check if position is valid and empty
     if (!board[row] || board[row][col] !== null) {
-      console.log('Invalid position:', { isEmpty: board[row]?.[col] === null });
       return;
     }
     
-    console.log('Making human move at', row, col);
     // Make the human move
     await makeMove(row, col);
   }
@@ -149,14 +145,11 @@
     if (!gameInstance || isGameOver) return false;
     
     try {
-      console.log('Making move:', { row, col, currentPlayer });
       const moveResult = JSON.parse(gameInstance.makeMove(row, col));
-      console.log('Move result:', moveResult);
       
       if (moveResult.success) {
         totalMoves++;
         updateBoardFromWasm();
-        console.log('Board updated, new board state:', board);
         
         // Update captures
         const boardState = JSON.parse(gameInstance.getBoardState());
@@ -176,10 +169,8 @@
         }
         
         waitingForHumanMove = false;
-        console.log('Move complete, waitingForHumanMove set to false');
         return true;
       }
-      console.log('Move was invalid');
       return false;
     } catch (error) {
       console.error('Move error:', error);
@@ -192,12 +183,14 @@
     
     try {
       const startTime = performance.now();
-      const aiMoveResult = JSON.parse(gameInstance.getAIMove(aiDepth));
+      // Pass depth and time limit in milliseconds
+      const aiMoveResult = JSON.parse(gameInstance.getAIMove(aiDepth, $gameSettings.aiMaxThinkingTime));
       const endTime = performance.now();
       
       // Track AI thinking time
       lastMoveTime = Math.round(endTime - startTime);
       totalThinkingTime += lastMoveTime;
+      aiMoveCount++;
       
       if (!aiMoveResult || aiMoveResult.row === undefined) {
         console.error('AI failed to find a move');
@@ -214,23 +207,18 @@
   async function playGameLoop() {
     if (!gameInstance || !isPlaying) return;
     
-    console.log('Starting game loop');
-    
     while (!isGameOver && !isPaused && !shouldStop && isPlaying) {
       // Check if we should stop at the beginning of each iteration
       if (shouldStop) {
-        console.log('Game loop stopped by shouldStop flag');
         break;
       }
       
       const currentPlayerType = currentPlayer === 1 ? player1Type : player2Type;
-      console.log('Current player:', { currentPlayer, currentPlayerType, currentPlayerName });
       
       if (currentPlayerType === 'human') {
         // Wait for human move
         waitingForHumanMove = true;
         gameStatus = `${currentPlayerName}'s turn`;
-        console.log('Waiting for human move...');
         
         // Wait until human makes a move (handled by handleCellClick)
         while (waitingForHumanMove && !isPaused && !isGameOver && !shouldStop) {
@@ -238,15 +226,12 @@
           if (shouldStop) break;
         }
         
-        console.log('Human move completed or loop broken');
-        
         if (isPaused || isGameOver || shouldStop) break;
         
       } else {
         // AI move
         waitingForHumanMove = false;
         gameStatus = `${currentPlayerName} is thinking...`;
-        console.log('AI turn starting...');
         
         // Wait for the delay to make it visible (but check shouldStop during the wait)
         const startTime = Date.now();
@@ -257,7 +242,6 @@
         if (isPaused || shouldStop) break;
         
         const aiMove = await getAIMove();
-        console.log('AI move selected:', aiMove);
         
         if (!aiMove) {
           gameStatus = 'AI error - no move found';
@@ -273,13 +257,9 @@
           break;
         }
         
-        console.log('AI move completed');
-        
         if (isGameOver || shouldStop) break;
       }
     }
-    
-    console.log('Game loop ended');
     
     if (isPaused) {
       gameStatus = 'Game paused';
@@ -329,6 +309,7 @@
       lastMoveTime = 0;
       player1Captures = 0;
       player2Captures = 0;
+      aiMoveCount = 0;
       
       // Auto-restart for AI vs AI
       if (autoStart && isFullAI) {
@@ -390,6 +371,7 @@
         {player2Captures}
         {totalThinkingTime}
         {lastMoveTime}
+        {aiMoveCount}
       />
     </div>
   </div>

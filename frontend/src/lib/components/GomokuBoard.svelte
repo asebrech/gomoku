@@ -72,7 +72,7 @@
 </script>
 
 <div class="flex items-center justify-center w-full p-8">
-  <div class="rounded-lg p-8" style="background: {$currentTheme.background}E6; border: 3px solid {$currentTheme.primary}; box-shadow: {$currentTheme.glowPrimary};">
+  <div class="rounded-lg p-8" style="background: {$currentTheme.background}99; border: 3px solid {$currentTheme.primary}; box-shadow: {$currentTheme.glowPrimary};">
     <svg 
       width={totalSize} 
       height={totalSize}
@@ -90,7 +90,7 @@
         y={padding} 
         width={boardSize} 
         height={boardSize}
-        fill="{$currentTheme.background}CC"
+        fill="transparent"
         stroke="none"
       />
       

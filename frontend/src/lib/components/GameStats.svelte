@@ -11,6 +11,7 @@
     player2Captures?: number;
     totalThinkingTime?: number;
     lastMoveTime?: number;
+    aiMoveCount?: number;
   }
   
   let {
@@ -22,19 +23,20 @@
     player1Captures = 0,
     player2Captures = 0,
     totalThinkingTime = 0,
-    lastMoveTime = 0
+    lastMoveTime = 0,
+    aiMoveCount = 0
   }: Props = $props();
   
   function formatTime(ms: number): string {
     if (ms < 1000) return `${ms}ms`;
-    return `${(ms / 1000).toFixed(2)}s`;
+    return `${(ms / 1000).toFixed(1)}s`;
   }
 </script>
 
 <div class="flex items-center justify-center w-full p-8">
   <div 
     class="rounded-lg p-6 min-w-[300px]"
-    style="background: {$currentTheme.background}E6; border: 3px solid {$currentTheme.primary}; box-shadow: {$currentTheme.glowPrimary};"
+    style="background: {$currentTheme.background}99; border: 3px solid {$currentTheme.primary}; box-shadow: {$currentTheme.glowPrimary};"
   >
     <h2 
       class="text-2xl font-bold text-center mb-6"
@@ -103,34 +105,16 @@
       </span>
     </div>
     
-    {#if totalThinkingTime > 0}
+    {#if aiDepth !== undefined}
       <div class="border-t my-3" style="border-color: {$currentTheme.primary}33;"></div>
       
       <!-- Last Move Time -->
       <div class="flex justify-between items-center">
-        <span class="text-white/80 font-medium">Last Move:</span>
-        <span class="font-bold" style="color: {$currentTheme.secondary};">
-          {formatTime(lastMoveTime)}
+        <span class="text-white/80 font-medium">AI Last Move:</span>
+        <span class="font-bold text-xl" style="color: {$currentTheme.secondary};">
+          {lastMoveTime > 0 ? formatTime(lastMoveTime) : '--'}
         </span>
       </div>
-      
-      <!-- Total AI Time -->
-      <div class="flex justify-between items-center">
-        <span class="text-white/80 font-medium">Total AI Time:</span>
-        <span class="font-bold" style="color: {$currentTheme.secondary};">
-          {formatTime(totalThinkingTime)}
-        </span>
-      </div>
-      
-      <!-- Average Time per Move -->
-      {#if totalMoves > 0}
-        <div class="flex justify-between items-center">
-          <span class="text-white/80 font-medium">Avg per Move:</span>
-          <span class="font-bold" style="color: {$currentTheme.secondary};">
-            {formatTime(Math.round(totalThinkingTime / totalMoves))}
-          </span>
-        </div>
-      {/if}
     {/if}
   </div>
 </div>
