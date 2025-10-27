@@ -95,6 +95,7 @@ version = "0.1.0"
 dependencies = [
  "futures-lite",
  "getrandom",
+ "instant",
  "js-sys",
  "rand",
  "rand_chacha",
@@ -104,6 +105,18 @@ dependencies = [
  "serde_json",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "web-sys",
+]
+
+[[package]]
+name = "instant"
+version = "0.1.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e0242819d153cba4b4b05a5a8f2a7e9bbf97b6055b2a002b395c96b5ff3c0222"
+dependencies = [
+ "cfg-if",
+ "js-sys",
+ "wasm-bindgen",
  "web-sys",
 ]
 

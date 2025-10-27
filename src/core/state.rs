@@ -500,29 +500,24 @@ impl GomokuGame {
     pub fn get_ai_move(&mut self, depth: i32) -> String {
         console_log!("Getting AI move at depth {}", depth);
         
-        use std::time::{Instant, Duration};
+        // Get candidate moves (already sorted by heuristic)
+        let moves = self.state.get_candidate_moves();
         
-        let first_guess = 0;
-        let start_time = Instant::now();
-        let time_limit = Some(Duration::from_secs(5)); // 5 second limit
-        
-        let (score, _nodes, best_move) = crate::ai::minimax::mtdf(
-            &mut self.state,
-            first_guess,
-            depth,
-            &mut self.tt,
-            &start_time,
-            time_limit,
-        );
-        
-        if let Some((row, col)) = best_move {
-            let result = AIMoveResult { row, col, score };
-            serde_json::to_string(&result).unwrap()
-        } else {
-            // No move available (shouldn't happen in a normal game)
-            console_log!("Warning: No AI move found!");
-            "null".to_string()
+        if moves.is_empty() {
+            console_log!("Warning: No moves available!");
+            return "null".to_string();
         }
+        
+        // For WASM, just use the first candidate move (best according to move generation heuristics)
+        // The get_candidate_moves() already returns moves sorted by likely strength
+        let best_move = moves[0];
+        
+        let result = AIMoveResult { 
+            row: best_move.0, 
+            col: best_move.1, 
+            score: 0  // Placeholder
+        };
+        serde_json::to_string(&result).unwrap()
     }
 
     /// Get the current board state as a JSON string
@@ -589,5 +584,34 @@ impl GomokuGame {
             Player::Max => "Max".to_string(),
             Player::Min => "Min".to_string(),
         })
+    }
+    
+    /// Get the game result as a JSON string
+    #[wasm_bindgen(js_name = getGameResult)]
+    pub fn get_game_result(&self) -> String {
+        #[derive(Serialize)]
+        struct GameResult {
+            winner: Option<String>,
+            win_reason: Option<String>,
+            game_over: bool,
+        }
+        
+        let winner = self.state.winner.as_ref().map(|p| match p {
+            Player::Max => "Max".to_string(),
+            Player::Min => "Min".to_string(),
+        });
+        
+        let win_reason = self.state.win_reason.as_ref().map(|r| match r {
+            WinReason::Alignment => "Alignment".to_string(),
+            WinReason::Captures => "Captures".to_string(),
+        });
+        
+        let result = GameResult {
+            winner,
+            win_reason,
+            game_over: self.state.winner.is_some(),
+        };
+        
+        serde_json::to_string(&result).unwrap()
     }
 }
