@@ -8,15 +8,17 @@
   }
   
   let { 
-    size = 19, 
     board = Array(19).fill(null).map(() => Array(19).fill(null)),
+    size = board.length || 19, 
     onCellClick 
   }: Props = $props();
   
+  // Reactive size based on board
+  const actualSize = $derived(board.length || size);
   const cellSize = 30; // px
-  const boardSize = cellSize * (size - 1);
+  const boardSize = $derived(cellSize * (actualSize - 1));
   const padding = 40;
-  const totalSize = boardSize + (padding * 2);
+  const totalSize = $derived(boardSize + (padding * 2));
   
   function handleClick(event: MouseEvent) {
     const svg = event.currentTarget as SVGSVGElement;
@@ -27,7 +29,7 @@
     const col = Math.round(x / cellSize);
     const row = Math.round(y / cellSize);
     
-    if (row >= 0 && row < size && col >= 0 && col < size) {
+    if (row >= 0 && row < actualSize && col >= 0 && col < actualSize) {
       console.log(`Clicked: row ${row}, col ${col}`);
       onCellClick?.(row, col);
     }
@@ -41,6 +43,9 @@
       height={totalSize}
       class="cursor-pointer"
       onclick={handleClick}
+      onkeydown={(e) => e.key === 'Enter' && handleClick(e)}
+      role="button"
+      tabindex="0"
     >
       <!-- Board background -->
       <rect 
@@ -53,7 +58,7 @@
       />
       
       <!-- Grid lines -->
-      {#each Array(size) as _, i}
+      {#each Array(actualSize) as _, i}
         <!-- Horizontal lines -->
         <line
           x1={padding}
