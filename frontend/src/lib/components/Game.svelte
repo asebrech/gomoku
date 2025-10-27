@@ -127,15 +127,20 @@
   }
   
   async function handleCellClick(row: number, col: number) {
+    console.log('Cell clicked:', { row, col, waitingForHumanMove, isGameOver, gameInstance: !!gameInstance, isPlaying });
+    
     if (!gameInstance || isGameOver || !waitingForHumanMove) {
+      console.log('Click rejected:', { gameInstance: !!gameInstance, isGameOver, waitingForHumanMove });
       return;
     }
     
     // Check if position is valid and empty
     if (!board[row] || board[row][col] !== null) {
+      console.log('Invalid position:', { isEmpty: board[row]?.[col] === null });
       return;
     }
     
+    console.log('Making human move at', row, col);
     // Make the human move
     await makeMove(row, col);
   }
@@ -144,25 +149,26 @@
     if (!gameInstance || isGameOver) return false;
     
     try {
+      console.log('Making move:', { row, col, currentPlayer });
       const moveResult = JSON.parse(gameInstance.makeMove(row, col));
+      console.log('Move result:', moveResult);
       
-      if (moveResult.valid) {
+      if (moveResult.success) {
         totalMoves++;
         updateBoardFromWasm();
+        console.log('Board updated, new board state:', board);
         
         // Update captures
         const boardState = JSON.parse(gameInstance.getBoardState());
         player1Captures = boardState.max_captures || 0;
         player2Captures = boardState.min_captures || 0;
         
-        // Check for game over
-        const gameResult = JSON.parse(gameInstance.getGameResult());
-        
-        if (gameResult.game_over) {
+        // Check for game over (use moveResult which already has game_over status)
+        if (moveResult.game_over) {
           isGameOver = true;
-          if (gameResult.winner) {
-            const winnerName = gameResult.winner === 'Max' ? player1Name : player2Name;
-            gameStatus = `${winnerName} wins! (${gameResult.win_reason})`;
+          if (moveResult.winner) {
+            const winnerName = moveResult.winner === 'Max' ? player1Name : player2Name;
+            gameStatus = `${winnerName} wins! (${moveResult.win_reason})`;
           } else {
             gameStatus = 'Game Over - Draw';
           }
@@ -170,8 +176,10 @@
         }
         
         waitingForHumanMove = false;
+        console.log('Move complete, waitingForHumanMove set to false');
         return true;
       }
+      console.log('Move was invalid');
       return false;
     } catch (error) {
       console.error('Move error:', error);
@@ -206,6 +214,8 @@
   async function playGameLoop() {
     if (!gameInstance || !isPlaying) return;
     
+    console.log('Starting game loop');
+    
     while (!isGameOver && !isPaused && !shouldStop && isPlaying) {
       // Check if we should stop at the beginning of each iteration
       if (shouldStop) {
@@ -214,11 +224,13 @@
       }
       
       const currentPlayerType = currentPlayer === 1 ? player1Type : player2Type;
+      console.log('Current player:', { currentPlayer, currentPlayerType, currentPlayerName });
       
       if (currentPlayerType === 'human') {
         // Wait for human move
         waitingForHumanMove = true;
         gameStatus = `${currentPlayerName}'s turn`;
+        console.log('Waiting for human move...');
         
         // Wait until human makes a move (handled by handleCellClick)
         while (waitingForHumanMove && !isPaused && !isGameOver && !shouldStop) {
@@ -226,12 +238,15 @@
           if (shouldStop) break;
         }
         
+        console.log('Human move completed or loop broken');
+        
         if (isPaused || isGameOver || shouldStop) break;
         
       } else {
         // AI move
         waitingForHumanMove = false;
         gameStatus = `${currentPlayerName} is thinking...`;
+        console.log('AI turn starting...');
         
         // Wait for the delay to make it visible (but check shouldStop during the wait)
         const startTime = Date.now();
@@ -242,6 +257,7 @@
         if (isPaused || shouldStop) break;
         
         const aiMove = await getAIMove();
+        console.log('AI move selected:', aiMove);
         
         if (!aiMove) {
           gameStatus = 'AI error - no move found';
@@ -257,9 +273,13 @@
           break;
         }
         
+        console.log('AI move completed');
+        
         if (isGameOver || shouldStop) break;
       }
     }
+    
+    console.log('Game loop ended');
     
     if (isPaused) {
       gameStatus = 'Game paused';
@@ -352,7 +372,11 @@
   <!-- Board and Stats Container -->
   <div class="flex justify-center items-start gap-8 flex-wrap lg:flex-nowrap">
     <div class="flex-shrink-0">
-      <GomokuBoard {board} onCellClick={handleCellClick} />
+      <GomokuBoard 
+        {board} 
+        onCellClick={handleCellClick}
+        currentPlayer={currentPlayer === 1 ? 'black' : 'white'}
+      />
     </div>
     
     <div class="flex-shrink-0 self-start">

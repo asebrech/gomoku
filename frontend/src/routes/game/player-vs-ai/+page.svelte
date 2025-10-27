@@ -16,7 +16,7 @@
       player2Type="ai"
       player1Name="You (Black)"
       player2Name="AI (White)"
-      aiDepth={3}
+      autoStart={true}
       onBack={() => goto('/game')}
     />
   </div>

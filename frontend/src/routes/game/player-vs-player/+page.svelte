@@ -16,6 +16,7 @@
       player2Type="human"
       player1Name="Player 1 (Black)"
       player2Name="Player 2 (White)"
+      autoStart={true}
       onBack={() => goto('/game')}
     />
   </div>
