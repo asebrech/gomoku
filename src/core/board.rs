@@ -11,7 +11,6 @@
 
 use std::hash::Hash;
 
-use bevy::prelude::*;
 use crate::core::patterns::{PatternAnalyzer, ALL_DIRECTIONS};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -29,7 +28,7 @@ impl Player {
     }
 }
 
-#[derive(Resource, Component, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Board {
     pub max_bits: Vec<u64>,
     pub min_bits: Vec<u64>,

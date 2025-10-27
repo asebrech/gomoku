@@ -16,7 +16,6 @@ use crate::ai::move_generation::MoveGenerator;
 use crate::core::board::{Board, Player};
 use crate::core::captures::CaptureHandler;
 use crate::core::rules::{WinDetection, DoubleThreeDetection, CaptureBreaking};
-use bevy::prelude::*;
 use std::hash::Hash;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Copy)]
@@ -25,7 +24,7 @@ pub enum WinReason {
     Captures,   // Won by capturing required pairs
 }
 
-#[derive(Resource, Component, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct GameState {
     pub board: Board,
     pub current_player: Player,

@@ -10,7 +10,6 @@
 //! - Transposition tables: <https://www.chessprogramming.org/Transposition_Table>
 
 use std::collections::HashMap;
-use bevy::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntryType {
@@ -28,7 +27,6 @@ pub struct TranspositionEntry {
     pub age: u32,
 }
 
-#[derive(Resource)]
 pub struct TranspositionTable {
     table: HashMap<u64, TranspositionEntry>,
     current_age: u32,
