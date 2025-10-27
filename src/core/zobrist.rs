@@ -29,10 +29,10 @@ impl ZobristHash {
         let mut position_keys = Vec::with_capacity(total_positions);
         
         for _ in 0..total_positions {
-            position_keys.push([rng.gen::<u64>(), rng.gen::<u64>()]);
+            position_keys.push([rng.random::<u64>(), rng.random::<u64>()]);
         }
         
-        let player_key = rng.gen::<u64>();
+        let player_key = rng.random::<u64>();
         
         Self {
             position_keys,

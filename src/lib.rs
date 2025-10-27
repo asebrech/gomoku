@@ -1,12 +1,13 @@
 pub mod ai {
     pub mod heuristic;
-    #[cfg(feature = "rayon")]
     pub mod lazy_smp;
     pub mod minimax;
     pub mod move_generation;
     pub mod pattern_history;
     pub mod transposition;
 }
+
+pub mod audio;
 
 pub mod core {
     pub mod board;
@@ -15,4 +16,27 @@ pub mod core {
     pub mod rules;
     pub mod state;
     pub mod zobrist;
+}
+
+pub mod ui {
+    pub mod app;
+    pub mod config;
+    pub mod theme;
+    pub mod components {
+        pub mod button;
+    }
+    pub mod display {
+        pub mod display;
+    }
+    pub mod screens {
+        pub mod game {
+            pub mod board;
+            pub mod game;
+            pub mod settings;
+        }
+        pub mod menu;
+        pub mod splash;
+        pub mod tutorial;
+        pub mod utils;
+    }
 }
