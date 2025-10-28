@@ -4,6 +4,7 @@
   import GomokuBoard from './GomokuBoard.svelte';
   import GameStats from './GameStats.svelte';
   import Button from './Button.svelte';
+  import Toggle from './Toggle.svelte';
   import { gameSettings } from '$lib/stores/gameSettings';
   
   interface Props {
@@ -45,6 +46,10 @@
   let lastDepthReached = $state(0); // Track the depth the AI reached
   let lastNodesSearched = $state(0); // Track nodes searched
   let lastAIScore = $state(0); // Track AI evaluation score
+  
+  // Double-three visualization
+  let showDoubleThree = $state(false);
+  let doubleThreePositions = $state<Array<{row: number, col: number}>>([]);
   
   // Stats tracking
   let totalMoves = $state(0);
@@ -130,8 +135,30 @@
       // Update captures
       player1Captures = gameInstance.get_max_captures();
       player2Captures = gameInstance.get_min_captures();
+      
+      // Update double-three positions if the toggle is on
+      updateDoubleThreePositions();
     } catch (error) {
       console.error('Error updating board:', error);
+    }
+  }
+  
+  function updateDoubleThreePositions() {
+    if (!gameInstance || !showDoubleThree) {
+      doubleThreePositions = [];
+      return;
+    }
+    
+    try {
+      const positions = gameInstance.get_double_three_positions();
+      doubleThreePositions = [];
+      for (let i = 0; i < positions.length; i++) {
+        const pos = positions[i];
+        doubleThreePositions.push({ row: pos.row, col: pos.col });
+      }
+    } catch (error) {
+      console.error('Error getting double-three positions:', error);
+      doubleThreePositions = [];
     }
   }
   
@@ -365,6 +392,11 @@
       return () => clearInterval(checkMove);
     }
   });
+  
+  $effect(() => {
+    // Update double-three positions when toggle changes
+    updateDoubleThreePositions();
+  });
 </script>
 
 <div class="w-full">
@@ -390,6 +422,7 @@
         {board} 
         onCellClick={handleCellClick}
         currentPlayer={currentPlayer === 1 ? 'black' : 'white'}
+        {doubleThreePositions}
       />
     </div>
     
@@ -413,6 +446,15 @@
   </div>
   
   <div class="flex justify-center items-center gap-4 mt-8 flex-wrap">
+    <!-- Double-three visibility toggle -->
+    <div class="mr-4">
+      <Toggle 
+        bind:checked={showDoubleThree} 
+        label="Show Double-Three" 
+        id="double-three-toggle"
+      />
+    </div>
+    
     {#if showSpeedControl}
       <div class="flex items-center gap-2">
         <label for="speed" class="text-white/90 text-sm">Speed:</label>

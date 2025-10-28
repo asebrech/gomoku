@@ -6,13 +6,15 @@
     board?: Array<Array<'black' | 'white' | null>>;
     onCellClick?: (row: number, col: number) => void;
     currentPlayer?: 'black' | 'white';
+    doubleThreePositions?: Array<{row: number, col: number}>;
   }
   
   let { 
     board = Array(19).fill(null).map(() => Array(19).fill(null)),
     size = board.length || 19,
     currentPlayer = 'black',
-    onCellClick 
+    onCellClick,
+    doubleThreePositions = []
   }: Props = $props();
   
   // Reactive size based on board
@@ -51,8 +53,9 @@
     const row = Math.round(y / cellSize);
     
     if (row >= 0 && row < actualSize && col >= 0 && col < actualSize) {
-      // Only show hover if the cell is empty
-      if (!board[row]?.[col]) {
+      // Only show hover if the cell is empty and not a double-three position
+      const isDoubleThree = doubleThreePositions.some(pos => pos.row === row && pos.col === col);
+      if (!board[row]?.[col] && !isDoubleThree) {
         hoverRow = row;
         hoverCol = col;
       } else {
@@ -63,6 +66,10 @@
       hoverRow = null;
       hoverCol = null;
     }
+  }
+  
+  function isDoubleThreePosition(row: number, col: number): boolean {
+    return doubleThreePositions.some(pos => pos.row === row && pos.col === col);
   }
   
   function handleMouseLeave() {
@@ -130,6 +137,43 @@
             />
           {/if}
         {/each}
+      {/each}
+      
+      <!-- Double-three markers (red crosses) -->
+      {#each doubleThreePositions as pos}
+        {#if !board[pos.row]?.[pos.col]}
+          <g class="animate-fade-in">
+            <!-- Red X mark -->
+            <line
+              x1={padding + pos.col * cellSize - 8}
+              y1={padding + pos.row * cellSize - 8}
+              x2={padding + pos.col * cellSize + 8}
+              y2={padding + pos.row * cellSize + 8}
+              stroke="#FF0000"
+              stroke-width="3"
+              stroke-linecap="round"
+            />
+            <line
+              x1={padding + pos.col * cellSize + 8}
+              y1={padding + pos.row * cellSize - 8}
+              x2={padding + pos.col * cellSize - 8}
+              y2={padding + pos.row * cellSize + 8}
+              stroke="#FF0000"
+              stroke-width="3"
+              stroke-linecap="round"
+            />
+            <!-- Optional: Add a subtle glow effect -->
+            <circle
+              cx={padding + pos.col * cellSize}
+              cy={padding + pos.row * cellSize}
+              r="10"
+              fill="none"
+              stroke="#FF0000"
+              stroke-width="1"
+              opacity="0.3"
+            />
+          </g>
+        {/if}
       {/each}
       
       <!-- Hover ghost stone -->

@@ -164,6 +164,36 @@ impl WasmGameState {
             score: result.score,
         })
     }
+
+    /// Get all positions that would create a double-three for the current player
+    /// Returns a JS array of Move objects
+    pub fn get_double_three_positions(&self) -> js_sys::Array {
+        let positions = js_sys::Array::new();
+        let size = self.inner.board.size;
+        
+        // Check all empty positions on the board
+        for row in 0..size {
+            for col in 0..size {
+                // Only check empty positions
+                if self.inner.board.get_player(row, col).is_none() {
+                    // Check if placing a stone here would create a double-three
+                    if DoubleThreeDetection::creates_double_three(
+                        &self.inner.board, 
+                        row, 
+                        col, 
+                        self.inner.current_player
+                    ) {
+                        let move_obj = js_sys::Object::new();
+                        js_sys::Reflect::set(&move_obj, &"row".into(), &JsValue::from(row)).unwrap();
+                        js_sys::Reflect::set(&move_obj, &"col".into(), &JsValue::from(col)).unwrap();
+                        positions.push(&move_obj);
+                    }
+                }
+            }
+        }
+        
+        positions
+    }
 }
 
 impl GameState {
