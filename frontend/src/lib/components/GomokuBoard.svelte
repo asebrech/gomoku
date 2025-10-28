@@ -7,6 +7,7 @@
     onCellClick?: (row: number, col: number) => void;
     currentPlayer?: 'black' | 'white';
     doubleThreePositions?: Array<{row: number, col: number}>;
+    aiHintPosition?: {row: number, col: number} | null;
   }
   
   let { 
@@ -14,7 +15,8 @@
     size = board.length || 19,
     currentPlayer = 'black',
     onCellClick,
-    doubleThreePositions = []
+    doubleThreePositions = [],
+    aiHintPosition = null
   }: Props = $props();
   
   // Reactive size based on board
@@ -185,6 +187,30 @@
           opacity="0.5"
           class="pointer-events-none"
         />
+      {/if}
+      
+      <!-- AI Hint indicator -->
+      {#if aiHintPosition && !board[aiHintPosition.row]?.[aiHintPosition.col]}
+        <g class="pointer-events-none animate-pulse">
+          <!-- Pulsing ring around suggested move -->
+          <circle
+            cx={padding + aiHintPosition.col * cellSize}
+            cy={padding + aiHintPosition.row * cellSize}
+            r="12"
+            fill="none"
+            stroke="#FFD700"
+            stroke-width="2"
+            opacity="0.8"
+          />
+          <!-- Inner dot -->
+          <circle
+            cx={padding + aiHintPosition.col * cellSize}
+            cy={padding + aiHintPosition.row * cellSize}
+            r="4"
+            fill="#FFD700"
+            opacity="0.6"
+          />
+        </g>
       {/if}
       
       <!-- Gradients for stones -->

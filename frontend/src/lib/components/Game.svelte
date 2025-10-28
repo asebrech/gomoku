@@ -54,6 +54,11 @@
   let showDoubleThree = $state(false);
   let doubleThreePositions = $state<Array<{row: number, col: number}>>([]);
   
+  // AI hint feature
+  let showAIHint = $state(false);
+  let aiHintPosition = $state<{row: number, col: number} | null>(null);
+  let isCalculatingHint = $state(false);
+  
   // Stats tracking
   let totalMoves = $state(0);
   let totalThinkingTime = $state(0);
@@ -181,6 +186,32 @@
     }
   }
   
+  async function calculateAIHint() {
+    // Only calculate hints for human players during their turn
+    if (!gameInstance || isGameOver || !showAIHint || !waitingForHumanMove) {
+      aiHintPosition = null;
+      return;
+    }
+    
+    try {
+      isCalculatingHint = true;
+      
+      // Use the same AI params as configured
+      const hintResult = gameInstance.get_ai_move(aiDepth, $gameSettings.aiMaxThinkingTime);
+      
+      if (hintResult && typeof hintResult.row === 'number' && typeof hintResult.col === 'number') {
+        aiHintPosition = { row: hintResult.row, col: hintResult.col };
+      } else {
+        aiHintPosition = null;
+      }
+    } catch (error) {
+      console.error('Error calculating AI hint:', error);
+      aiHintPosition = null;
+    } finally {
+      isCalculatingHint = false;
+    }
+  }
+  
   async function handleCellClick(row: number, col: number) {
     if (!gameInstance || isGameOver || !waitingForHumanMove) {
       return;
@@ -208,6 +239,9 @@
       gameInstance.make_move_coords(row, col);
       totalMoves++;
       updateBoardFromWasm();
+      
+      // Clear AI hint after move
+      aiHintPosition = null;
       
       // Check for game over
       if (gameInstance.is_terminal()) {
@@ -429,6 +463,18 @@
       });
     }
   });
+  
+  $effect(() => {
+    // Calculate AI hint when toggle is on and it's human's turn
+    if (gameInstance && !isGameOver && showAIHint && waitingForHumanMove && hasHuman) {
+      calculateAIHint();
+    } else if (!showAIHint) {
+      // Clear hint when toggle is off
+      untrack(() => {
+        aiHintPosition = null;
+      });
+    }
+  });
 </script>
 
 <div class="w-full max-h-[calc(100vh-5rem)] flex flex-col">
@@ -498,6 +544,7 @@
         onCellClick={handleCellClick}
         currentPlayer={currentPlayer === 1 ? 'black' : 'white'}
         {doubleThreePositions}
+        {aiHintPosition}
       />
     </div>
     
@@ -518,6 +565,9 @@
         {lastAIScore}
         {showDoubleThree}
         onToggleDoubleThree={(value) => showDoubleThree = value}
+        {showAIHint}
+        onToggleAIHint={(value) => showAIHint = value}
+        {isCalculatingHint}
         {isPlaying}
         {isPaused}
         {isGameOver}

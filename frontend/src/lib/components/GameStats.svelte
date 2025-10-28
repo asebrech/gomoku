@@ -21,6 +21,9 @@
     // New props for controls
     showDoubleThree?: boolean;
     onToggleDoubleThree?: (value: boolean) => void;
+    showAIHint?: boolean;
+    onToggleAIHint?: (value: boolean) => void;
+    isCalculatingHint?: boolean;
     isPlaying?: boolean;
     isPaused?: boolean;
     isGameOver?: boolean;
@@ -52,6 +55,9 @@
     // Controls
     showDoubleThree = false,
     onToggleDoubleThree,
+    showAIHint = false,
+    onToggleAIHint,
+    isCalculatingHint = false,
     isPlaying = false,
     isPaused = false,
     isGameOver = false,
@@ -238,6 +244,22 @@
         id="double-three-toggle"
       />
     </div>
+    
+    <!-- AI Hint toggle (only for games with human players) -->
+    {#if hasHuman}
+      <div class="flex justify-center">
+        <Toggle 
+          checked={showAIHint}
+          onchange={onToggleAIHint}
+          label="AI Hint" 
+          id="ai-hint-toggle"
+          disabled={isPlaying && isFullAI}
+        />
+        {#if isCalculatingHint}
+          <span class="ml-2 text-xs text-cyan-400 animate-pulse">Computing...</span>
+        {/if}
+      </div>
+    {/if}
     
     <!-- AI vs AI Controls -->
     {#if isFullAI}
