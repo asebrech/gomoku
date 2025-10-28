@@ -7,6 +7,7 @@
     size?: 'sm' | 'md' | 'lg';
     onclick?: () => void;
     disabled?: boolean;
+    fullWidth?: boolean;
     children: Snippet;
   }
   
@@ -15,6 +16,7 @@
     size = 'md',
     onclick,
     disabled = false,
+    fullWidth = false,
     children 
   }: Props = $props();
   
@@ -89,7 +91,7 @@
 </script>
 
 <button 
-  class="{baseClasses} {sizeClasses[size]}"
+  class="{baseClasses} {sizeClasses[size]} {fullWidth ? 'w-full' : ''}"
   style={styleString}
   {onclick}
   {disabled}

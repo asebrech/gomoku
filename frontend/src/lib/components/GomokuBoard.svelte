@@ -19,9 +19,9 @@
   
   // Reactive size based on board
   const actualSize = $derived(board.length || size);
-  const cellSize = 30; // px
+  const cellSize = 22; // px - reduced from 30 for better fit
   const boardSize = $derived(cellSize * (actualSize - 1));
-  const padding = 40;
+  const padding = 30; // reduced from 40
   const totalSize = $derived(boardSize + (padding * 2));
   
   // Hover state
@@ -78,8 +78,8 @@
   }
 </script>
 
-<div class="flex items-center justify-center w-full p-8">
-  <div class="rounded-lg p-8" style="background: {$currentTheme.background}99; border: 3px solid {$currentTheme.primary}; box-shadow: {$currentTheme.glowPrimary};">
+<div class="flex items-center justify-center w-full">
+  <div class="rounded-lg p-4" style="background: {$currentTheme.background}99; border: 3px solid {$currentTheme.primary}; box-shadow: {$currentTheme.glowPrimary};">
     <svg 
       width={totalSize} 
       height={totalSize}
@@ -87,7 +87,6 @@
       onclick={handleClick}
       onmousemove={handleMouseMove}
       onmouseleave={handleMouseLeave}
-      onkeydown={(e) => e.key === 'Enter' && handleClick(e)}
       role="button"
       tabindex="0"
     >
@@ -130,7 +129,7 @@
             <circle
               cx={padding + col * cellSize}
               cy={padding + row * cellSize}
-              r="13"
+              r="10"
               fill={stone === 'black' ? `url(#player1Gradient)` : `url(#player2Gradient)`}
               filter="url(#stoneShadow)"
               class="animate-fade-in"
@@ -145,28 +144,28 @@
           <g class="animate-fade-in">
             <!-- Red X mark -->
             <line
-              x1={padding + pos.col * cellSize - 8}
-              y1={padding + pos.row * cellSize - 8}
-              x2={padding + pos.col * cellSize + 8}
-              y2={padding + pos.row * cellSize + 8}
+              x1={padding + pos.col * cellSize - 6}
+              y1={padding + pos.row * cellSize - 6}
+              x2={padding + pos.col * cellSize + 6}
+              y2={padding + pos.row * cellSize + 6}
               stroke="#FF0000"
-              stroke-width="3"
+              stroke-width="2"
               stroke-linecap="round"
             />
             <line
-              x1={padding + pos.col * cellSize + 8}
-              y1={padding + pos.row * cellSize - 8}
-              x2={padding + pos.col * cellSize - 8}
-              y2={padding + pos.row * cellSize + 8}
+              x1={padding + pos.col * cellSize + 6}
+              y1={padding + pos.row * cellSize - 6}
+              x2={padding + pos.col * cellSize - 6}
+              y2={padding + pos.row * cellSize + 6}
               stroke="#FF0000"
-              stroke-width="3"
+              stroke-width="2"
               stroke-linecap="round"
             />
             <!-- Optional: Add a subtle glow effect -->
             <circle
               cx={padding + pos.col * cellSize}
               cy={padding + pos.row * cellSize}
-              r="10"
+              r="8"
               fill="none"
               stroke="#FF0000"
               stroke-width="1"
@@ -181,7 +180,7 @@
         <circle
           cx={padding + hoverCol * cellSize}
           cy={padding + hoverRow * cellSize}
-          r="13"
+          r="10"
           fill={currentPlayer === 'black' ? `url(#player1GhostGradient)` : `url(#player2GhostGradient)`}
           opacity="0.5"
           class="pointer-events-none"

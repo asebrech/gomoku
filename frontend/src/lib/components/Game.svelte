@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { _ } from 'svelte-i18n';
+  import { untrack } from 'svelte';
   import GomokuBoard from './GomokuBoard.svelte';
   import GameStats from './GameStats.svelte';
   import Button from './Button.svelte';
@@ -136,25 +137,41 @@
       player1Captures = gameInstance.get_max_captures();
       player2Captures = gameInstance.get_min_captures();
       
-      // Update double-three positions if the toggle is on
-      updateDoubleThreePositions();
+      // Update double-three positions if the toggle is on and game is not over
+      if (showDoubleThree && !isGameOver) {
+        updateDoubleThreePositions();
+      }
     } catch (error) {
       console.error('Error updating board:', error);
     }
   }
   
   function updateDoubleThreePositions() {
-    if (!gameInstance || !showDoubleThree) {
+    // Guard against calling when game instance doesn't exist or game is over
+    if (!gameInstance || isGameOver) {
+      doubleThreePositions = [];
+      return;
+    }
+    
+    // Only update if showDoubleThree is enabled
+    if (!showDoubleThree) {
       doubleThreePositions = [];
       return;
     }
     
     try {
       const positions = gameInstance.get_double_three_positions();
+      if (!positions) {
+        doubleThreePositions = [];
+        return;
+      }
+      
       doubleThreePositions = [];
       for (let i = 0; i < positions.length; i++) {
         const pos = positions[i];
-        doubleThreePositions.push({ row: pos.row, col: pos.col });
+        if (pos && typeof pos.row === 'number' && typeof pos.col === 'number') {
+          doubleThreePositions.push({ row: pos.row, col: pos.col });
+        }
       }
     } catch (error) {
       console.error('Error getting double-three positions:', error);
@@ -394,20 +411,31 @@
   });
   
   $effect(() => {
-    // Update double-three positions when toggle changes
-    updateDoubleThreePositions();
+    // Update double-three positions when toggle changes or board updates
+    // Only run if game instance exists and game is not over
+    // Use untrack to prevent infinite loops when updating doubleThreePositions
+    if (gameInstance && !isGameOver && showDoubleThree) {
+      untrack(() => {
+        updateDoubleThreePositions();
+      });
+    } else if (!showDoubleThree) {
+      // Clear positions when toggle is off
+      untrack(() => {
+        doubleThreePositions = [];
+      });
+    }
   });
 </script>
 
-<div class="w-full">
-  <div class="text-center mb-6">
-    <p class="text-2xl font-bold mb-2" style="color: {isPlaying && !waitingForHumanMove ? '#FF00FF' : '#00FFFF'};">
+<div class="w-full max-h-[calc(100vh-5rem)] flex flex-col">
+  <div class="text-center py-2 flex-shrink-0">
+    <p class="text-xl font-bold mb-1" style="color: {isPlaying && !waitingForHumanMove ? '#FF00FF' : '#00FFFF'};">
       {gameStatus}
       {#if isAIThinking}
         <span class="inline-block ml-2 animate-pulse">🤔</span>
       {/if}
     </p>
-    <p class="text-lg text-white/80">
+    <p class="text-base text-white/80">
       Current turn: <span class="font-bold" style="color: #00FFFF;">{currentPlayerName}</span>
       {#if isAIThinking}
         <span class="ml-2 text-sm text-cyan-400 animate-pulse">Computing...</span>
@@ -416,7 +444,7 @@
   </div>
   
   <!-- Board and Stats Container -->
-  <div class="flex justify-center items-start gap-8 flex-wrap lg:flex-nowrap">
+  <div class="flex justify-center items-start gap-4 flex-1 min-h-0 px-4 pb-4">
     <div class="flex-shrink-0">
       <GomokuBoard 
         {board} 
@@ -441,72 +469,21 @@
         {lastDepthReached}
         {lastNodesSearched}
         {lastAIScore}
+        {showDoubleThree}
+        onToggleDoubleThree={(value) => showDoubleThree = value}
+        {isPlaying}
+        {isPaused}
+        {isGameOver}
+        {isFullAI}
+        {hasHuman}
+        {gameInstance}
+        onStartGame={startGame}
+        onPauseGame={pauseGame}
+        onResumeGame={resumeGame}
+        onUndoMove={undoMove}
+        onResetGame={resetGame}
+        {onBack}
       />
     </div>
-  </div>
-  
-  <div class="flex justify-center items-center gap-4 mt-8 flex-wrap">
-    <!-- Double-three visibility toggle -->
-    <div class="mr-4">
-      <Toggle 
-        bind:checked={showDoubleThree} 
-        label="Show Double-Three" 
-        id="double-three-toggle"
-      />
-    </div>
-    
-    {#if showSpeedControl}
-      <div class="flex items-center gap-2">
-        <label for="speed" class="text-white/90 text-sm">Speed:</label>
-        <select 
-          id="speed"
-          bind:value={aiMoveDelay}
-          disabled={isPlaying}
-          class="px-3 py-1 bg-white/10 backdrop-blur-md border border-white/20 rounded text-white/90 text-sm disabled:opacity-50"
-        >
-          <option value={100}>Very Fast</option>
-          <option value={300}>Fast</option>
-          <option value={500}>Normal</option>
-          <option value={1000}>Slow</option>
-          <option value={2000}>Very Slow</option>
-        </select>
-      </div>
-    {/if}
-    
-    {#if isFullAI}
-      {#if !isPlaying && !isPaused}
-        <Button variant="primary" size="md" onclick={startGame} disabled={!gameInstance || isGameOver}>
-          Start AI Battle
-        </Button>
-      {/if}
-      
-      {#if isPlaying}
-        <Button variant="secondary" size="md" onclick={pauseGame}>
-          Pause
-        </Button>
-      {/if}
-      
-      {#if isPaused && !isGameOver}
-        <Button variant="primary" size="md" onclick={resumeGame}>
-          Resume
-        </Button>
-      {/if}
-    {/if}
-    
-    {#if hasHuman && !isFullAI}
-      <Button variant="secondary" size="md" onclick={undoMove} disabled={isPlaying}>
-        Undo
-      </Button>
-    {/if}
-    
-    <Button variant="secondary" size="md" onclick={resetGame} disabled={isPlaying && !isPaused}>
-      New Game
-    </Button>
-    
-    {#if onBack}
-      <Button variant="ghost" size="md" onclick={onBack}>
-        {$_('game.menu.back')}
-      </Button>
-    {/if}
   </div>
 </div>
