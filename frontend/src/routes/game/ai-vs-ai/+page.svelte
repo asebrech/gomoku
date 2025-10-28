@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import Game from '$lib/components/Game.svelte';
+  import { gameSettings } from '$lib/stores/gameSettings';
 </script>
 
 <div class="min-h-[calc(100vh-4rem)] py-8">
@@ -16,11 +17,11 @@
       player2Type="ai"
       player1Name="Black AI"
       player2Name="White AI"
-      aiDepth={3}
+      aiDepth={$gameSettings.aiDepth}
       autoStart={true}
-      showSpeedControl={true}
       moveDelay={500}
       onBack={() => goto('/game')}
+    />
     />
   </div>
 </div>
