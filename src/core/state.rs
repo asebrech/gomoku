@@ -32,6 +32,15 @@ pub struct Move {
     pub col: usize,
 }
 
+#[wasm_bindgen]
+pub struct AIMoveResult {
+    pub row: usize,
+    pub col: usize,
+    pub depth_reached: i32,
+    pub nodes_searched: f64, // u64 as f64 for JS compatibility
+    pub score: i32,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct GameState {
     pub board: Board,
@@ -122,7 +131,7 @@ impl WasmGameState {
         self.inner = GameState::new(self.inner.board.size, self.inner.win_condition);
     }
 
-    pub fn get_ai_move(&mut self, depth: i32, time_limit_ms: f64) -> Option<Move> {
+    pub fn get_ai_move(&mut self, depth: i32, time_limit_ms: f64) -> Option<AIMoveResult> {
         use web_sys::console;
         
         console::log_1(&"[RUST] ===== get_ai_move ENTRY =====".into());
@@ -144,8 +153,16 @@ impl WasmGameState {
         let result = lazy_smp_search(&mut self.inner, time_limit, depth, None);
         
         console::log_1(&"[RUST] lazy_smp_search completed".into());
+        console::log_1(&format!("[RUST] Depth reached: {}, Nodes: {}, Score: {}", 
+            result.depth_reached, result.nodes_searched, result.score).into());
         
-        result.best_move.map(|(row, col)| Move { row, col })
+        result.best_move.map(|(row, col)| AIMoveResult {
+            row,
+            col,
+            depth_reached: result.depth_reached,
+            nodes_searched: result.nodes_searched as f64,
+            score: result.score,
+        })
     }
 }
 

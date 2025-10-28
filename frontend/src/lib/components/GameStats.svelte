@@ -12,6 +12,9 @@
     totalThinkingTime?: number;
     lastMoveTime?: number;
     aiMoveCount?: number;
+    lastDepthReached?: number;
+    lastNodesSearched?: number;
+    lastAIScore?: number;
   }
   
   let {
@@ -24,12 +27,21 @@
     player2Captures = 0,
     totalThinkingTime = 0,
     lastMoveTime = 0,
-    aiMoveCount = 0
+    aiMoveCount = 0,
+    lastDepthReached = 0,
+    lastNodesSearched = 0,
+    lastAIScore = 0
   }: Props = $props();
   
   function formatTime(ms: number): string {
     if (ms < 1000) return `${ms}ms`;
     return `${(ms / 1000).toFixed(1)}s`;
+  }
+  
+  function formatNodes(nodes: number): string {
+    if (nodes < 1000) return `${nodes}`;
+    if (nodes < 1000000) return `${(nodes / 1000).toFixed(1)}K`;
+    return `${(nodes / 1000000).toFixed(1)}M`;
   }
 </script>
 
@@ -65,7 +77,7 @@
     {#if aiDepth}
       <!-- AI Depth -->
       <div class="flex justify-between items-center">
-        <span class="text-white/80 font-medium">AI Depth:</span>
+        <span class="text-white/80 font-medium">AI Max Depth:</span>
         <span class="font-bold" style="color: {$currentTheme.secondary};">
           {aiDepth}
         </span>
@@ -108,6 +120,16 @@
     {#if aiDepth !== undefined}
       <div class="border-t my-3" style="border-color: {$currentTheme.primary}33;"></div>
       
+      <!-- Actual Depth Reached -->
+      {#if lastDepthReached > 0}
+        <div class="flex justify-between items-center">
+          <span class="text-white/80 font-medium">Depth Reached:</span>
+          <span class="font-bold text-xl" style="color: {$currentTheme.accent};">
+            {lastDepthReached}
+          </span>
+        </div>
+      {/if}
+      
       <!-- Last Move Time -->
       <div class="flex justify-between items-center">
         <span class="text-white/80 font-medium">AI Last Move:</span>
@@ -115,6 +137,26 @@
           {lastMoveTime > 0 ? formatTime(lastMoveTime) : '--'}
         </span>
       </div>
+      
+      <!-- Nodes Searched -->
+      {#if lastNodesSearched > 0}
+        <div class="flex justify-between items-center">
+          <span class="text-white/80 font-medium text-sm">Nodes Searched:</span>
+          <span class="font-bold" style="color: {$currentTheme.secondary};">
+            {formatNodes(lastNodesSearched)}
+          </span>
+        </div>
+      {/if}
+      
+      <!-- AI Evaluation Score -->
+      {#if lastAIScore !== 0}
+        <div class="flex justify-between items-center">
+          <span class="text-white/80 font-medium text-sm">Evaluation:</span>
+          <span class="font-bold" style="color: {lastAIScore > 0 ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2};">
+            {lastAIScore > 0 ? '+' : ''}{lastAIScore}
+          </span>
+        </div>
+      {/if}
     {/if}
   </div>
 </div>

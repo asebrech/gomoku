@@ -41,6 +41,10 @@
   let aiMoveDelay = $state(moveDelay);
   let waitingForHumanMove = $state(false);
   let shouldStop = $state(false);
+  let isAIThinking = $state(false); // New: Track when AI is computing
+  let lastDepthReached = $state(0); // Track the depth the AI reached
+  let lastNodesSearched = $state(0); // Track nodes searched
+  let lastAIScore = $state(0); // Track AI evaluation score
   
   // Stats tracking
   let totalMoves = $state(0);
@@ -184,25 +188,42 @@
     if (!gameInstance) return null;
     
     try {
+      isAIThinking = true; // Set thinking state
       const startTime = performance.now();
+      
+      // Yield to the browser before heavy computation to allow UI updates
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
       // Pass time limit as a regular number (f64 in Rust)
-      const aiMove = gameInstance.get_ai_move(aiDepth, $gameSettings.aiMaxThinkingTime);
+      const aiMoveResult = gameInstance.get_ai_move(aiDepth, $gameSettings.aiMaxThinkingTime);
       const endTime = performance.now();
       
-      // Track AI thinking time
-      lastMoveTime = Math.round(endTime - startTime);
-      totalThinkingTime += lastMoveTime;
-      aiMoveCount++;
+      // Yield again after computation to let the browser update
+      await new Promise(resolve => setTimeout(resolve, 0));
       
-      if (!aiMove) {
+      if (!aiMoveResult) {
         console.error('AI failed to find a move');
         return null;
       }
       
-      return { row: aiMove.row, col: aiMove.col };
+      // Track AI thinking time and stats
+      lastMoveTime = Math.round(endTime - startTime);
+      totalThinkingTime += lastMoveTime;
+      aiMoveCount++;
+      
+      // Track AI search stats
+      lastDepthReached = aiMoveResult.depth_reached;
+      lastNodesSearched = Math.round(aiMoveResult.nodes_searched);
+      lastAIScore = aiMoveResult.score;
+      
+      console.log(`AI Move: depth=${lastDepthReached}, nodes=${lastNodesSearched}, score=${lastAIScore}, time=${lastMoveTime}ms`);
+      
+      return { row: aiMoveResult.row, col: aiMoveResult.col };
     } catch (error) {
       console.error('AI move error:', error);
       return null;
+    } finally {
+      isAIThinking = false; // Clear thinking state
     }
   }
   
@@ -312,6 +333,9 @@
       player1Captures = 0;
       player2Captures = 0;
       aiMoveCount = 0;
+      lastDepthReached = 0;
+      lastNodesSearched = 0;
+      lastAIScore = 0;
       
       // Auto-restart for AI vs AI
       if (autoStart && isFullAI) {
@@ -347,9 +371,15 @@
   <div class="text-center mb-6">
     <p class="text-2xl font-bold mb-2" style="color: {isPlaying && !waitingForHumanMove ? '#FF00FF' : '#00FFFF'};">
       {gameStatus}
+      {#if isAIThinking}
+        <span class="inline-block ml-2 animate-pulse">🤔</span>
+      {/if}
     </p>
     <p class="text-lg text-white/80">
       Current turn: <span class="font-bold" style="color: #00FFFF;">{currentPlayerName}</span>
+      {#if isAIThinking}
+        <span class="ml-2 text-sm text-cyan-400 animate-pulse">Computing...</span>
+      {/if}
     </p>
   </div>
   
@@ -375,6 +405,9 @@
         {totalThinkingTime}
         {lastMoveTime}
         {aiMoveCount}
+        {lastDepthReached}
+        {lastNodesSearched}
+        {lastAIScore}
       />
     </div>
   </div>

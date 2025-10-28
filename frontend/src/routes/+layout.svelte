@@ -25,7 +25,8 @@
 				console.log('WASM module loaded');
 				
 				// Initialize thread pool for parallel AI search
-				const numThreads = navigator.hardwareConcurrency || 4;
+				// Use fewer threads for WASM to reduce coordination overhead
+				const numThreads = Math.min(navigator.hardwareConcurrency || 4, 4); // Cap at 4 for WASM
 				console.log(`Initializing thread pool with ${numThreads} threads...`);
 				await wasmModule.initThreadPool(numThreads);
 				console.log('Thread pool initialized successfully');

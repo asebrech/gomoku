@@ -92,11 +92,20 @@ fn lazy_smp_worker(
     max_depth: i32,
     shared_state: Arc<SharedSearchState>,
     worker_id: usize,
-    start_time: Instant,
     time_limit: Option<Duration>,
 ) -> (i32, Option<(usize, usize)>, i32, u64) {
+    // Each worker creates its own start time in its own thread context
+    let worker_start = Instant::now();
+    
     let mut local_state = state.clone();
-    let mut tt = TranspositionTable::new(2_000_000);
+    
+    // Reduce TT size in WASM to minimize allocation overhead
+    #[cfg(target_arch = "wasm32")]
+    let tt_size = 500_000; // Smaller TT for WASM
+    #[cfg(not(target_arch = "wasm32"))]
+    let tt_size = 2_000_000;
+    
+    let mut tt = TranspositionTable::new(tt_size);
 
     let mut best_move = None;
     let mut best_score = 0;
@@ -126,7 +135,7 @@ fn lazy_smp_worker(
         }
 
         if let Some(limit) = time_limit {
-            if start_time.elapsed() >= limit {
+            if worker_start.elapsed() >= limit {
                 shared_state.signal_stop();
                 break;
             }
@@ -141,7 +150,7 @@ fn lazy_smp_worker(
             first_guess,
             search_depth,
             &mut tt,
-            &start_time,
+            &worker_start,
             time_limit,
         );
 
@@ -192,7 +201,18 @@ pub fn lazy_smp_search(
 
     console::log_1(&format!("[RUST] lazy_smp_search: Getting thread count").into());
     let threads = num_threads.unwrap_or_else(|| {
-        rayon::current_num_threads()
+        // In WASM, limit threads to reduce overhead
+        // Web Workers have high coordination costs
+        #[cfg(target_arch = "wasm32")]
+        {
+            let hardware_threads = rayon::current_num_threads();
+            // Use at most 2-3 threads in WASM for better performance
+            hardware_threads.min(2)
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            rayon::current_num_threads()
+        }
     });
     console::log_1(&format!("[RUST] lazy_smp_search: Using {} threads", threads).into());
 
@@ -227,7 +247,6 @@ pub fn lazy_smp_search(
                 max_depth,
                 shared_state_clone,
                 worker_id,
-                start_time,
                 Some(time_limit),
             )
         })
