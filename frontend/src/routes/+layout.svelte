@@ -20,7 +20,7 @@
 				
 				// Initialize WASM module and thread pool
 				console.log('Initializing WASM module...');
-				const wasmModule = await import('$lib/wasm/gomoku');
+				const wasmModule = await import('$lib/wasm/pkg/gomoku');
 				await wasmModule.default();
 				console.log('WASM module loaded');
 				

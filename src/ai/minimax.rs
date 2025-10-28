@@ -19,7 +19,7 @@
 
 use crate::core::state::GameState;
 use std::cmp::{max, min};
-use std::time::{Duration, Instant};
+use instant::{Duration, Instant};
 
 use super::{heuristic::Heuristic, transposition::{TranspositionTable, EntryType}};
 

@@ -23,7 +23,7 @@ use crate::core::state::GameState;
 use rayon::prelude::*;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use instant::{Duration, Instant};
 
 use super::{minimax::mtdf, transposition::TranspositionTable};
 

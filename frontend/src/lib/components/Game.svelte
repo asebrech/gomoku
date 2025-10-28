@@ -63,7 +63,7 @@
   onMount(async () => {
     try {
       // Import WASM module (already initialized in root layout)
-      const wasmModule = await import('$lib/wasm/gomoku');
+      const wasmModule = await import('$lib/wasm/pkg/gomoku');
       
       // Create game instance with settings from store
       gameInstance = new wasmModule.WasmGameState($gameSettings.boardSize, $gameSettings.winCondition);
@@ -185,7 +185,7 @@
     
     try {
       const startTime = performance.now();
-      // Pass depth and time limit in milliseconds as a number (not BigInt)
+      // Pass time limit as a regular number (f64 in Rust)
       const aiMove = gameInstance.get_ai_move(aiDepth, $gameSettings.aiMaxThinkingTime);
       const endTime = performance.now();
       
