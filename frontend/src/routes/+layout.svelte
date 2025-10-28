@@ -10,10 +10,30 @@
 
 	let { children } = $props();
 	let ready = $state(false);
+	let wasmReady = $state(false);
 
 	onMount(async () => {
 		if (browser) {
-			await initI18n();
+			try {
+				// Initialize i18n
+				await initI18n();
+				
+				// Initialize WASM module and thread pool
+				console.log('Initializing WASM module...');
+				const wasmModule = await import('$lib/wasm/gomoku');
+				await wasmModule.default();
+				console.log('WASM module loaded');
+				
+				// Initialize thread pool for parallel AI search
+				const numThreads = navigator.hardwareConcurrency || 4;
+				console.log(`Initializing thread pool with ${numThreads} threads...`);
+				await wasmModule.initThreadPool(numThreads);
+				console.log('Thread pool initialized successfully');
+				
+				wasmReady = true;
+			} catch (error) {
+				console.error('Failed to initialize WASM:', error);
+			}
 		}
 		ready = true;
 	});

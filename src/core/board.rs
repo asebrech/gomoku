@@ -10,9 +10,11 @@
 //! iterate set bits, and common board queries used throughout the engine.
 
 use std::hash::Hash;
+use wasm_bindgen::prelude::*;
 
 use crate::core::patterns::{PatternAnalyzer, ALL_DIRECTIONS};
 
+#[wasm_bindgen]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Player {
     Max,
@@ -36,6 +38,42 @@ pub struct Board {
     pub size: usize,
     pub u64_count: usize,
     pub total_cells: usize,
+}
+
+// WASM wrapper for Board
+#[wasm_bindgen]
+pub struct WasmBoard {
+    inner: Board,
+}
+
+#[wasm_bindgen]
+impl WasmBoard {
+    #[wasm_bindgen(constructor)]
+    pub fn new(size: usize) -> Self {
+        WasmBoard {
+            inner: Board::new(size),
+        }
+    }
+
+    pub fn get_size(&self) -> usize {
+        self.inner.size
+    }
+
+    pub fn is_valid_position(&self, row: usize, col: usize) -> bool {
+        self.inner.is_valid_position(row, col)
+    }
+
+    pub fn is_empty_at(&self, row: usize, col: usize) -> bool {
+        self.inner.is_empty_position(row, col)
+    }
+
+    pub fn get_player(&self, row: usize, col: usize) -> Option<Player> {
+        self.inner.get_player(row, col)
+    }
+
+    pub fn is_full(&self) -> bool {
+        self.inner.is_full()
+    }
 }
 
 impl Board {
@@ -115,19 +153,6 @@ impl Board {
         (bits[array_idx] & (1u64 << bit_idx)) != 0
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.occupied.iter().all(|&b| b == 0)
-    }
-
-    pub fn count_stones(&self) -> usize {
-        self.occupied.iter().map(|&bits| bits.count_ones() as usize).sum()
-    }
-
-    pub fn count_player_stones(&self, player: Player) -> usize {
-        let bits = self.get_player_bits(player);
-        bits.iter().map(|&b| b.count_ones() as usize).sum()
-    }
-
     #[inline]
     pub fn get_player_bits(&self, player: Player) -> &Vec<u64> {
         match player {
@@ -144,8 +169,25 @@ impl Board {
         }
     }
 
-    pub fn center(&self) -> (usize, usize) {
-        (self.size / 2, self.size / 2)
+    pub fn is_empty(&self) -> bool {
+        self.occupied.iter().all(|&b| b == 0)
+    }
+
+    pub fn count_stones(&self) -> usize {
+        self.occupied.iter().map(|&bits| bits.count_ones() as usize).sum()
+    }
+
+    pub fn count_player_stones(&self, player: Player) -> usize {
+        let bits = self.get_player_bits(player);
+        bits.iter().map(|&b| b.count_ones() as usize).sum()
+    }
+
+    pub fn center_row(&self) -> usize {
+        self.size / 2
+    }
+
+    pub fn center_col(&self) -> usize {
+        self.size / 2
     }
 
     pub fn is_empty_position(&self, row: usize, col: usize) -> bool {
@@ -156,7 +198,7 @@ impl Board {
         !Self::is_bit_set(&self.occupied, idx)
     }
 
-    pub fn get_player(&self, row: usize, col: usize) -> Option<Player> {
+    pub fn get_player_at(&self, row: usize, col: usize) -> Option<Player> {
         if !self.is_valid_position(row, col) {
             return None;
         }
@@ -228,6 +270,17 @@ impl Board {
         }
 
         total_set_bits == self.total_cells
+    }
+}
+
+// Methods returning tuples (non-WASM compatible)
+impl Board {
+    pub fn center(&self) -> (usize, usize) {
+        (self.size / 2, self.size / 2)
+    }
+
+    pub fn get_player(&self, row: usize, col: usize) -> Option<Player> {
+        self.get_player_at(row, col)
     }
 
     pub fn get_empty_positions(&self) -> Vec<(usize, usize)> {

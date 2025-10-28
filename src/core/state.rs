@@ -17,11 +17,19 @@ use crate::core::board::{Board, Player};
 use crate::core::captures::CaptureHandler;
 use crate::core::rules::{WinDetection, DoubleThreeDetection, CaptureBreaking};
 use std::hash::Hash;
+use wasm_bindgen::prelude::*;
 
+#[wasm_bindgen]
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Copy)]
 pub enum WinReason {
     Alignment,  // Won by placing N stones in a row
     Captures,   // Won by capturing required pairs
+}
+
+#[wasm_bindgen]
+pub struct Move {
+    pub row: usize,
+    pub col: usize,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -41,6 +49,104 @@ pub struct GameState {
     pub current_hash: u64,
     pub player_in_check: Option<Player>,
     pub check_position: Option<(usize, usize)>,
+}
+
+// WASM wrapper for GameState
+#[wasm_bindgen]
+pub struct WasmGameState {
+    inner: GameState,
+}
+
+#[wasm_bindgen]
+impl WasmGameState {
+    #[wasm_bindgen(constructor)]
+    pub fn new(board_size: usize, win_condition: usize) -> Self {
+        WasmGameState {
+            inner: GameState::new(board_size, win_condition),
+        }
+    }
+
+    pub fn with_defaults(board_size: usize, win_condition: usize) -> Self {
+        WasmGameState {
+            inner: GameState::with_defaults(board_size, win_condition),
+        }
+    }
+
+    pub fn get_board_size(&self) -> usize {
+        self.inner.board.size
+    }
+
+    pub fn get_current_player(&self) -> Player {
+        self.inner.current_player
+    }
+
+    pub fn get_winner(&self) -> Option<Player> {
+        self.inner.winner
+    }
+
+    pub fn get_max_captures(&self) -> usize {
+        self.inner.max_captures
+    }
+
+    pub fn get_min_captures(&self) -> usize {
+        self.inner.min_captures
+    }
+
+    pub fn get_stone_at(&self, row: usize, col: usize) -> Option<Player> {
+        self.inner.board.get_player(row, col)
+    }
+
+    pub fn is_move_legal_coords(&self, row: usize, col: usize) -> bool {
+        self.inner.is_move_legal((row, col))
+    }
+
+    pub fn make_move_coords(&mut self, row: usize, col: usize) {
+        self.inner.make_move((row, col));
+    }
+
+    pub fn undo_last_move(&mut self) {
+        if let Some(last_move) = self.inner.move_history.last().cloned() {
+            self.inner.undo_move(last_move);
+        }
+    }
+
+    pub fn is_terminal(&self) -> bool {
+        self.inner.is_terminal()
+    }
+
+    pub fn hash(&self) -> u64 {
+        self.inner.hash()
+    }
+
+    pub fn reset(&mut self) {
+        self.inner = GameState::new(self.inner.board.size, self.inner.win_condition);
+    }
+
+    pub fn get_ai_move(&mut self, depth: i32, time_limit_ms: f64) -> Option<Move> {
+        use web_sys::console;
+        
+        console::log_1(&"[RUST] ===== get_ai_move ENTRY =====".into());
+        
+        use crate::ai::lazy_smp::lazy_smp_search;
+        
+        let time_limit = time_limit_ms as u64;
+        console::log_1(&format!("[RUST] get_ai_move: depth={}, time_limit={}ms", depth, time_limit).into());
+        
+        // Check if game is already over
+        if self.inner.is_terminal() {
+            console::log_1(&"[RUST] Game is terminal, returning None".into());
+            return None;
+        }
+        
+        console::log_1(&format!("[RUST] Calling lazy_smp_search with depth={}, time_limit={}ms", depth, time_limit).into());
+        
+        // Pass None for num_threads - it will use rayon::current_num_threads() in WASM
+        let result = lazy_smp_search(&mut self.inner, time_limit, depth, None);
+        
+        console::log_1(&"[RUST] lazy_smp_search completed".into());
+        
+        result.best_move.map(|(row, col)| Move { row, col })
+    }
 }
 
 impl GameState {

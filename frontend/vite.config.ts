@@ -5,5 +5,11 @@ import wasm from 'vite-plugin-wasm';
 import topLevelAwait from 'vite-plugin-top-level-await';
 
 export default defineConfig({
-	plugins: [tailwindcss(), sveltekit(), wasm(), topLevelAwait()]
+	plugins: [tailwindcss(), sveltekit(), wasm(), topLevelAwait()],
+	server: {
+		headers: {
+			'Cross-Origin-Opener-Policy': 'same-origin',
+			'Cross-Origin-Embedder-Policy': 'require-corp'
+		}
+	}
 });

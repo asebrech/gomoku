@@ -183,18 +183,25 @@ pub fn lazy_smp_search(
     max_depth: i32,
     num_threads: Option<usize>,
 ) -> SearchResult {
+    use web_sys::console;
+    
+    console::log_1(&"[RUST] lazy_smp_search: Starting".into());
+    
     let start_time = Instant::now();
     let time_limit = Duration::from_millis(time_limit_ms);
 
+    console::log_1(&format!("[RUST] lazy_smp_search: Getting thread count").into());
     let threads = num_threads.unwrap_or_else(|| {
-        std::thread::available_parallelism()
-            .map(|n| n.get())
-            .unwrap_or(4)
-            .min(8)
+        rayon::current_num_threads()
     });
+    console::log_1(&format!("[RUST] lazy_smp_search: Using {} threads", threads).into());
 
+    console::log_1(&"[RUST] lazy_smp_search: Getting candidate moves".into());
     let initial_moves = state.get_candidate_moves();
+    console::log_1(&format!("[RUST] lazy_smp_search: Found {} candidate moves", initial_moves.len()).into());
+    
     if initial_moves.is_empty() {
+        console::log_1(&"[RUST] lazy_smp_search: No moves available, returning".into());
         return SearchResult {
             best_move: None,
             score: 0,
@@ -204,11 +211,14 @@ pub fn lazy_smp_search(
         };
     }
 
+    console::log_1(&"[RUST] lazy_smp_search: Creating shared state".into());
     let shared_state = Arc::new(SharedSearchState::new());
 
+    console::log_1(&"[RUST] lazy_smp_search: Spawning workers".into());
     let workers: Vec<_> = (0..threads)
         .into_par_iter()
         .map(|worker_id| {
+            console::log_1(&format!("[RUST] Worker {} starting", worker_id).into());
             let state_clone = state.clone();
             let shared_state_clone = Arc::clone(&shared_state);
 
@@ -222,6 +232,8 @@ pub fn lazy_smp_search(
             )
         })
         .collect();
+
+    console::log_1(&"[RUST] lazy_smp_search: Workers completed, collecting results".into());
 
     let mut best_score = i32::MIN;
     let mut best_move = None;

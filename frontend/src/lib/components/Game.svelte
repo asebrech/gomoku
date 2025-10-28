@@ -62,13 +62,12 @@
   
   onMount(async () => {
     try {
-      // Import WASM module
+      // Import WASM module (already initialized in root layout)
       const wasmModule = await import('$lib/wasm/gomoku');
-      await wasmModule.default();
       
       // Create game instance with settings from store
-      gameInstance = new wasmModule.GomokuGame($gameSettings.boardSize, $gameSettings.winCondition);
-      console.log(`WASM initialized successfully! Board: ${$gameSettings.boardSize}x${$gameSettings.boardSize}, Win: ${$gameSettings.winCondition}`);
+      gameInstance = new wasmModule.WasmGameState($gameSettings.boardSize, $gameSettings.winCondition);
+      console.log(`Game initialized! Board: ${$gameSettings.boardSize}x${$gameSettings.boardSize}, Win: ${$gameSettings.winCondition}`);
       
       // Initialize board with correct size
       board = Array($gameSettings.boardSize).fill(null).map(() => Array($gameSettings.boardSize).fill(null));
@@ -83,7 +82,7 @@
         startGame();
       }
     } catch (error) {
-      console.error('Failed to load WASM:', error);
+      console.error('Failed to initialize game:', error);
       gameStatus = 'Error loading game engine';
     }
   });
@@ -101,27 +100,32 @@
     if (!gameInstance) return;
     
     try {
-      const boardState = JSON.parse(gameInstance.getBoardState());
-      const size = boardState.size;
+      const size = gameInstance.get_board_size();
       
       // Convert the board state to our 2D array format
       const newBoard = Array(size).fill(null).map(() => Array(size).fill(null));
       
-      // Max player (player 1) uses black stones
-      boardState.max_positions.forEach(([row, col]: [number, number]) => {
-        newBoard[row][col] = 'black';
-      });
-      
-      // Min player (player 2) uses white stones
-      boardState.min_positions.forEach(([row, col]: [number, number]) => {
-        newBoard[row][col] = 'white';
-      });
+      // Iterate through all positions and get the player at each
+      for (let row = 0; row < size; row++) {
+        for (let col = 0; col < size; col++) {
+          const player = gameInstance.get_stone_at(row, col);
+          if (player !== undefined) {
+            // Player.Max (0) = black, Player.Min (1) = white
+            newBoard[row][col] = player === 0 ? 'black' : 'white';
+          }
+        }
+      }
       
       board = newBoard;
       
-      // Update current player
-      currentPlayer = boardState.current_player === 'Max' ? 1 : 2;
+      // Update current player (0 = Max/Player1, 1 = Min/Player2)
+      const wasmCurrentPlayer = gameInstance.get_current_player();
+      currentPlayer = wasmCurrentPlayer === 0 ? 1 : 2;
       currentPlayerName = currentPlayer === 1 ? player1Name : player2Name;
+      
+      // Update captures
+      player1Captures = gameInstance.get_max_captures();
+      player2Captures = gameInstance.get_min_captures();
     } catch (error) {
       console.error('Error updating board:', error);
     }
@@ -145,33 +149,31 @@
     if (!gameInstance || isGameOver) return false;
     
     try {
-      const moveResult = JSON.parse(gameInstance.makeMove(row, col));
-      
-      if (moveResult.success) {
-        totalMoves++;
-        updateBoardFromWasm();
-        
-        // Update captures
-        const boardState = JSON.parse(gameInstance.getBoardState());
-        player1Captures = boardState.max_captures || 0;
-        player2Captures = boardState.min_captures || 0;
-        
-        // Check for game over (use moveResult which already has game_over status)
-        if (moveResult.game_over) {
-          isGameOver = true;
-          if (moveResult.winner) {
-            const winnerName = moveResult.winner === 'Max' ? player1Name : player2Name;
-            gameStatus = `${winnerName} wins! (${moveResult.win_reason})`;
-          } else {
-            gameStatus = 'Game Over - Draw';
-          }
-          isPlaying = false;
-        }
-        
-        waitingForHumanMove = false;
-        return true;
+      // Check if move is legal first
+      if (!gameInstance.is_move_legal_coords(row, col)) {
+        return false;
       }
-      return false;
+      
+      // Make the move
+      gameInstance.make_move_coords(row, col);
+      totalMoves++;
+      updateBoardFromWasm();
+      
+      // Check for game over
+      if (gameInstance.is_terminal()) {
+        isGameOver = true;
+        const winner = gameInstance.get_winner();
+        if (winner !== undefined) {
+          const winnerName = winner === 0 ? player1Name : player2Name;
+          gameStatus = `${winnerName} wins!`;
+        } else {
+          gameStatus = 'Game Over - Draw';
+        }
+        isPlaying = false;
+      }
+      
+      waitingForHumanMove = false;
+      return true;
     } catch (error) {
       console.error('Move error:', error);
       return false;
@@ -183,8 +185,8 @@
     
     try {
       const startTime = performance.now();
-      // Pass depth and time limit in milliseconds
-      const aiMoveResult = JSON.parse(gameInstance.getAIMove(aiDepth, $gameSettings.aiMaxThinkingTime));
+      // Pass depth and time limit in milliseconds as a number (not BigInt)
+      const aiMove = gameInstance.get_ai_move(aiDepth, $gameSettings.aiMaxThinkingTime);
       const endTime = performance.now();
       
       // Track AI thinking time
@@ -192,12 +194,12 @@
       totalThinkingTime += lastMoveTime;
       aiMoveCount++;
       
-      if (!aiMoveResult || aiMoveResult.row === undefined) {
+      if (!aiMove) {
         console.error('AI failed to find a move');
         return null;
       }
       
-      return { row: aiMoveResult.row, col: aiMoveResult.col };
+      return { row: aiMove.row, col: aiMove.col };
     } catch (error) {
       console.error('AI move error:', error);
       return null;
@@ -321,7 +323,8 @@
   }
   
   function undoMove() {
-    if (gameInstance && gameInstance.undoMove()) {
+    if (gameInstance) {
+      gameInstance.undo_last_move();
       updateBoardFromWasm();
       gameStatus = `${currentPlayerName}'s turn`;
     }

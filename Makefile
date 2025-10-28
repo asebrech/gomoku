@@ -2,7 +2,9 @@ NAME = gomoku
 
 all: $(NAME)
 
-$(NAME):
+$(NAME): wasm
+
+wasm:
 	wasm-pack build --target web --out-dir frontend/src/lib/wasm/pkg
 
 dev:
@@ -25,4 +27,4 @@ fclean: clean
 
 re: fclean all
 
-.PHONY: all dev start install test clean fclean re
+.PHONY: all wasm dev start install test clean fclean re
