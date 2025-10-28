@@ -139,14 +139,36 @@
     
     <!-- Captures -->
     <div class="flex justify-between items-center">
-      <span class="text-white/80 font-medium text-sm">Black Captures:</span>
+      <div class="flex items-center gap-1">
+        <svg width="16" height="16" class="inline-block">
+          <defs>
+            <radialGradient id="capturePlayer1Gradient">
+              <stop offset="30%" stop-color={$currentTheme.stonePlayer1} stop-opacity="0.9" />
+              <stop offset="100%" stop-color={$currentTheme.stonePlayer1} stop-opacity="1" />
+            </radialGradient>
+          </defs>
+          <circle cx="8" cy="8" r="7" fill="url(#capturePlayer1Gradient)" />
+        </svg>
+        <span class="text-white/80 font-medium text-sm">Captures:</span>
+      </div>
       <span class="font-bold" style="color: {$currentTheme.stonePlayer1};">
         {player1Captures}
       </span>
     </div>
     
     <div class="flex justify-between items-center">
-      <span class="text-white/80 font-medium text-sm">White Captures:</span>
+      <div class="flex items-center gap-1">
+        <svg width="16" height="16" class="inline-block">
+          <defs>
+            <radialGradient id="capturePlayer2Gradient">
+              <stop offset="30%" stop-color={$currentTheme.stonePlayer2} stop-opacity="0.9" />
+              <stop offset="100%" stop-color={$currentTheme.stonePlayer2} stop-opacity="1" />
+            </radialGradient>
+          </defs>
+          <circle cx="8" cy="8" r="7" fill="url(#capturePlayer2Gradient)" />
+        </svg>
+        <span class="text-white/80 font-medium text-sm">Captures:</span>
+      </div>
       <span class="font-bold" style="color: {$currentTheme.stonePlayer2};">
         {player2Captures}
       </span>

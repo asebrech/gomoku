@@ -7,6 +7,7 @@
   import Button from './Button.svelte';
   import Toggle from './Toggle.svelte';
   import { gameSettings } from '$lib/stores/gameSettings';
+  import { currentTheme } from '$lib/theme/themeStore';
   
   interface Props {
     player1Type: 'human' | 'ai';
@@ -40,6 +41,7 @@
   let isGameOver = $state(false);
   let currentPlayer = $state(1); // 1 or 2
   let currentPlayerName = $state(player1Name);
+  let winnerPlayer = $state<number | null>(null); // Track winner (1 or 2)
   let aiMoveDelay = $state(moveDelay);
   let waitingForHumanMove = $state(false);
   let shouldStop = $state(false);
@@ -212,9 +214,10 @@
         isGameOver = true;
         const winner = gameInstance.get_winner();
         if (winner !== undefined) {
-          const winnerName = winner === 0 ? player1Name : player2Name;
-          gameStatus = `${winnerName} wins!`;
+          winnerPlayer = winner === 0 ? 1 : 2; // Convert to player number
+          gameStatus = 'wins!';
         } else {
+          winnerPlayer = null;
           gameStatus = 'Game Over - Draw';
         }
         isPlaying = false;
@@ -285,7 +288,7 @@
       if (currentPlayerType === 'human') {
         // Wait for human move
         waitingForHumanMove = true;
-        gameStatus = `${currentPlayerName}'s turn`;
+        gameStatus = 'Your turn';
         
         // Wait until human makes a move (handled by handleCellClick)
         while (waitingForHumanMove && !isPaused && !isGameOver && !shouldStop) {
@@ -298,7 +301,7 @@
       } else {
         // AI move
         waitingForHumanMove = false;
-        gameStatus = `${currentPlayerName} is thinking...`;
+        gameStatus = 'AI is thinking...';
         
         // Wait for the delay to make it visible (but check shouldStop during the wait)
         const startTime = Date.now();
@@ -368,6 +371,7 @@
       isPlaying = false;
       isPaused = false;
       waitingForHumanMove = false;
+      winnerPlayer = null;
       gameStatus = 'Ready to start';
       
       // Reset stats
@@ -394,7 +398,7 @@
     if (gameInstance) {
       gameInstance.undo_last_move();
       updateBoardFromWasm();
-      gameStatus = `${currentPlayerName}'s turn`;
+      gameStatus = 'Move undone';
     }
   }
   
@@ -429,18 +433,61 @@
 
 <div class="w-full max-h-[calc(100vh-5rem)] flex flex-col">
   <div class="text-center py-2 flex-shrink-0">
-    <p class="text-xl font-bold mb-1" style="color: {isPlaying && !waitingForHumanMove ? '#FF00FF' : '#00FFFF'};">
-      {gameStatus}
-      {#if isAIThinking}
-        <span class="inline-block ml-2 animate-pulse">🤔</span>
+    <!-- Game Status with winner stone if applicable -->
+    <div class="flex items-center justify-center gap-2 mb-1">
+      {#if winnerPlayer !== null}
+        <!-- Winner stone indicator -->
+        <svg width="28" height="28" class="inline-block">
+          <defs>
+            <radialGradient id="winnerGradient">
+              <stop offset="30%" stop-color={winnerPlayer === 1 ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2} stop-opacity="0.9" />
+              <stop offset="100%" stop-color={winnerPlayer === 1 ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2} stop-opacity="1" />
+            </radialGradient>
+            <filter id="winnerStoneShadow">
+              <feDropShadow dx="1" dy="2" stdDeviation="2" flood-opacity="0.6"/>
+            </filter>
+          </defs>
+          <circle
+            cx="14"
+            cy="14"
+            r="12"
+            fill="url(#winnerGradient)"
+            filter="url(#winnerStoneShadow)"
+          />
+        </svg>
       {/if}
-    </p>
-    <p class="text-base text-white/80">
-      Current turn: <span class="font-bold" style="color: #00FFFF;">{currentPlayerName}</span>
+      <p class="text-xl font-bold" style="color: {isPlaying && !waitingForHumanMove ? '#FF00FF' : '#00FFFF'};">
+        {gameStatus}
+        {#if isAIThinking}
+          <span class="inline-block ml-2 animate-pulse">🤔</span>
+        {/if}
+      </p>
+    </div>
+    <div class="flex items-center justify-center gap-2 text-base text-white/80">
+      <span>Current turn:</span>
+      <!-- Themed stone indicator -->
+      <svg width="24" height="24" class="inline-block">
+        <defs>
+          <radialGradient id="currentPlayerGradient">
+            <stop offset="30%" stop-color={currentPlayer === 1 ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2} stop-opacity="0.9" />
+            <stop offset="100%" stop-color={currentPlayer === 1 ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2} stop-opacity="1" />
+          </radialGradient>
+          <filter id="currentStoneShadow">
+            <feDropShadow dx="1" dy="2" stdDeviation="1" flood-opacity="0.5"/>
+          </filter>
+        </defs>
+        <circle
+          cx="12"
+          cy="12"
+          r="10"
+          fill="url(#currentPlayerGradient)"
+          filter="url(#currentStoneShadow)"
+        />
+      </svg>
       {#if isAIThinking}
         <span class="ml-2 text-sm text-cyan-400 animate-pulse">Computing...</span>
       {/if}
-    </p>
+    </div>
   </div>
   
   <!-- Board and Stats Container -->
