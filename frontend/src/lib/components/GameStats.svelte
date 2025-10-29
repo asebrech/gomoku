@@ -30,10 +30,12 @@
     isFullAI?: boolean;
     hasHuman?: boolean;
     gameInstance?: any;
+    needsAIContinue?: boolean;
     onStartGame?: () => void;
     onPauseGame?: () => void;
     onResumeGame?: () => void;
     onUndoMove?: () => void;
+    onContinueAI?: () => void;
     onResetGame?: () => void;
     onBack?: () => void;
   }
@@ -64,10 +66,12 @@
     isFullAI = false,
     hasHuman = false,
     gameInstance,
+    needsAIContinue = false,
     onStartGame,
     onPauseGame,
     onResumeGame,
     onUndoMove,
+    onContinueAI,
     onResetGame,
     onBack
   }: Props = $props();
@@ -284,13 +288,20 @@
     
     <!-- Undo button for human games -->
     {#if hasHuman && !isFullAI}
-      <Button variant="secondary" size="sm" onclick={onUndoMove} disabled={isPlaying} fullWidth>
+      <Button variant="secondary" size="sm" onclick={onUndoMove} disabled={totalMoves === 0 || isGameOver} fullWidth>
         Undo Move
       </Button>
     {/if}
     
+    <!-- Continue button after undo (when it's AI's turn) -->
+    {#if needsAIContinue && hasHuman && !isFullAI}
+      <Button variant="primary" size="sm" onclick={onContinueAI} fullWidth>
+        Continue AI Turn
+      </Button>
+    {/if}
+    
     <!-- New Game -->
-    <Button variant="secondary" size="sm" onclick={onResetGame} disabled={isPlaying && !isPaused} fullWidth>
+    <Button variant="secondary" size="sm" onclick={onResetGame} fullWidth>
       New Game
     </Button>
     

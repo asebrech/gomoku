@@ -49,6 +49,7 @@
   let lastDepthReached = $state(0); // Track the depth the AI reached
   let lastNodesSearched = $state(0); // Track nodes searched
   let lastAIScore = $state(0); // Track AI evaluation score
+  let needsAIContinue = $state(false); // Track if we need AI to continue after undo
   
   // Double-three visualization
   let showDoubleThree = $state(false);
@@ -213,7 +214,7 @@
   }
   
   async function handleCellClick(row: number, col: number) {
-    if (!gameInstance || isGameOver || !waitingForHumanMove) {
+    if (!gameInstance || isGameOver || !waitingForHumanMove || needsAIContinue) {
       return;
     }
     
@@ -335,6 +336,15 @@
       } else {
         // AI move
         waitingForHumanMove = false;
+        
+        // If we need to wait for continue button after undo, wait here
+        while (needsAIContinue && !shouldStop && !isPaused) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          if (shouldStop || isPaused) break;
+        }
+        
+        if (isPaused || shouldStop) break;
+        
         gameStatus = 'AI is thinking...';
         
         // Wait for the delay to make it visible (but check shouldStop during the wait)
@@ -405,6 +415,7 @@
       isPlaying = false;
       isPaused = false;
       waitingForHumanMove = false;
+      needsAIContinue = false;
       winnerPlayer = null;
       gameStatus = 'Ready to start';
       
@@ -429,10 +440,37 @@
   }
   
   function undoMove() {
-    if (gameInstance) {
+    if (gameInstance && totalMoves > 0) {
       gameInstance.undo_last_move();
+      totalMoves--;
       updateBoardFromWasm();
       gameStatus = 'Move undone';
+      
+      // Clear AI hint after undo
+      aiHintPosition = null;
+      
+      // Check whose turn it is now after undo
+      const currentPlayerType = currentPlayer === 1 ? player1Type : player2Type;
+      
+      // If it's now an AI's turn, we need a continue button
+      if (currentPlayerType === 'ai' && hasHuman) {
+        needsAIContinue = true;
+        waitingForHumanMove = false;
+        gameStatus = 'Click Continue to let AI play';
+      } else {
+        // It's a human's turn
+        needsAIContinue = false;
+        waitingForHumanMove = true;
+        gameStatus = 'Your turn';
+      }
+    }
+  }
+  
+  function continueAfterUndo() {
+    if (needsAIContinue) {
+      needsAIContinue = false;
+      // Continue the game loop - it will handle the AI turn
+      // Don't need to call playGameLoop again, just let the existing loop continue
     }
   }
   
@@ -574,10 +612,12 @@
         {isFullAI}
         {hasHuman}
         {gameInstance}
+        {needsAIContinue}
         onStartGame={startGame}
         onPauseGame={pauseGame}
         onResumeGame={resumeGame}
         onUndoMove={undoMove}
+        onContinueAI={continueAfterUndo}
         onResetGame={resetGame}
         {onBack}
       />
