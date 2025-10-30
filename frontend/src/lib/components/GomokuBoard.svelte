@@ -8,6 +8,7 @@
     currentPlayer?: 'black' | 'white';
     doubleThreePositions?: Array<{row: number, col: number}>;
     aiHintPosition?: {row: number, col: number} | null;
+    lastMovePosition?: {row: number, col: number} | null;
   }
   
   let { 
@@ -16,7 +17,8 @@
     currentPlayer = 'black',
     onCellClick,
     doubleThreePositions = [],
-    aiHintPosition = null
+    aiHintPosition = null,
+    lastMovePosition = null
   }: Props = $props();
   
   // Reactive size based on board
@@ -128,14 +130,29 @@
       {#each board as rowData, row}
         {#each rowData as stone, col}
           {#if stone}
-            <circle
-              cx={padding + col * cellSize}
-              cy={padding + row * cellSize}
-              r="10"
-              fill={stone === 'black' ? `url(#player1Gradient)` : `url(#player2Gradient)`}
-              filter="url(#stoneShadow)"
-              class="animate-fade-in"
-            />
+            <g>
+              <circle
+                cx={padding + col * cellSize}
+                cy={padding + row * cellSize}
+                r="10"
+                fill={stone === 'black' ? `url(#player1Gradient)` : `url(#player2Gradient)`}
+                filter="url(#stoneShadow)"
+                class="animate-fade-in"
+              />
+              <!-- Highlight ring for last move -->
+              {#if lastMovePosition && lastMovePosition.row === row && lastMovePosition.col === col}
+                <circle
+                  cx={padding + col * cellSize}
+                  cy={padding + row * cellSize}
+                  r="13"
+                  fill="none"
+                  stroke="{$currentTheme.accent}"
+                  stroke-width="2.5"
+                  opacity="0.9"
+                  class="animate-pulse"
+                />
+              {/if}
+            </g>
           {/if}
         {/each}
       {/each}

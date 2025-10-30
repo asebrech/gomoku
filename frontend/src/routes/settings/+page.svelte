@@ -3,36 +3,34 @@
   import { _ } from 'svelte-i18n';
   import Button from '$lib/components/Button.svelte';
   import Slider from '$lib/components/Slider.svelte';
+  import Toggle from '$lib/components/Toggle.svelte';
   import { gameSettings } from '$lib/stores/gameSettings';
   
   let boardSize = $state($gameSettings.boardSize);
   let aiDepth = $state($gameSettings.aiDepth);
   let aiMaxThinkingTime = $state($gameSettings.aiMaxThinkingTime);
+  let showDoubleThree = $state($gameSettings.showDoubleThree);
+  let showAIHint = $state($gameSettings.showAIHint);
   
-  let saveStatus = $state('');
-  
-  function saveSettings() {
+  // Auto-save settings whenever any value changes
+  $effect(() => {
     gameSettings.set({
       boardSize,
       winCondition: 5, // Always 5 in a row
       aiDepth,
-      aiMaxThinkingTime
+      aiMaxThinkingTime,
+      showDoubleThree,
+      showAIHint
     });
-    saveStatus = 'Settings saved!';
-    setTimeout(() => {
-      saveStatus = '';
-    }, 2000);
-  }
+  });
   
   function resetToDefaults() {
     gameSettings.reset();
     boardSize = $gameSettings.boardSize;
     aiDepth = $gameSettings.aiDepth;
     aiMaxThinkingTime = $gameSettings.aiMaxThinkingTime;
-    saveStatus = 'Reset to defaults!';
-    setTimeout(() => {
-      saveStatus = '';
-    }, 2000);
+    showDoubleThree = $gameSettings.showDoubleThree;
+    showAIHint = $gameSettings.showAIHint;
   }
   
   // Validate board size
@@ -62,11 +60,9 @@
       <h1 class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-purple-600 mb-4">
         {$_('settings.title')}
       </h1>
-      {#if saveStatus}
-        <p class="text-lg font-semibold" style="color: #00FFFF;">
-          {saveStatus}
-        </p>
-      {/if}
+      <p class="text-sm text-white/60">
+        Settings are saved automatically
+      </p>
     </div>
     
     <div class="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-8 space-y-8">
@@ -110,6 +106,46 @@
           showInput={true}
         />
       </div>
+      
+      <!-- Divider -->
+      <div class="border-t border-white/20 my-4"></div>
+      
+      <!-- Visual Aids Section -->
+      <div class="setting-section">
+        <h3 class="text-xl font-bold text-white/90 mb-4">Visual Aids</h3>
+        
+        <!-- Double-Three Display -->
+        <div class="flex items-center justify-between py-3">
+          <div>
+            <label for="show-double-three" class="text-white/90 font-medium cursor-pointer">
+              Show Double-Three Positions
+            </label>
+            <p class="setting-hint">
+              Highlights illegal double-three positions with red X markers
+            </p>
+          </div>
+          <Toggle 
+            id="show-double-three"
+            bind:checked={showDoubleThree}
+          />
+        </div>
+        
+        <!-- AI Hint Display -->
+        <div class="flex items-center justify-between py-3">
+          <div>
+            <label for="show-ai-hint" class="text-white/90 font-medium cursor-pointer">
+              Show AI Hint
+            </label>
+            <p class="setting-hint">
+              Displays AI-suggested move with a golden ring (Human games only)
+            </p>
+          </div>
+          <Toggle 
+            id="show-ai-hint"
+            bind:checked={showAIHint}
+          />
+        </div>
+      </div>
     </div>
     
     <!-- Buttons -->
@@ -119,9 +155,6 @@
       </Button>
       <Button variant="secondary" size="md" onclick={resetToDefaults}>
         Reset to Defaults
-      </Button>
-      <Button variant="primary" size="lg" onclick={saveSettings}>
-        Save Settings
       </Button>
     </div>
   </div>

@@ -88,17 +88,7 @@
   }
 </script>
 
-<div class="flex flex-col items-center justify-start w-full h-full overflow-y-auto">
-  <!-- Turn Display -->
-  <div class="mb-2 flex-shrink-0">
-    <p 
-      class="text-2xl font-bold text-center"
-      style="color: {$currentTheme.primary}; text-shadow: {$currentTheme.glowPrimary};"
-    >
-      Turn {totalMoves}
-    </p>
-  </div>
-  
+<div class="flex flex-col items-stretch w-full h-full">
   <div 
     class="rounded-lg p-4 min-w-[280px] max-w-[320px] flex-shrink-0"
     style="background: {$currentTheme.background}99; border: 3px solid {$currentTheme.primary}; box-shadow: {$currentTheme.glowPrimary};"
@@ -109,16 +99,21 @@
     >
       Game Stats
     </h2>
+    
+    <!-- Turn Display moved here -->
+    <div class="mb-3 pb-3 border-b" style="border-color: {$currentTheme.primary}33;">
+      <div class="flex justify-between items-center">
+        <span class="text-white/80 font-medium text-sm">Turn:</span>
+        <p 
+          class="text-2xl font-bold"
+          style="color: {$currentTheme.primary}; text-shadow: {$currentTheme.glowPrimary};"
+        >
+          {totalMoves}
+        </p>
+      </div>
+    </div>
   
   <div class="space-y-2">
-    <!-- Game Mode -->
-    <div class="flex justify-between items-center">
-      <span class="text-white/80 font-medium text-sm">Game Mode:</span>
-      <span class="font-bold" style="color: {$currentTheme.secondary};">
-        {gameMode}
-      </span>
-    </div>
-    
     <!-- Board Size -->
     <div class="flex justify-between items-center">
       <span class="text-white/80 font-medium text-sm">Board Size:</span>

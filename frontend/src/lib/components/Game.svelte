@@ -52,11 +52,11 @@
   let needsAIContinue = $state(false); // Track if we need AI to continue after undo
   
   // Double-three visualization
-  let showDoubleThree = $state(false);
+  let showDoubleThree = $state($gameSettings.showDoubleThree);
   let doubleThreePositions = $state<Array<{row: number, col: number}>>([]);
   
   // AI hint feature
-  let showAIHint = $state(false);
+  let showAIHint = $state($gameSettings.showAIHint);
   let aiHintPosition = $state<{row: number, col: number} | null>(null);
   let isCalculatingHint = $state(false);
   
@@ -67,6 +67,9 @@
   let player1Captures = $state(0);
   let player2Captures = $state(0);
   let aiMoveCount = $state(0); // Track number of AI moves separately
+  
+  // Last move tracking for visual effect
+  let lastMovePosition = $state<{row: number, col: number} | null>(null);
   
   const isFullAI = player1Type === 'ai' && player2Type === 'ai';
   const hasHuman = player1Type === 'human' || player2Type === 'human';
@@ -239,6 +242,10 @@
       // Make the move
       gameInstance.make_move_coords(row, col);
       totalMoves++;
+      
+      // Track the last move position for visual effect
+      lastMovePosition = { row, col };
+      
       updateBoardFromWasm();
       
       // Clear AI hint after move
@@ -429,6 +436,7 @@
       lastDepthReached = 0;
       lastNodesSearched = 0;
       lastAIScore = 0;
+      lastMovePosition = null;
       
       // Auto-restart for AI vs AI
       if (autoStart && isFullAI) {
@@ -446,8 +454,9 @@
       updateBoardFromWasm();
       gameStatus = 'Move undone';
       
-      // Clear AI hint after undo
+      // Clear AI hint and last move position after undo
       aiHintPosition = null;
+      lastMovePosition = null;
       
       // Check whose turn it is now after undo
       const currentPlayerType = currentPlayer === 1 ? player1Type : player2Type;
@@ -515,78 +524,76 @@
   });
 </script>
 
-<div class="w-full max-h-[calc(100vh-5rem)] flex flex-col">
-  <div class="text-center py-2 flex-shrink-0">
-    <!-- Game Status with winner stone if applicable -->
-    <div class="flex items-center justify-center gap-2 mb-1">
-      {#if winnerPlayer !== null}
-        <!-- Winner stone indicator -->
-        <svg width="28" height="28" class="inline-block">
-          <defs>
-            <radialGradient id="winnerGradient">
-              <stop offset="30%" stop-color={winnerPlayer === 1 ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2} stop-opacity="0.9" />
-              <stop offset="100%" stop-color={winnerPlayer === 1 ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2} stop-opacity="1" />
-            </radialGradient>
-            <filter id="winnerStoneShadow">
-              <feDropShadow dx="1" dy="2" stdDeviation="2" flood-opacity="0.6"/>
-            </filter>
-          </defs>
-          <circle
-            cx="14"
-            cy="14"
-            r="12"
-            fill="url(#winnerGradient)"
-            filter="url(#winnerStoneShadow)"
-          />
-        </svg>
-      {/if}
-      <p class="text-xl font-bold" style="color: {isPlaying && !waitingForHumanMove ? '#FF00FF' : '#00FFFF'};">
-        {gameStatus}
-        {#if isAIThinking}
-          <span class="inline-block ml-2 animate-pulse">🤔</span>
-        {/if}
-      </p>
-    </div>
-    <div class="flex items-center justify-center gap-2 text-base text-white/80">
-      <span>Current turn:</span>
-      <!-- Themed stone indicator -->
-      <svg width="24" height="24" class="inline-block">
-        <defs>
-          <radialGradient id="currentPlayerGradient">
-            <stop offset="30%" stop-color={currentPlayer === 1 ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2} stop-opacity="0.9" />
-            <stop offset="100%" stop-color={currentPlayer === 1 ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2} stop-opacity="1" />
-          </radialGradient>
-          <filter id="currentStoneShadow">
-            <feDropShadow dx="1" dy="2" stdDeviation="1" flood-opacity="0.5"/>
-          </filter>
-        </defs>
-        <circle
-          cx="12"
-          cy="12"
-          r="10"
-          fill="url(#currentPlayerGradient)"
-          filter="url(#currentStoneShadow)"
-        />
-      </svg>
-      {#if isAIThinking}
-        <span class="ml-2 text-sm text-cyan-400 animate-pulse">Computing...</span>
-      {/if}
-    </div>
-  </div>
-  
+<div class="w-full max-h-[calc(100vh-5rem)] flex flex-col items-center">
   <!-- Board and Stats Container -->
-  <div class="flex justify-center items-start gap-4 flex-1 min-h-0 px-4 pb-4">
-    <div class="flex-shrink-0">
+  <div class="flex justify-center items-start gap-6 flex-1 min-h-0 px-4 pb-4 pt-2">
+    <!-- Board Column -->
+    <div class="flex flex-col items-center gap-3 flex-shrink-0 relative">
+      <!-- Game Over Pop-up Message -->
+      {#if isGameOver}
+        <div class="absolute -top-20 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in">
+          <div 
+            class="rounded-xl px-8 py-4 shadow-2xl"
+            style="background: {$currentTheme.background}; border: 4px solid {winnerPlayer !== null ? (winnerPlayer === 1 ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2) : $currentTheme.primary}; box-shadow: 0 0 30px {winnerPlayer !== null ? (winnerPlayer === 1 ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2) : $currentTheme.primary}80;"
+          >
+            <div class="flex items-center justify-center gap-3">
+              {#if winnerPlayer !== null}
+                <!-- Winner stone indicator -->
+                <svg width="36" height="36" class="inline-block">
+                  <defs>
+                    <radialGradient id="winnerGradient">
+                      <stop offset="30%" stop-color={winnerPlayer === 1 ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2} stop-opacity="0.9" />
+                      <stop offset="100%" stop-color={winnerPlayer === 1 ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2} stop-opacity="1" />
+                    </radialGradient>
+                    <filter id="winnerStoneShadow">
+                      <feDropShadow dx="2" dy="3" stdDeviation="3" flood-opacity="0.7"/>
+                    </filter>
+                  </defs>
+                  <circle
+                    cx="18"
+                    cy="18"
+                    r="15"
+                    fill="url(#winnerGradient)"
+                    filter="url(#winnerStoneShadow)"
+                  />
+                </svg>
+              {/if}
+              <p 
+                class="text-3xl font-bold whitespace-nowrap"
+                style="color: {winnerPlayer !== null ? (winnerPlayer === 1 ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2) : $currentTheme.primary}; text-shadow: 0 0 10px {winnerPlayer !== null ? (winnerPlayer === 1 ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2) : $currentTheme.primary}80;"
+              >
+                {gameStatus}
+              </p>
+              {#if winnerPlayer !== null}
+                <!-- Winner stone indicator -->
+                <svg width="36" height="36" class="inline-block">
+                  <circle
+                    cx="18"
+                    cy="18"
+                    r="15"
+                    fill="url(#winnerGradient)"
+                    filter="url(#winnerStoneShadow)"
+                  />
+                </svg>
+              {/if}
+            </div>
+          </div>
+        </div>
+      {/if}
+      
+      <!-- Board -->
       <GomokuBoard 
         {board} 
         onCellClick={handleCellClick}
         currentPlayer={currentPlayer === 1 ? 'black' : 'white'}
         {doubleThreePositions}
         {aiHintPosition}
+        {lastMovePosition}
       />
     </div>
     
-    <div class="flex-shrink-0 self-start">
+    <!-- Stats Panel Aligned with Board -->
+    <div class="flex-shrink-0">
       <GameStats
         gameMode={gameModeDisplay()}
         boardSize={$gameSettings.boardSize}
@@ -602,9 +609,15 @@
         {lastNodesSearched}
         {lastAIScore}
         {showDoubleThree}
-        onToggleDoubleThree={(value) => showDoubleThree = value}
+        onToggleDoubleThree={(value) => {
+          showDoubleThree = value;
+          gameSettings.update(s => ({ ...s, showDoubleThree: value }));
+        }}
         {showAIHint}
-        onToggleAIHint={(value) => showAIHint = value}
+        onToggleAIHint={(value) => {
+          showAIHint = value;
+          gameSettings.update(s => ({ ...s, showAIHint: value }));
+        }}
         {isCalculatingHint}
         {isPlaying}
         {isPaused}

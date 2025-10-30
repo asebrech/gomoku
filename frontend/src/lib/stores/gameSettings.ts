@@ -6,13 +6,17 @@ export interface GameSettings {
   winCondition: number;
   aiDepth: number;
   aiMaxThinkingTime: number; // in milliseconds
+  showDoubleThree: boolean;
+  showAIHint: boolean;
 }
 
 const DEFAULT_SETTINGS: GameSettings = {
   boardSize: 19,
   winCondition: 5,
-  aiDepth: 10,
-  aiMaxThinkingTime: 1000 // 1000ms (1 second) default
+  aiDepth: 20,
+  aiMaxThinkingTime: 500, // 500ms (0.5 second) default
+  showDoubleThree: false,
+  showAIHint: false
 };
 
 // Load settings from localStorage if in browser
