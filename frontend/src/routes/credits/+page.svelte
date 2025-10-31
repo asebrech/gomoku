@@ -38,7 +38,7 @@
       <h1 class="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-purple-600 mb-4">
         Credits
       </h1>
-      <p class="text-xl text-white/80">
+      <p class="text-xl" style="color: rgba(255, 255, 255, 0.8);">
         Made with passion and lots of coffee ☕
       </p>
     </div>
@@ -56,7 +56,7 @@
           box-shadow: {$currentTheme.glowPrimary};
         "
       >
-        <div class="text-sm text-white/60 mb-1">View on GitHub</div>
+        <div class="text-sm mb-1" style="color: rgba(255, 255, 255, 0.6);">View on GitHub</div>
         <div class="text-2xl font-bold" style="color: {$currentTheme.primary};">
           {repository.name}
         </div>
@@ -98,7 +98,7 @@
               <h3 class="text-2xl font-bold mb-2" style="color: {$currentTheme.primary};">
                 {author.name}
               </h3>
-              <p class="text-base text-white/70 mb-3">
+              <p class="text-base mb-3" style="color: rgba(255, 255, 255, 0.7);">
                 {author.role}
               </p>
               <p class="text-sm group-hover:underline" style="color: {$currentTheme.primary};">
@@ -142,10 +142,10 @@
             <h3 class="text-2xl font-bold mb-2" style="color: {$currentTheme.accent};">
               {specialThanks.name}
             </h3>
-            <p class="text-base text-white/70 mb-3">
+            <p class="text-base mb-3" style="color: rgba(255, 255, 255, 0.7);">
               {specialThanks.role}
             </p>
-            <p class="text-sm text-white/60 italic mb-4">
+            <p class="text-sm italic mb-4" style="color: rgba(255, 255, 255, 0.6);">
               "For rigorously testing our AI and proving it can actually play Gomoku! 🎯"
             </p>
             <p class="text-sm group-hover:underline" style="color: {$currentTheme.accent};">
@@ -182,7 +182,7 @@
     </div>
     
     <!-- Footer -->
-    <div class="text-center text-white/50 text-sm mb-8">
+    <div class="text-center text-sm mb-8" style="color: rgba(255, 255, 255, 0.5);">
       <p>© 2025 Gomoku Project</p>
       <p class="mt-2">Made with ❤️ for the love of strategy games</p>
     </div>
