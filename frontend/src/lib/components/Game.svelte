@@ -24,8 +24,8 @@
   let {
     player1Type,
     player2Type,
-    player1Name = player1Type === 'ai' ? 'Black AI' : 'Player 1 (Black)',
-    player2Name = player2Type === 'ai' ? 'White AI' : 'Player 2 (White)',
+    player1Name = player1Type === 'ai' ? 'AI 1' : 'Player 1',
+    player2Name = player2Type === 'ai' ? 'AI 2' : 'Player 2',
     aiDepth = $gameSettings.aiDepth,
     autoStart = false,
     moveDelay = 500,
@@ -529,58 +529,6 @@
   <div class="flex justify-center items-start gap-6 flex-1 min-h-0 px-4 pb-4 pt-2">
     <!-- Board Column -->
     <div class="flex flex-col items-center gap-3 flex-shrink-0 relative">
-      <!-- Game Over Pop-up Message -->
-      {#if isGameOver}
-        <div class="absolute -top-20 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in">
-          <div 
-            class="rounded-xl px-8 py-4 shadow-2xl"
-            style="background: {$currentTheme.background}; border: 4px solid {winnerPlayer !== null ? (winnerPlayer === 1 ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2) : $currentTheme.primary}; box-shadow: 0 0 30px {winnerPlayer !== null ? (winnerPlayer === 1 ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2) : $currentTheme.primary}80;"
-          >
-            <div class="flex items-center justify-center gap-3">
-              {#if winnerPlayer !== null}
-                <!-- Winner stone indicator -->
-                <svg width="36" height="36" class="inline-block">
-                  <defs>
-                    <radialGradient id="winnerGradient">
-                      <stop offset="30%" stop-color={winnerPlayer === 1 ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2} stop-opacity="0.9" />
-                      <stop offset="100%" stop-color={winnerPlayer === 1 ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2} stop-opacity="1" />
-                    </radialGradient>
-                    <filter id="winnerStoneShadow">
-                      <feDropShadow dx="2" dy="3" stdDeviation="3" flood-opacity="0.7"/>
-                    </filter>
-                  </defs>
-                  <circle
-                    cx="18"
-                    cy="18"
-                    r="15"
-                    fill="url(#winnerGradient)"
-                    filter="url(#winnerStoneShadow)"
-                  />
-                </svg>
-              {/if}
-              <p 
-                class="text-3xl font-bold whitespace-nowrap"
-                style="color: {winnerPlayer !== null ? (winnerPlayer === 1 ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2) : $currentTheme.primary}; text-shadow: 0 0 10px {winnerPlayer !== null ? (winnerPlayer === 1 ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2) : $currentTheme.primary}80;"
-              >
-                {gameStatus}
-              </p>
-              {#if winnerPlayer !== null}
-                <!-- Winner stone indicator -->
-                <svg width="36" height="36" class="inline-block">
-                  <circle
-                    cx="18"
-                    cy="18"
-                    r="15"
-                    fill="url(#winnerGradient)"
-                    filter="url(#winnerStoneShadow)"
-                  />
-                </svg>
-              {/if}
-            </div>
-          </div>
-        </div>
-      {/if}
-      
       <!-- Board -->
       <GomokuBoard 
         {board} 
@@ -599,6 +547,9 @@
         boardSize={$gameSettings.boardSize}
         aiDepth={player1Type === 'ai' || player2Type === 'ai' ? aiDepth : undefined}
         currentPlayer={currentPlayerName}
+        winnerPlayer={winnerPlayer}
+        player1Name={player1Name}
+        player2Name={player2Name}
         {totalMoves}
         {player1Captures}
         {player2Captures}

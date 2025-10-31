@@ -9,6 +9,9 @@
     boardSize: number;
     aiDepth?: number;
     currentPlayer: string;
+    winnerPlayer?: number | null;
+    player1Name?: string;
+    player2Name?: string;
     totalMoves: number;
     player1Captures?: number;
     player2Captures?: number;
@@ -45,6 +48,9 @@
     boardSize,
     aiDepth,
     currentPlayer,
+    winnerPlayer = null,
+    player1Name = 'Player 1',
+    player2Name = 'Player 2',
     totalMoves,
     player1Captures = 0,
     player2Captures = 0,
@@ -94,13 +100,60 @@
     style="background: {$currentTheme.background}99; border: 3px solid {$currentTheme.primary}; box-shadow: {$currentTheme.glowPrimary};"
   >
     <h2 
-      class="text-xl font-bold text-center mb-4"
+      class="text-xl font-bold text-center mb-2"
       style="color: {$currentTheme.primary};"
     >
-      Game Stats
+      {gameMode}
     </h2>
     
-    <!-- Turn Display moved here -->
+    <!-- Game Over Message -->
+    {#if isGameOver && winnerPlayer !== null}
+      {@const winnerName = winnerPlayer === 1 ? player1Name : player2Name}
+      {@const cleanWinnerName = winnerName?.replace(/\s*\((Black|White)\)\s*/i, '').trim() || winnerName}
+      {@const winnerColor = winnerPlayer === 1 ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2}
+      <div 
+        class="rounded-lg px-4 py-3 mb-3 text-center animate-fade-in"
+        style="background: {$currentTheme.background}; border: 3px solid {winnerColor}; box-shadow: 0 0 20px {winnerColor}60;"
+      >
+        <div class="flex items-center justify-center gap-2 mb-1">
+          <svg width="24" height="24" class="inline-block">
+            <defs>
+              <radialGradient id="winnerSmallGradient">
+                <stop offset="30%" stop-color={winnerColor} stop-opacity="0.9" />
+                <stop offset="100%" stop-color={winnerColor} stop-opacity="1" />
+              </radialGradient>
+              <filter id="winnerSmallShadow">
+                <feDropShadow dx="1" dy="2" stdDeviation="2" flood-opacity="0.7"/>
+              </filter>
+            </defs>
+            <circle
+              cx="12"
+              cy="12"
+              r="10"
+              fill="url(#winnerSmallGradient)"
+              filter="url(#winnerSmallShadow)"
+            />
+          </svg>
+          <p 
+            class="text-xl font-bold"
+            style="color: {winnerColor};"
+          >
+            {cleanWinnerName} Wins!
+          </p>
+          <svg width="24" height="24" class="inline-block">
+            <circle
+              cx="12"
+              cy="12"
+              r="10"
+              fill="url(#winnerSmallGradient)"
+              filter="url(#winnerSmallShadow)"
+            />
+          </svg>
+        </div>
+      </div>
+    {/if}
+    
+    <!-- Turn Display -->
     <div class="mb-3 pb-3 border-b" style="border-color: {$currentTheme.primary}33;">
       <div class="flex justify-between items-center">
         <span class="text-white/80 font-medium text-sm">Turn:</span>
