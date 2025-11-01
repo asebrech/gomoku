@@ -10,7 +10,7 @@
   
   onMount(() => {
     // Create audio element
-    audioElement = new Audio('/assets/sound/menu-theme.mp3');
+    audioElement = new Audio('/menu-theme.mp3');
     audioElement.loop = true;
     audioElement.volume = $audioSettings.musicVolume;
     // Start muted - user must click to play
