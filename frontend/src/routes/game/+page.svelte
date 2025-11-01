@@ -2,11 +2,13 @@
   import { goto } from '$app/navigation';
   import { _ } from 'svelte-i18n';
   import Button from '$lib/components/Button.svelte';
+  import { currentTheme } from '$lib/theme/themeStore';
 </script>
 
 <div class="flex items-center justify-center min-h-[calc(100vh-4rem)]">
   <div class="relative z-10 text-center px-4 max-w-2xl animate-fade-in">
-    <h1 class="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-purple-600 mb-4 tracking-tight">
+    <h1 class="text-6xl font-black text-transparent bg-clip-text mb-4 tracking-tight"
+        style="background-image: {$currentTheme.gradientPrimary}; -webkit-background-clip: text; background-clip: text;">
       {$_('game.menu.title')}
     </h1>
     

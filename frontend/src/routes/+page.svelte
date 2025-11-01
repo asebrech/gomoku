@@ -2,6 +2,7 @@
   import { goto } from '$app/navigation';
   import { _ } from 'svelte-i18n';
   import Button from '$lib/components/Button.svelte';
+  import { currentTheme } from '$lib/theme/themeStore';
   import logo from '$lib/assets/logo/gomoku-logo.png';
 </script>
 
@@ -11,7 +12,8 @@
       <img src={logo} alt="Gomoku Logo" class="w-32 h-auto mx-auto drop-shadow-2xl animate-float" />
     </div>
     
-    <h1 class="text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-purple-600 mb-4 tracking-tight">
+    <h1 class="text-7xl font-black text-transparent bg-clip-text mb-4 tracking-tight"
+        style="background-image: {$currentTheme.gradientPrimary}; -webkit-background-clip: text; background-clip: text;">
       {$_('home.title')}
     </h1>
     
@@ -26,6 +28,10 @@
       
       <Button variant="primary" size="lg" onclick={() => goto('/settings')}>
         {$_('home.settings')}
+      </Button>
+      
+      <Button variant="primary" size="lg" onclick={() => goto('/themes')}>
+        Theme Editor
       </Button>
       
       <Button variant="primary" size="lg" onclick={() => goto('/credits')}>

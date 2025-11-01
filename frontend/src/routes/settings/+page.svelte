@@ -5,6 +5,7 @@
   import Slider from '$lib/components/Slider.svelte';
   import Toggle from '$lib/components/Toggle.svelte';
   import { gameSettings } from '$lib/stores/gameSettings';
+  import { currentTheme } from '$lib/theme/themeStore';
   
   let boardSize = $state($gameSettings.boardSize);
   let aiDepth = $state($gameSettings.aiDepth);
@@ -57,7 +58,8 @@
 <div class="min-h-[calc(100vh-4rem)] py-8">
   <div class="max-w-2xl mx-auto px-4">
     <div class="text-center mb-8">
-      <h1 class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-purple-600 mb-4">
+      <h1 class="text-5xl font-black text-transparent bg-clip-text mb-4"
+          style="background-image: {$currentTheme.gradientPrimary}; -webkit-background-clip: text; background-clip: text;">
         {$_('settings.title')}
       </h1>
       <p class="text-sm text-white/60">
@@ -152,6 +154,9 @@
     <div class="flex justify-center gap-4 mt-8 flex-wrap">
       <Button variant="primary" size="lg" onclick={() => goto('/')}>
         {$_('game.menu.back')}
+      </Button>
+      <Button variant="primary" size="lg" onclick={() => goto('/themes')}>
+        Theme Editor
       </Button>
       <Button variant="primary" size="lg" onclick={resetToDefaults}>
         Reset to Defaults

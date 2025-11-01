@@ -4,6 +4,7 @@
 	import { initI18n } from '$lib/i18n/i18n';
 	import { isLoading } from 'svelte-i18n';
 	import LanguageSwitcher from '$lib/components/LanguageSwitcher.svelte';
+	import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
 	import BackgroundMusic from '$lib/components/BackgroundMusic.svelte';
 	import dolphinVideo from '$lib/assets/backgrounds/dolphin/dolphin.webm';
 	import logo from '$lib/assets/logo/gomoku-logo.png';
@@ -78,6 +79,7 @@
 					</div>
 					
 					<div class="flex items-center gap-4">
+						<ThemeSwitcher />
 						<LanguageSwitcher />
 					</div>
 				</div>

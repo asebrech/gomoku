@@ -35,7 +35,8 @@
   <div class="max-w-4xl mx-auto">
     <!-- Title -->
     <div class="text-center mb-12">
-      <h1 class="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-purple-600 mb-4">
+      <h1 class="text-6xl font-black text-transparent bg-clip-text mb-4"
+          style="background-image: {$currentTheme.gradientPrimary}; -webkit-background-clip: text; background-clip: text;">
         Credits
       </h1>
       <p class="text-xl" style="color: rgba(255, 255, 255, 0.8);">

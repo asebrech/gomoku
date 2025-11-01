@@ -1,4 +1,6 @@
-import { writable } from 'svelte/store';
+import { writable, get } from 'svelte/store';
+
+const ACTIVE_THEME_KEY = 'gomoku_active_theme';
 
 // Theme interface
 export interface ThemeColors {
@@ -91,7 +93,34 @@ export const blackWhiteTheme: ThemeColors = {
 };
 
 // Active theme store - can be changed at runtime
-export const currentTheme = writable<ThemeColors>(synthwaveTheme);
+function loadActiveTheme(): ThemeColors {
+	if (typeof window === 'undefined') return synthwaveTheme;
+	
+	try {
+		const stored = localStorage.getItem(ACTIVE_THEME_KEY);
+		return stored ? JSON.parse(stored) : synthwaveTheme;
+	} catch (error) {
+		console.error('Failed to load active theme:', error);
+		return synthwaveTheme;
+	}
+}
+
+function saveActiveTheme(theme: ThemeColors) {
+	if (typeof window === 'undefined') return;
+	
+	try {
+		localStorage.setItem(ACTIVE_THEME_KEY, JSON.stringify(theme));
+	} catch (error) {
+		console.error('Failed to save active theme:', error);
+	}
+}
+
+export const currentTheme = writable<ThemeColors>(loadActiveTheme());
+
+// Save to localStorage whenever theme changes
+currentTheme.subscribe(theme => {
+	saveActiveTheme(theme);
+});
 
 // Available themes registry
 export const availableThemes = {
@@ -101,23 +130,26 @@ export const availableThemes = {
 
 // Helper function to switch themes
 export function setTheme(themeName: keyof typeof availableThemes) {
-	currentTheme.set(availableThemes[themeName]);
+	const theme = availableThemes[themeName];
+	currentTheme.set(theme);
 	
 	// Also update CSS custom properties for use outside Svelte
 	if (typeof document !== 'undefined') {
-		updateCSSVariables(availableThemes[themeName]);
+		updateCSSVariables(theme);
 	}
 }
 
 // Helper function to set custom theme
 export function setCustomTheme(theme: Partial<ThemeColors>) {
-	currentTheme.update(current => ({
+	const current = get(currentTheme);
+	const updated = {
 		...current,
 		...theme
-	}));
+	};
+	currentTheme.set(updated);
 	
 	if (typeof document !== 'undefined') {
-		currentTheme.subscribe(t => updateCSSVariables(t));
+		updateCSSVariables(updated);
 	}
 }
 
