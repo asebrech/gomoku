@@ -32,12 +32,5 @@
         {$_('home.credits')}
       </Button>
     </div>
-    
-    <div class="flex gap-2 justify-center flex-wrap">
-      <span class="px-4 py-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-full text-white/80 text-sm font-medium">TypeScript</span>
-      <span class="px-4 py-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-full text-white/80 text-sm font-medium">Rust WASM</span>
-      <span class="px-4 py-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-full text-white/80 text-sm font-medium">Svelte 5</span>
-      <span class="px-4 py-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-full text-white/80 text-sm font-medium">SvelteKit</span>
-    </div>
   </div>
 </div>

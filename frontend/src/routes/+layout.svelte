@@ -4,6 +4,7 @@
 	import { initI18n } from '$lib/i18n/i18n';
 	import { isLoading } from 'svelte-i18n';
 	import LanguageSwitcher from '$lib/components/LanguageSwitcher.svelte';
+	import BackgroundMusic from '$lib/components/BackgroundMusic.svelte';
 	import dolphinVideo from '$lib/assets/backgrounds/dolphin/dolphin.webm';
 	import logo from '$lib/assets/logo/gomoku-logo.png';
 	import '../app.css';
@@ -87,5 +88,8 @@
 		<main class="pt-16 min-h-screen">
 			{@render children?.()}
 		</main>
+		
+		<!-- Background Music Player -->
+		<BackgroundMusic />
 	</div>
 {/if}
