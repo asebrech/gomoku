@@ -84,6 +84,7 @@
 
 <div class="flex items-center justify-center w-full">
   <div class="rounded-lg p-4" style="background: {$currentTheme.background}99; border: 3px solid {$currentTheme.primary}; box-shadow: {$currentTheme.glowPrimary};">
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
     <svg 
       width={totalSize} 
       height={totalSize}
