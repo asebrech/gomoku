@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { _ } from 'svelte-i18n';
   import type { ThemeColors } from '$lib/theme/themeStore';
   
   interface Props {
@@ -9,7 +10,7 @@
 </script>
 
 <div class="theme-preview-container">
-  <h3 class="preview-title">Live Preview</h3>
+  <h3 class="preview-title">{$_('themeEditor.livePreview')}</h3>
   
   <div 
     class="preview-window" 
@@ -30,8 +31,8 @@
         class="preview-card"
         style="background: {theme.surface}; border-color: {theme.primary}33;"
       >
-        <h4 style="color: {theme.textPrimary};">Sample Card</h4>
-        <p style="color: {theme.textSecondary};">This is how text will appear</p>
+        <h4 style="color: {theme.textPrimary};">{$_('themeEditor.preview.sampleCard')}</h4>
+        <p style="color: {theme.textSecondary};">{$_('themeEditor.preview.sampleText')}</p>
         
         <!-- Buttons -->
         <div class="preview-buttons">
@@ -39,38 +40,38 @@
             class="preview-button"
             style="background: {theme.buttonNormal}; color: {theme.textPrimary};"
           >
-            Normal
+            {$_('themeEditor.preview.normal')}
           </button>
           <button 
             class="preview-button"
             style="background: {theme.buttonHovered}; color: {theme.textPrimary};"
           >
-            Hovered
+            {$_('themeEditor.preview.hovered')}
           </button>
           <button 
             class="preview-button"
             style="background: {theme.buttonPressed}; color: {theme.textPrimary};"
           >
-            Pressed
+            {$_('themeEditor.preview.pressed')}
           </button>
         </div>
       </div>
       
       <!-- Game Stones Preview -->
       <div class="preview-stones">
-        <div class="stone-label" style="color: {theme.textPrimary};">Game Stones:</div>
+        <div class="stone-label" style="color: {theme.textPrimary};">{$_('themeEditor.preview.gameStones')}</div>
         <div class="stones-row">
           <div 
             class="preview-stone"
             style="background: {theme.stonePlayer1}; box-shadow: 0 0 10px {theme.stonePlayer1}88;"
           >
-            <span class="stone-label-text" style="color: {theme.textPrimary};">P1</span>
+            <span class="stone-label-text" style="color: {theme.textPrimary};">{$_('themeEditor.preview.player1')}</span>
           </div>
           <div 
             class="preview-stone"
             style="background: {theme.stonePlayer2}; box-shadow: 0 0 10px {theme.stonePlayer2}88;"
           >
-            <span class="stone-label-text" style="color: {theme.textPrimary};">P2</span>
+            <span class="stone-label-text" style="color: {theme.textPrimary};">{$_('themeEditor.preview.player2')}</span>
           </div>
         </div>
       </div>
@@ -81,13 +82,13 @@
           class="gradient-bar"
           style="background: {theme.gradientPrimary};"
         >
-          <span style="color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">Primary Gradient</span>
+          <span style="color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">{$_('themeEditor.preview.primaryGradient')}</span>
         </div>
         <div 
           class="gradient-bar"
           style="background: {theme.gradientSecondary};"
         >
-          <span style="color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">Secondary Gradient</span>
+          <span style="color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">{$_('themeEditor.preview.secondaryGradient')}</span>
         </div>
       </div>
     </div>

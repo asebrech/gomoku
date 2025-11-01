@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { _ } from 'svelte-i18n';
   import { currentTheme, setTheme, availableThemes, synthwaveTheme, blackWhiteTheme, type ThemeColors } from '$lib/theme/themeStore';
   import { customThemes, type CustomTheme, themeTemplates } from '$lib/stores/customThemes';
   
@@ -45,7 +46,7 @@
   <button
     class="theme-switcher-button"
     onclick={() => showDropdown = !showDropdown}
-    aria-label="Switch theme"
+    aria-label={$_('themeEditor.title')}
     aria-expanded={showDropdown}
   >
     <svg 
@@ -61,13 +62,13 @@
         d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"
       />
     </svg>
-    <span class="ml-2 hidden sm:inline">Themes</span>
+    <span class="ml-2 hidden sm:inline">{$_('themeEditor.title')}</span>
   </button>
   
   {#if showDropdown}
     <div class="theme-dropdown">
       <div class="dropdown-header">
-        <span class="dropdown-title">Built-in Themes</span>
+        <span class="dropdown-title">{$_('themeEditor.sections.builtInThemes')}</span>
       </div>
       
       <div class="theme-list">
@@ -80,7 +81,7 @@
             <span class="dot" style="background: #00FFFF;"></span>
             <span class="dot" style="background: #FF33CC;"></span>
           </div>
-          <span>Synthwave</span>
+          <span>{$_('themes.synthwave')}</span>
           {#if isThemeActive(synthwaveTheme)}
             <span class="active-badge">✓</span>
           {/if}
@@ -95,7 +96,7 @@
             <span class="dot" style="background: #000000;"></span>
             <span class="dot" style="background: #666666;"></span>
           </div>
-          <span>Black & White</span>
+          <span>{$_('themes.blackwhite')}</span>
           {#if isThemeActive(blackWhiteTheme)}
             <span class="active-badge">✓</span>
           {/if}
@@ -110,7 +111,7 @@
             <span class="dot" style="background: #00CED1;"></span>
             <span class="dot" style="background: #48D1CC;"></span>
           </div>
-          <span>Ocean</span>
+          <span>{$_('themes.ocean')}</span>
           {#if isThemeActive(themeTemplates.ocean.colors)}
             <span class="active-badge">✓</span>
           {/if}
@@ -125,7 +126,7 @@
             <span class="dot" style="background: #F7931E;"></span>
             <span class="dot" style="background: #FFD23F;"></span>
           </div>
-          <span>Sunset</span>
+          <span>{$_('themes.sunset')}</span>
           {#if isThemeActive(themeTemplates.sunset.colors)}
             <span class="active-badge">✓</span>
           {/if}
@@ -140,7 +141,7 @@
             <span class="dot" style="background: #4A7C2E;"></span>
             <span class="dot" style="background: #8BC34A;"></span>
           </div>
-          <span>Forest</span>
+          <span>{$_('themes.forest')}</span>
           {#if isThemeActive(themeTemplates.forest.colors)}
             <span class="active-badge">✓</span>
           {/if}
@@ -151,8 +152,8 @@
         <div class="dropdown-divider"></div>
         
         <div class="dropdown-header">
-          <span class="dropdown-title">Custom Themes</span>
-          <a href="/themes" class="edit-link">Edit</a>
+          <span class="dropdown-title">{$_('themeEditor.sections.customThemes')}</span>
+          <a href="/themes" class="edit-link">{$_('themeEditor.actions.edit')}</a>
         </div>
         
         <div class="theme-list">
@@ -181,7 +182,7 @@
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
         </svg>
-        <span>Create New Theme</span>
+        <span>{$_('themeEditor.actions.createNew')}</span>
       </a>
     </div>
   {/if}

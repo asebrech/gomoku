@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { _ } from 'svelte-i18n';
+  import { _, locale } from 'svelte-i18n';
+  import { get } from 'svelte/store';
   import Button from '$lib/components/Button.svelte';
   import ColorPicker from '$lib/components/ColorPicker.svelte';
   import ThemePreview from '$lib/components/ThemePreview.svelte';
@@ -27,40 +28,40 @@
   // Color categories for organization
   const colorCategories = [
     {
-      title: 'Core Colors',
+      titleKey: 'themeEditor.colorCategories.core',
       colors: [
-        { key: 'primary', label: 'Primary', description: 'Main brand color' },
-        { key: 'secondary', label: 'Secondary', description: 'Secondary accent' },
-        { key: 'accent', label: 'Accent', description: 'Highlight color' },
+        { key: 'primary', labelKey: 'themeEditor.colorLabels.primary', descKey: 'themeEditor.colorDescriptions.primary' },
+        { key: 'secondary', labelKey: 'themeEditor.colorLabels.secondary', descKey: 'themeEditor.colorDescriptions.secondary' },
+        { key: 'accent', labelKey: 'themeEditor.colorLabels.accent', descKey: 'themeEditor.colorDescriptions.accent' },
       ]
     },
     {
-      title: 'Background Colors',
+      titleKey: 'themeEditor.colorCategories.backgrounds',
       colors: [
-        { key: 'background', label: 'Background', description: 'Main background' },
-        { key: 'surface', label: 'Surface', description: 'Card/panel background' },
+        { key: 'background', labelKey: 'themeEditor.colorLabels.background', descKey: 'themeEditor.colorDescriptions.background' },
+        { key: 'surface', labelKey: 'themeEditor.colorLabels.surface', descKey: 'themeEditor.colorDescriptions.surface' },
       ]
     },
     {
-      title: 'Text Colors',
+      titleKey: 'themeEditor.colorCategories.text',
       colors: [
-        { key: 'textPrimary', label: 'Primary Text', description: 'Main text color' },
-        { key: 'textSecondary', label: 'Secondary Text', description: 'Muted text' },
+        { key: 'textPrimary', labelKey: 'themeEditor.colorLabels.textPrimary', descKey: 'themeEditor.colorDescriptions.textPrimary' },
+        { key: 'textSecondary', labelKey: 'themeEditor.colorLabels.textSecondary', descKey: 'themeEditor.colorDescriptions.textSecondary' },
       ]
     },
     {
-      title: 'Button States',
+      titleKey: 'themeEditor.colorCategories.buttons',
       colors: [
-        { key: 'buttonNormal', label: 'Normal', description: 'Default button' },
-        { key: 'buttonHovered', label: 'Hovered', description: 'Hover state' },
-        { key: 'buttonPressed', label: 'Pressed', description: 'Active/pressed state' },
+        { key: 'buttonNormal', labelKey: 'themeEditor.colorLabels.buttonNormal', descKey: 'themeEditor.colorDescriptions.buttonNormal' },
+        { key: 'buttonHovered', labelKey: 'themeEditor.colorLabels.buttonHovered', descKey: 'themeEditor.colorDescriptions.buttonHovered' },
+        { key: 'buttonPressed', labelKey: 'themeEditor.colorLabels.buttonPressed', descKey: 'themeEditor.colorDescriptions.buttonPressed' },
       ]
     },
     {
-      title: 'Game Elements',
+      titleKey: 'themeEditor.colorCategories.gameElements',
       colors: [
-        { key: 'stonePlayer1', label: 'Player 1 Stone', description: 'First player stone' },
-        { key: 'stonePlayer2', label: 'Player 2 Stone', description: 'Second player stone' },
+        { key: 'stonePlayer1', labelKey: 'themeEditor.colorLabels.stonePlayer1', descKey: 'themeEditor.colorDescriptions.stonePlayer1' },
+        { key: 'stonePlayer2', labelKey: 'themeEditor.colorLabels.stonePlayer2', descKey: 'themeEditor.colorDescriptions.stonePlayer2' },
       ]
     }
   ];
@@ -129,7 +130,7 @@
   
   function saveTheme() {
     if (!themeName.trim()) {
-      errorMessage = 'Please enter a theme name';
+      errorMessage = get(_)('themeEditor.messages.enterName');
       setTimeout(() => errorMessage = '', 3000);
       return;
     }
@@ -142,14 +143,14 @@
         name: themeName,
         colors: completeTheme
       });
-      successMessage = 'Theme updated successfully!';
+      successMessage = get(_)('themeEditor.messages.themeUpdated');
     } else {
       // Create new theme
       customThemes.add({
         name: themeName,
         colors: completeTheme
       });
-      successMessage = 'Theme created successfully!';
+      successMessage = get(_)('themeEditor.messages.themeSaved');
     }
     
     setTimeout(() => successMessage = '', 3000);
@@ -165,19 +166,19 @@
   
   function applyTheme(theme: CustomTheme) {
     currentTheme.set(theme.colors);
-    successMessage = `Applied theme: ${theme.name}`;
+    successMessage = get(_)('themeEditor.messages.themeApplied', { values: { name: theme.name } });
     setTimeout(() => successMessage = '', 3000);
   }
   
   function deleteTheme(id: string) {
-    if (confirm('Are you sure you want to delete this theme?')) {
+    if (confirm(get(_)('themeEditor.messages.deleteConfirm'))) {
       customThemes.delete(id);
       if (editingThemeId === id) {
         editingThemeId = null;
         themeName = 'My Custom Theme';
         editingTheme = { ...synthwaveTheme };
       }
-      successMessage = 'Theme deleted';
+      successMessage = get(_)('themeEditor.messages.themeDeleted');
       setTimeout(() => successMessage = '', 3000);
     }
   }
@@ -192,10 +193,10 @@
       a.download = `theme-${id}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      successMessage = 'Theme exported!';
+      successMessage = get(_)('themeEditor.messages.themeExported');
       setTimeout(() => successMessage = '', 3000);
     } catch (error) {
-      errorMessage = 'Failed to export theme';
+      errorMessage = get(_)('themeEditor.messages.exportFailed');
       setTimeout(() => errorMessage = '', 3000);
     }
   }
@@ -203,7 +204,7 @@
   function importTheme() {
     try {
       const imported = customThemes.importTheme(importJson);
-      successMessage = `Imported theme: ${imported.name}`;
+      successMessage = get(_)('themeEditor.messages.themeImported', { values: { name: imported.name } });
       showImportDialog = false;
       importJson = '';
       setTimeout(() => successMessage = '', 3000);
@@ -217,7 +218,7 @@
     const theme = themes.find(t => t.id === id);
     if (theme) {
       customThemes.duplicate(id, `${theme.name} (Copy)`);
-      successMessage = 'Theme duplicated!';
+      successMessage = get(_)('themeEditor.messages.themeDuplicated');
       setTimeout(() => successMessage = '', 3000);
     }
   }
@@ -235,10 +236,10 @@
     <div class="text-center mb-8">
       <h1 class="text-5xl font-black text-transparent bg-clip-text mb-4"
           style="background-image: {$currentTheme.gradientPrimary}; -webkit-background-clip: text; background-clip: text;">
-        Theme Editor
+        {$_('themeEditor.title')}
       </h1>
       <p class="text-sm text-white/60">
-        Create and customize your own themes
+        {$_('themeEditor.subtitle')}
       </p>
     </div>
     
@@ -259,21 +260,21 @@
       <div class="space-y-6">
         <!-- Theme Name and Template -->
         <div class="panel">
-          <h2 class="section-title">Theme Settings</h2>
+          <h2 class="section-title">{$_('themeEditor.themeSettings')}</h2>
           
           <div class="form-group">
-            <label for="theme-name" class="form-label">Theme Name</label>
+            <label for="theme-name" class="form-label">{$_('themeEditor.themeName')}</label>
             <input
               id="theme-name"
               type="text"
               bind:value={themeName}
-              placeholder="Enter theme name..."
+              placeholder={$_('themeEditor.themeNamePlaceholder')}
               class="text-input"
             />
           </div>
           
           <div class="form-group">
-            <label for="existing-theme-select" class="form-label">Edit Existing Theme</label>
+            <label for="existing-theme-select" class="form-label">{$_('themeEditor.editExisting')}</label>
             <select
               id="existing-theme-select"
               onchange={(e) => {
@@ -285,7 +286,7 @@
               }}
               class="select-input"
             >
-              <option value="">-- Select a theme to edit --</option>
+              <option value="">{$_('themeEditor.selectTheme')}</option>
               {#each themes as theme}
                 <option value={theme.id} selected={theme.id === editingThemeId}>
                   {theme.name}
@@ -295,7 +296,7 @@
           </div>
           
           <div class="form-group">
-            <label for="template-select" class="form-label">Start from Template</label>
+            <label for="template-select" class="form-label">{$_('themeEditor.startFromTemplate')}</label>
             <select
               id="template-select"
               bind:value={selectedTemplate}
@@ -304,7 +305,7 @@
             >
               {#each Object.keys(themeTemplates) as templateKey}
                 <option value={templateKey}>
-                  {themeTemplates[templateKey as keyof typeof themeTemplates].name}
+                  {$_(`themes.${templateKey}`)}
                 </option>
               {/each}
             </select>
@@ -312,10 +313,10 @@
           
           <div class="flex gap-3">
             <Button variant="primary" size="md" onclick={saveTheme}>
-              {editingThemeId ? 'Update Theme' : 'Save Theme'}
+              {editingThemeId ? $_('themeEditor.updateTheme') : $_('themeEditor.saveTheme')}
             </Button>
             <Button variant="secondary" size="md" onclick={resetEditor}>
-              Reset
+              {$_('themeEditor.reset')}
             </Button>
           </div>
         </div>
@@ -323,12 +324,12 @@
         <!-- Color Pickers -->
         {#each colorCategories as category}
           <div class="panel">
-            <h3 class="section-title">{category.title}</h3>
+            <h3 class="section-title">{$_(category.titleKey)}</h3>
             <div class="color-grid">
               {#each category.colors as colorDef}
                 <ColorPicker
-                  label={colorDef.label}
-                  description={colorDef.description}
+                  label={$_(colorDef.labelKey)}
+                  description={$_(colorDef.descKey)}
                   bind:value={editingTheme[colorDef.key as keyof ThemeColors]!}
                 />
               {/each}
@@ -340,10 +341,10 @@
         <div class="panel">
           <div class="flex gap-3">
             <Button variant="primary" size="lg" fullWidth={true} onclick={saveTheme}>
-              {editingThemeId ? 'Update Theme' : 'Save Theme'}
+              {editingThemeId ? $_('themeEditor.updateTheme') : $_('themeEditor.saveTheme')}
             </Button>
             <Button variant="secondary" size="lg" onclick={resetEditor}>
-              Reset
+              {$_('themeEditor.reset')}
             </Button>
           </div>
         </div>
@@ -360,15 +361,15 @@
     <!-- Saved Themes -->
     <div class="mt-12">
       <div class="flex items-center justify-between mb-6">
-        <h2 class="text-3xl font-bold text-white/90">Saved Themes</h2>
+        <h2 class="text-3xl font-bold text-white/90">{$_('themeEditor.savedThemes')}</h2>
         <Button variant="secondary" size="md" onclick={() => showImportDialog = true}>
-          Import Theme
+          {$_('themeEditor.actions.import')}
         </Button>
       </div>
       
       {#if themes.length === 0}
         <div class="panel text-center py-12">
-          <p class="text-white/60 text-lg">No custom themes yet. Create your first one!</p>
+          <p class="text-white/60 text-lg">{$_('themeEditor.noThemesYet')}</p>
         </div>
       {:else}
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -394,7 +395,7 @@
               <div class="theme-card-content">
                 <h3 class="theme-card-title">{theme.name}</h3>
                 <p class="theme-card-date">
-                  Updated: {new Date(theme.updatedAt).toLocaleDateString()}
+                  {$_('themeEditor.updatedDate', { values: { date: new Date(theme.updatedAt).toLocaleDateString() } })}
                 </p>
                 
                 <div class="theme-card-actions">
@@ -402,31 +403,31 @@
                     class="action-btn action-btn-apply"
                     onclick={(e) => { e.stopPropagation(); applyTheme(theme); }}
                   >
-                    Apply
+                    {$_('themeEditor.actions.apply')}
                   </button>
                   <button 
                     class="action-btn action-btn-edit"
                     onclick={(e) => { e.stopPropagation(); loadThemeForEditing(theme); }}
                   >
-                    Edit
+                    {$_('themeEditor.actions.edit')}
                   </button>
                   <button 
                     class="action-btn action-btn-duplicate"
                     onclick={(e) => { e.stopPropagation(); duplicateTheme(theme.id); }}
                   >
-                    Duplicate
+                    {$_('themeEditor.actions.duplicate')}
                   </button>
                   <button 
                     class="action-btn action-btn-export"
                     onclick={(e) => { e.stopPropagation(); exportTheme(theme.id); }}
                   >
-                    Export
+                    {$_('themeEditor.actions.export')}
                   </button>
                   <button 
                     class="action-btn action-btn-delete"
                     onclick={(e) => { e.stopPropagation(); deleteTheme(theme.id); }}
                   >
-                    Delete
+                    {$_('themeEditor.actions.delete')}
                   </button>
                 </div>
               </div>
@@ -439,7 +440,7 @@
     <!-- Back Button -->
     <div class="flex justify-center mt-12">
       <Button variant="primary" size="lg" onclick={() => goto('/')}>
-        Back to Menu
+        {$_('game.menu.back')}
       </Button>
     </div>
   </div>
@@ -453,22 +454,22 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="modal-content" onclick={(e) => e.stopPropagation()}>
-      <h2 class="modal-title">Import Theme</h2>
-      <p class="modal-description">Paste your theme JSON below:</p>
+      <h2 class="modal-title">{$_('themeEditor.importDialog.title')}</h2>
+      <p class="modal-description">{$_('themeEditor.importDialog.description')}</p>
       
       <textarea
         bind:value={importJson}
-        placeholder="Paste theme JSON here..."
+        placeholder={$_('themeEditor.importDialog.placeholder')}
         class="import-textarea"
         rows="10"
       ></textarea>
       
       <div class="modal-actions">
         <Button variant="primary" size="md" onclick={importTheme}>
-          Import
+          {$_('themeEditor.importDialog.import')}
         </Button>
         <Button variant="secondary" size="md" onclick={() => showImportDialog = false}>
-          Cancel
+          {$_('themeEditor.importDialog.cancel')}
         </Button>
       </div>
     </div>

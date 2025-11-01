@@ -2,6 +2,7 @@
   import { locale } from 'svelte-i18n';
   import { currentTheme } from '$lib/theme/themeStore';
   import Button from './Button.svelte';
+  import { browser } from '$app/environment';
   
   const languageNames: Record<string, string> = {
     'en': '🇬🇧 EN',
@@ -19,6 +20,10 @@
   
   function setLanguage(lang: string) {
     locale.set(lang);
+    // Save to localStorage for persistence
+    if (browser) {
+      localStorage.setItem('selectedLocale', lang);
+    }
     isOpen = false;
   }
   

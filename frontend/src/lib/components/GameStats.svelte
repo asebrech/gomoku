@@ -138,7 +138,7 @@
             class="text-xl font-bold"
             style="color: {winnerColor};"
           >
-            {cleanWinnerName} Wins!
+            {cleanWinnerName} {$_('game.stats.wins')}
           </p>
           <svg width="24" height="24" class="inline-block">
             <circle
@@ -156,7 +156,7 @@
     <!-- Turn Display -->
     <div class="mb-3 pb-3 border-b" style="border-color: {$currentTheme.primary}33;">
       <div class="flex justify-between items-center">
-        <span class="text-white/80 font-medium text-sm">Turn:</span>
+        <span class="text-white/80 font-medium text-sm">{$_('game.stats.turn')}</span>
         <p 
           class="text-2xl font-bold"
           style="color: {$currentTheme.primary}; text-shadow: {$currentTheme.glowPrimary};"
@@ -169,7 +169,7 @@
   <div class="space-y-2">
     <!-- Board Size -->
     <div class="flex justify-between items-center">
-      <span class="text-white/80 font-medium text-sm">Board Size:</span>
+      <span class="text-white/80 font-medium text-sm">{$_('game.stats.boardSize')}</span>
       <span class="font-bold" style="color: {$currentTheme.secondary};">
         {boardSize}x{boardSize}
       </span>
@@ -178,7 +178,7 @@
     {#if aiDepth}
       <!-- AI Depth -->
       <div class="flex justify-between items-center">
-        <span class="text-white/80 font-medium text-sm">AI Max Depth:</span>
+        <span class="text-white/80 font-medium text-sm">{$_('game.stats.aiMaxDepth')}</span>
         <span class="font-bold" style="color: {$currentTheme.secondary};">
           {aiDepth}
         </span>
@@ -189,7 +189,7 @@
     
     <!-- Current Player -->
     <div class="flex justify-between items-center">
-      <span class="text-white/80 font-medium text-sm">Current Turn:</span>
+      <span class="text-white/80 font-medium text-sm">{$_('game.stats.currentTurn')}</span>
       <span class="font-bold" style="color: {$currentTheme.primary};">
         {currentPlayer}
       </span>
@@ -207,7 +207,7 @@
           </defs>
           <circle cx="8" cy="8" r="7" fill="url(#capturePlayer1Gradient)" />
         </svg>
-        <span class="text-white/80 font-medium text-sm">Captures:</span>
+        <span class="text-white/80 font-medium text-sm">{$_('game.stats.captures')}</span>
       </div>
       <span class="font-bold" style="color: {$currentTheme.stonePlayer1};">
         {player1Captures}
@@ -225,7 +225,7 @@
           </defs>
           <circle cx="8" cy="8" r="7" fill="url(#capturePlayer2Gradient)" />
         </svg>
-        <span class="text-white/80 font-medium text-sm">Captures:</span>
+        <span class="text-white/80 font-medium text-sm">{$_('game.stats.captures')}</span>
       </div>
       <span class="font-bold" style="color: {$currentTheme.stonePlayer2};">
         {player2Captures}
@@ -238,7 +238,7 @@
       <!-- Actual Depth Reached -->
       {#if lastDepthReached > 0}
         <div class="flex justify-between items-center">
-          <span class="text-white/80 font-medium text-sm">Depth Reached:</span>
+          <span class="text-white/80 font-medium text-sm">{$_('game.stats.depthReached')}</span>
           <span class="font-bold text-lg" style="color: {$currentTheme.accent};">
             {lastDepthReached}
           </span>
@@ -247,7 +247,7 @@
       
       <!-- Last Move Time -->
       <div class="flex justify-between items-center">
-        <span class="text-white/80 font-medium text-sm">AI Last Move:</span>
+        <span class="text-white/80 font-medium text-sm">{$_('game.stats.aiLastMove')}</span>
         <span class="font-bold text-lg" style="color: {$currentTheme.secondary};">
           {lastMoveTime > 0 ? formatTime(lastMoveTime) : '--'}
         </span>
@@ -256,7 +256,7 @@
       <!-- Nodes Searched -->
       {#if lastNodesSearched > 0}
         <div class="flex justify-between items-center">
-          <span class="text-white/80 font-medium text-sm">Nodes Searched:</span>
+          <span class="text-white/80 font-medium text-sm">{$_('game.stats.nodesSearched')}</span>
           <span class="font-bold" style="color: {$currentTheme.secondary};">
             {formatNodes(lastNodesSearched)}
           </span>
@@ -266,7 +266,7 @@
       <!-- AI Evaluation Score -->
       {#if lastAIScore !== 0}
         <div class="flex justify-between items-center">
-          <span class="text-white/80 font-medium text-sm">Evaluation:</span>
+          <span class="text-white/80 font-medium text-sm">{$_('game.stats.evaluation')}</span>
           <span class="font-bold" style="color: {lastAIScore > 0 ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2};">
             {lastAIScore > 0 ? '+' : ''}{lastAIScore}
           </span>
@@ -284,7 +284,7 @@
       class="text-base font-bold text-center mb-2"
       style="color: {$currentTheme.primary};"
     >
-      Controls
+      {$_('game.stats.controls')}
     </h3>
     
     <!-- Double-three visibility toggle -->
@@ -292,7 +292,7 @@
       <Toggle 
         checked={showDoubleThree}
         onchange={onToggleDoubleThree}
-        label="Show Double-Three" 
+        label={$_('game.stats.showDoubleThree')}
         id="double-three-toggle"
       />
     </div>
@@ -303,12 +303,12 @@
         <Toggle 
           checked={showAIHint}
           onchange={onToggleAIHint}
-          label="AI Hint" 
+          label={$_('game.stats.aiHint')}
           id="ai-hint-toggle"
           disabled={isPlaying && isFullAI}
         />
         {#if isCalculatingHint}
-          <span class="ml-2 text-xs text-cyan-400 animate-pulse">Computing...</span>
+          <span class="ml-2 text-xs text-cyan-400 animate-pulse">{$_('game.stats.computing')}</span>
         {/if}
       </div>
     {/if}
@@ -317,40 +317,45 @@
     {#if isFullAI}
       {#if !isPlaying && !isPaused}
         <Button variant="primary" size="sm" onclick={onStartGame} disabled={!gameInstance || isGameOver} fullWidth>
-          Start Match
+          {$_('game.stats.startMatch')}
         </Button>
       {/if}
       
       {#if isPlaying}
         <Button variant="primary" size="sm" onclick={onPauseGame} fullWidth>
-          Pause
+          {$_('game.stats.pause')}
         </Button>
       {/if}
       
       {#if isPaused && !isGameOver}
         <Button variant="primary" size="sm" onclick={onResumeGame} fullWidth>
-          Resume
+          {$_('game.stats.resume')}
         </Button>
       {/if}
+      
+      <!-- Undo button for AI vs AI -->
+      <Button variant="primary" size="sm" onclick={onUndoMove} disabled={totalMoves === 0 || isGameOver} fullWidth>
+        {$_('game.stats.undoMove')}
+      </Button>
     {/if}
     
     <!-- Undo button for human games -->
     {#if hasHuman && !isFullAI}
       <Button variant="primary" size="sm" onclick={onUndoMove} disabled={totalMoves === 0 || isGameOver} fullWidth>
-        Undo Move
+        {$_('game.stats.undoMove')}
       </Button>
     {/if}
     
     <!-- Continue button after undo (when it's AI's turn) -->
     {#if needsAIContinue && hasHuman && !isFullAI}
       <Button variant="primary" size="sm" onclick={onContinueAI} fullWidth>
-        Continue AI Turn
+        {$_('game.stats.continueAI')}
       </Button>
     {/if}
     
     <!-- New Game -->
     <Button variant="primary" size="sm" onclick={onResetGame} fullWidth>
-      New Game
+      {$_('game.stats.newGame')}
     </Button>
     
     <!-- Back button -->

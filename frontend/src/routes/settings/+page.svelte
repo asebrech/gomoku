@@ -63,7 +63,7 @@
         {$_('settings.title')}
       </h1>
       <p class="text-sm text-white/60">
-        Settings are saved automatically
+        {$_('settings.autoSave')}
       </p>
     </div>
     
@@ -76,7 +76,7 @@
           min={9}
           max={19}
           step={1}
-          label="Board Size"
+          label={$_('settings.boardSize')}
           unit="x{boardSize}"
           showInput={true}
         />
@@ -90,7 +90,7 @@
           min={2}
           max={25}
           step={1}
-          label="AI Search Depth"
+          label={$_('settings.aiDepth')}
           showInput={true}
         />
       </div>
@@ -103,7 +103,7 @@
           min={0}
           max={5000}
           step={50}
-          label="AI Max Thinking Time"
+          label={$_('settings.aiMaxThinkingTime')}
           unit="ms"
           showInput={true}
         />
@@ -114,16 +114,16 @@
       
       <!-- Visual Aids Section -->
       <div class="setting-section">
-        <h3 class="text-xl font-bold text-white/90 mb-4">Visual Aids</h3>
+        <h3 class="text-xl font-bold text-white/90 mb-4">{$_('settings.visualAids')}</h3>
         
         <!-- Double-Three Display -->
         <div class="flex items-center justify-between py-3">
           <div>
             <label for="show-double-three" class="text-white/90 font-medium cursor-pointer">
-              Show Double-Three Positions
+              {$_('settings.showDoubleThree')}
             </label>
             <p class="setting-hint">
-              Highlights illegal double-three positions with red X markers
+              {$_('settings.showDoubleThreeHint')}
             </p>
           </div>
           <Toggle 
@@ -136,10 +136,10 @@
         <div class="flex items-center justify-between py-3">
           <div>
             <label for="show-ai-hint" class="text-white/90 font-medium cursor-pointer">
-              Show AI Hint
+              {$_('settings.showAIHint')}
             </label>
             <p class="setting-hint">
-              Displays AI-suggested move with a golden ring (Human games only)
+              {$_('settings.showAIHintDescription')}
             </p>
           </div>
           <Toggle 
@@ -156,10 +156,10 @@
         {$_('game.menu.back')}
       </Button>
       <Button variant="primary" size="lg" onclick={() => goto('/themes')}>
-        Theme Editor
+        {$_('settings.themeEditor')}
       </Button>
       <Button variant="primary" size="lg" onclick={resetToDefaults}>
-        Reset to Defaults
+        {$_('settings.resetToDefaults')}
       </Button>
     </div>
   </div>

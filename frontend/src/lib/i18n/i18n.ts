@@ -7,12 +7,24 @@ register('es', () => import('./locales/es.json'));
 
 let isInitialized = false;
 
+// Get saved locale from localStorage or fallback to browser locale
+function getSavedLocale(): string {
+  if (browser) {
+    const saved = localStorage.getItem('selectedLocale');
+    if (saved && ['en', 'fr', 'es'].includes(saved)) {
+      return saved;
+    }
+    return getLocaleFromNavigator() || 'en';
+  }
+  return 'en';
+}
+
 export async function initI18n() {
   if (isInitialized) return;
   
   init({
     fallbackLocale: 'en',
-    initialLocale: browser ? getLocaleFromNavigator() : 'en',
+    initialLocale: getSavedLocale(),
   });
   
   // Wait for the locale to be loaded
