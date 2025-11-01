@@ -1,6 +1,7 @@
 <script lang="ts">
   import { locale } from 'svelte-i18n';
   import { currentTheme } from '$lib/theme/themeStore';
+  import Button from './Button.svelte';
   
   const languageNames: Record<string, string> = {
     'en': '🇬🇧 EN',
@@ -21,25 +22,12 @@
     isOpen = false;
   }
   
-  const buttonStyles = $derived({
-    background: `${$currentTheme.surface}1A`,
-    border: `1px solid ${$currentTheme.primary}33`,
-    color: '#FFFFFF',
-    backdropFilter: 'blur(8px)'
-  });
-  
   const dropdownStyles = $derived({
     background: `${$currentTheme.surface}E6`,
     border: `1px solid ${$currentTheme.primary}33`,
     backdropFilter: 'blur(12px)',
     boxShadow: $currentTheme.glowPrimary
   });
-  
-  const buttonStyleString = $derived(
-    Object.entries(buttonStyles)
-      .map(([key, value]) => `${key.replace(/([A-Z])/g, '-$1').toLowerCase()}: ${value}`)
-      .join('; ')
-  );
   
   const dropdownStyleString = $derived(
     Object.entries(dropdownStyles)
@@ -49,13 +37,9 @@
 </script>
 
 <div class="relative">
-  <button
-    class="px-4 py-2 rounded-lg font-medium transition-all duration-200"
-    style={buttonStyleString}
-    onclick={() => isOpen = !isOpen}
-  >
+  <Button variant="secondary" size="md" onclick={() => isOpen = !isOpen}>
     {displayText}
-  </button>
+  </Button>
   
   {#if isOpen}
     <div

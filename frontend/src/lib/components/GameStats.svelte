@@ -288,7 +288,7 @@
     </h3>
     
     <!-- Double-three visibility toggle -->
-    <div class="flex justify-center">
+    <div class="flex justify-between items-center">
       <Toggle 
         checked={showDoubleThree}
         onchange={onToggleDoubleThree}
@@ -299,7 +299,7 @@
     
     <!-- AI Hint toggle (only for games with human players) -->
     {#if hasHuman}
-      <div class="flex justify-center">
+      <div class="flex justify-between items-center">
         <Toggle 
           checked={showAIHint}
           onchange={onToggleAIHint}
@@ -322,7 +322,7 @@
       {/if}
       
       {#if isPlaying}
-        <Button variant="secondary" size="sm" onclick={onPauseGame} fullWidth>
+        <Button variant="primary" size="sm" onclick={onPauseGame} fullWidth>
           Pause
         </Button>
       {/if}
@@ -336,7 +336,7 @@
     
     <!-- Undo button for human games -->
     {#if hasHuman && !isFullAI}
-      <Button variant="secondary" size="sm" onclick={onUndoMove} disabled={totalMoves === 0 || isGameOver} fullWidth>
+      <Button variant="primary" size="sm" onclick={onUndoMove} disabled={totalMoves === 0 || isGameOver} fullWidth>
         Undo Move
       </Button>
     {/if}
@@ -349,13 +349,13 @@
     {/if}
     
     <!-- New Game -->
-    <Button variant="secondary" size="sm" onclick={onResetGame} fullWidth>
+    <Button variant="primary" size="sm" onclick={onResetGame} fullWidth>
       New Game
     </Button>
     
     <!-- Back button -->
     {#if onBack}
-      <Button variant="ghost" size="sm" onclick={onBack} fullWidth>
+      <Button variant="primary" size="sm" onclick={onBack} fullWidth>
         {$_('game.menu.back')}
       </Button>
     {/if}

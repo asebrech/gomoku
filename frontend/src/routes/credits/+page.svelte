@@ -189,7 +189,7 @@
     
     <!-- Back Button -->
     <div class="flex justify-center">
-      <Button variant="ghost" size="lg" onclick={() => goto('/')}>
+      <Button variant="primary" size="lg" onclick={() => goto('/')}>
         Back to Menu
       </Button>
     </div>

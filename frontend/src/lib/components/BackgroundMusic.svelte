@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { audioSettings } from '$lib/stores/audioSettings';
   import { currentTheme } from '$lib/theme/themeStore';
+  import Button from './Button.svelte';
   
   let audioElement: HTMLAudioElement | null = null;
   let showVolumeSlider = $state(false);
@@ -98,37 +99,30 @@
   {/if}
   
   <!-- Play/Pause Button -->
-  <button
-    onclick={togglePlay}
-    class="p-3 rounded-full backdrop-blur-md transition-all duration-200 hover:scale-110 active:scale-95"
-    style="
-      background: {$currentTheme.background}cc; 
-      border: 2px solid {$currentTheme.primary}; 
-      box-shadow: 0 0 20px {$currentTheme.primary}40{isPlaying ? `, 0 0 40px ${$currentTheme.primary}30` : ''};
-    "
-    title={isPlaying ? 'Pause music' : 'Play music'}
-  >
-    {#if !isPlaying}
-      <!-- Muted/Paused Icon -->
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6" style="color: {$currentTheme.primary};">
-        <path d="M11 5L6 9H2v6h4l5 4V5z"/>
-        <line x1="23" y1="9" x2="17" y2="15"/>
-        <line x1="17" y1="9" x2="23" y2="15"/>
-      </svg>
-    {:else if $audioSettings.musicVolume < 0.5}
-      <!-- Low Volume Icon -->
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6" style="color: {$currentTheme.primary};">
-        <path d="M11 5L6 9H2v6h4l5 4V5z"/>
-        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
-      </svg>
-    {:else}
-      <!-- High Volume Icon -->
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6" style="color: {$currentTheme.primary};">
-        <path d="M11 5L6 9H2v6h4l5 4V5z"/>
-        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
-      </svg>
-    {/if}
-  </button>
+  <div class="flex items-center justify-center">
+    <Button variant="secondary" size="md" onclick={togglePlay}>
+      {#if !isPlaying}
+        <!-- Muted/Paused Icon -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6" style="color: {$currentTheme.primary};">
+          <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+          <line x1="23" y1="9" x2="17" y2="15"/>
+          <line x1="17" y1="9" x2="23" y2="15"/>
+        </svg>
+      {:else if $audioSettings.musicVolume < 0.5}
+        <!-- Low Volume Icon -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6" style="color: {$currentTheme.primary};">
+          <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+        </svg>
+      {:else}
+        <!-- High Volume Icon -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6" style="color: {$currentTheme.primary};">
+          <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+        </svg>
+      {/if}
+    </Button>
+  </div>
 </div>
 
 <style>

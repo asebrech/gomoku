@@ -1,5 +1,6 @@
 <script lang="ts">
   import { currentTheme } from '$lib/theme/themeStore';
+  import Button from './Button.svelte';
   
   interface Props {
     value?: number;
@@ -36,18 +37,13 @@
 
 <div class="flex items-center gap-4 p-4 rounded-lg backdrop-blur-md border transition-colors duration-300"
      style="background-color: {$currentTheme.surface}80; border-color: {$currentTheme.primary}4D;">
-  <button 
-    onclick={toggleMute}
-    class="w-10 h-10 flex items-center justify-center rounded-lg transition-all duration-200 border"
-    style="background-color: {$currentTheme.buttonNormal}; 
-           border-color: {$currentTheme.primary}80;
-           box-shadow: {$currentTheme.glowPrimary};"
-    aria-label={muted ? 'Unmute' : 'Mute'}
-  >
-    <span class="font-bold text-lg" style="color: {$currentTheme.secondary};">
-      {volumeIcon}
-    </span>
-  </button>
+  <div class="flex items-center justify-center" style="width: 2.5rem;">
+    <Button variant="secondary" size="sm" onclick={toggleMute}>
+      <span class="font-bold text-lg" style="color: {$currentTheme.secondary};">
+        {volumeIcon}
+      </span>
+    </Button>
+  </div>
   
   <div class="flex-1">
     <div class="relative">

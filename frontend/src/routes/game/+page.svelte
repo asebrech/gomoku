@@ -23,12 +23,12 @@
         {$_('game.menu.playerVsPlayer')}
       </Button>
       
-      <Button variant="secondary" size="lg" onclick={() => goto('/game/ai-vs-ai')}>
+      <Button variant="primary" size="lg" onclick={() => goto('/game/ai-vs-ai')}>
         {$_('game.menu.aiVsAi')}
       </Button>
       
       <div class="mt-4">
-        <Button variant="ghost" size="md" onclick={() => goto('/')}>
+        <Button variant="primary" size="lg" onclick={() => goto('/')}>
           {$_('game.menu.back')}
         </Button>
       </div>

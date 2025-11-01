@@ -24,11 +24,11 @@
         {$_('home.play')}
       </Button>
       
-      <Button variant="secondary" size="md" onclick={() => goto('/settings')}>
+      <Button variant="primary" size="lg" onclick={() => goto('/settings')}>
         {$_('home.settings')}
       </Button>
       
-      <Button variant="ghost" size="md" onclick={() => goto('/credits')}>
+      <Button variant="primary" size="lg" onclick={() => goto('/credits')}>
         {$_('home.credits')}
       </Button>
     </div>

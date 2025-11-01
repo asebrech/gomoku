@@ -150,10 +150,10 @@
     
     <!-- Buttons -->
     <div class="flex justify-center gap-4 mt-8 flex-wrap">
-      <Button variant="ghost" size="md" onclick={() => goto('/')}>
+      <Button variant="primary" size="lg" onclick={() => goto('/')}>
         {$_('game.menu.back')}
       </Button>
-      <Button variant="secondary" size="md" onclick={resetToDefaults}>
+      <Button variant="primary" size="lg" onclick={resetToDefaults}>
         Reset to Defaults
       </Button>
     </div>
