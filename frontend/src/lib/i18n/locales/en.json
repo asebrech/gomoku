@@ -127,7 +127,6 @@
       "duplicate": "Duplicate",
       "export": "Export",
       "delete": "Delete",
-      "import": "Import Theme",
       "cancel": "Cancel"
     },
     "messages": {
@@ -137,18 +136,14 @@
       "themeApplied": "Applied theme: {name}",
       "themeDuplicated": "Theme duplicated!",
       "themeExported": "Theme exported!",
-      "themeImported": "Imported theme: {name}",
       "enterName": "Please enter a theme name",
       "deleteConfirm": "Are you sure you want to delete this theme?",
-      "exportFailed": "Failed to export theme",
-      "importFailed": "Failed to import theme"
+      "exportFailed": "Failed to export theme"
     },
-    "importDialog": {
-      "title": "Import Theme",
-      "description": "Paste your theme JSON below:",
-      "placeholder": "Paste theme JSON here...",
-      "import": "Import",
-      "cancel": "Cancel"
+
+    "sections": {
+      "builtInThemes": "Built-in Themes",
+      "customThemes": "Custom Themes"
     },
     "preview": {
       "sampleCard": "Sample Card",

@@ -13,8 +13,6 @@
   let themeName = $state('My Custom Theme');
   let selectedTemplate = $state<string>('synthwave');
   let editingThemeId = $state<string | null>(null);
-  let showImportDialog = $state(false);
-  let importJson = $state('');
   let errorMessage = $state('');
   let successMessage = $state('');
   
@@ -201,18 +199,7 @@
     }
   }
   
-  function importTheme() {
-    try {
-      const imported = customThemes.importTheme(importJson);
-      successMessage = get(_)('themeEditor.messages.themeImported', { values: { name: imported.name } });
-      showImportDialog = false;
-      importJson = '';
-      setTimeout(() => successMessage = '', 3000);
-    } catch (error) {
-      errorMessage = (error as Error).message;
-      setTimeout(() => errorMessage = '', 3000);
-    }
-  }
+
   
   function duplicateTheme(id: string) {
     const theme = themes.find(t => t.id === id);
@@ -352,7 +339,7 @@
       
       <!-- Right Column: Preview -->
       <div class="space-y-6">
-        <div class="panel sticky top-4">
+        <div class="panel sticky top-20">
           <ThemePreview theme={editingTheme as ThemeColors} />
         </div>
       </div>
@@ -362,9 +349,6 @@
     <div class="mt-12">
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-3xl font-bold text-white/90">{$_('themeEditor.savedThemes')}</h2>
-        <Button variant="secondary" size="md" onclick={() => showImportDialog = true}>
-          {$_('themeEditor.actions.import')}
-        </Button>
       </div>
       
       {#if themes.length === 0}
@@ -446,35 +430,7 @@
   </div>
 </div>
 
-<!-- Import Dialog -->
-{#if showImportDialog}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-overlay" onclick={() => showImportDialog = false}>
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="modal-content" onclick={(e) => e.stopPropagation()}>
-      <h2 class="modal-title">{$_('themeEditor.importDialog.title')}</h2>
-      <p class="modal-description">{$_('themeEditor.importDialog.description')}</p>
-      
-      <textarea
-        bind:value={importJson}
-        placeholder={$_('themeEditor.importDialog.placeholder')}
-        class="import-textarea"
-        rows="10"
-      ></textarea>
-      
-      <div class="modal-actions">
-        <Button variant="primary" size="md" onclick={importTheme}>
-          {$_('themeEditor.importDialog.import')}
-        </Button>
-        <Button variant="secondary" size="md" onclick={() => showImportDialog = false}>
-          {$_('themeEditor.importDialog.cancel')}
-        </Button>
-      </div>
-    </div>
-  </div>
-{/if}
+
 
 <style>
   .panel {
@@ -662,64 +618,7 @@
     background: rgba(239, 68, 68, 0.3);
   }
   
-  .modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(4px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    padding: 1rem;
-  }
-  
-  .modal-content {
-    background: linear-gradient(135deg, rgba(26, 0, 51, 0.95) 0%, rgba(51, 0, 102, 0.95) 100%);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 1rem;
-    padding: 2rem;
-    max-width: 600px;
-    width: 100%;
-    max-height: 90vh;
-    overflow-y: auto;
-  }
-  
-  .modal-title {
-    font-size: 1.5rem;
-    font-weight: bold;
-    color: white;
-    margin-bottom: 0.5rem;
-  }
-  
-  .modal-description {
-    color: rgba(255, 255, 255, 0.7);
-    margin-bottom: 1rem;
-  }
-  
-  .import-textarea {
-    width: 100%;
-    padding: 1rem;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 0.5rem;
-    color: white;
-    font-family: 'Courier New', monospace;
-    font-size: 0.875rem;
-    resize: vertical;
-    margin-bottom: 1rem;
-  }
-  
-  .import-textarea:focus {
-    outline: none;
-    border-color: rgba(255, 255, 255, 0.4);
-  }
-  
-  .modal-actions {
-    display: flex;
-    gap: 1rem;
-    justify-content: flex-end;
-  }
+
   
   @media (max-width: 1024px) {
     .panel.sticky {

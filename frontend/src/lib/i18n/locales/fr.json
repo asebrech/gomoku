@@ -127,7 +127,6 @@
       "duplicate": "Dupliquer",
       "export": "Exporter",
       "delete": "Supprimer",
-      "import": "Importer un Thème",
       "cancel": "Annuler"
     },
     "messages": {
@@ -137,18 +136,14 @@
       "themeApplied": "Thème appliqué : {name}",
       "themeDuplicated": "Thème dupliqué !",
       "themeExported": "Thème exporté !",
-      "themeImported": "Thème importé : {name}",
       "enterName": "Veuillez entrer un nom de thème",
       "deleteConfirm": "Êtes-vous sûr de vouloir supprimer ce thème ?",
-      "exportFailed": "Échec de l'exportation du thème",
-      "importFailed": "Échec de l'importation du thème"
+      "exportFailed": "Échec de l'exportation du thème"
     },
-    "importDialog": {
-      "title": "Importer un Thème",
-      "description": "Collez votre JSON de thème ci-dessous :",
-      "placeholder": "Collez le JSON du thème ici...",
-      "import": "Importer",
-      "cancel": "Annuler"
+
+    "sections": {
+      "builtInThemes": "Thèmes Intégrés",
+      "customThemes": "Thèmes Personnalisés"
     },
     "preview": {
       "sampleCard": "Carte d'Exemple",

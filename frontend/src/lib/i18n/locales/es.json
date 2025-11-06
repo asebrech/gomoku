@@ -127,7 +127,6 @@
       "duplicate": "Duplicar",
       "export": "Exportar",
       "delete": "Eliminar",
-      "import": "Importar Tema",
       "cancel": "Cancelar"
     },
     "messages": {
@@ -137,18 +136,14 @@
       "themeApplied": "Tema aplicado: {name}",
       "themeDuplicated": "¡Tema duplicado!",
       "themeExported": "¡Tema exportado!",
-      "themeImported": "Tema importado: {name}",
       "enterName": "Por favor ingresa un nombre de tema",
       "deleteConfirm": "¿Estás seguro de que quieres eliminar este tema?",
-      "exportFailed": "Error al exportar el tema",
-      "importFailed": "Error al importar el tema"
+      "exportFailed": "Error al exportar el tema"
     },
-    "importDialog": {
-      "title": "Importar Tema",
-      "description": "Pega tu JSON de tema a continuación:",
-      "placeholder": "Pega el JSON del tema aquí...",
-      "import": "Importar",
-      "cancel": "Cancelar"
+
+    "sections": {
+      "builtInThemes": "Temas Integrados",
+      "customThemes": "Temas Personalizados"
     },
     "preview": {
       "sampleCard": "Tarjeta de Ejemplo",

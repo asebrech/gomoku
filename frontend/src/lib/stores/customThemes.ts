@@ -97,35 +97,7 @@ function createCustomThemesStore() {
 			return JSON.stringify(theme, null, 2);
 		},
 		
-		// Import theme from JSON
-		importTheme: (jsonString: string): CustomTheme => {
-			try {
-				const theme = JSON.parse(jsonString) as CustomTheme;
-				
-				// Validate theme structure
-				if (!theme.name || !theme.colors) {
-					throw new Error('Invalid theme structure');
-				}
-				
-				// Create new theme with new ID and timestamps
-				const newTheme: CustomTheme = {
-					...theme,
-					id: crypto.randomUUID(),
-					createdAt: new Date().toISOString(),
-					updatedAt: new Date().toISOString(),
-				};
-				
-				update(themes => {
-					const updated = [...themes, newTheme];
-					saveCustomThemes(updated);
-					return updated;
-				});
-				
-				return newTheme;
-			} catch (error) {
-				throw new Error('Failed to import theme: ' + (error as Error).message);
-			}
-		},
+
 		
 		// Duplicate an existing theme
 		duplicate: (id: string, newName?: string): CustomTheme => {
