@@ -541,8 +541,8 @@
 </script>
 
 <div class="w-full max-h-[calc(100vh-5rem)] flex flex-col items-center">
-  <!-- Board and Stats Container -->
-  <div class="flex justify-center items-start gap-6 flex-1 min-h-0 px-4 pb-4 pt-2">
+  <!-- Desktop Layout: Board and Stats Side by Side -->
+  <div class="hidden md:flex justify-center items-start gap-6 flex-1 min-h-0 px-4 pb-4 pt-2">
     <!-- Board Column -->
     <div class="flex flex-col items-center gap-3 flex-shrink-0 relative">
       <!-- Board -->
@@ -601,6 +601,175 @@
         onResetGame={resetGame}
         {onBack}
       />
+    </div>
+  </div>
+
+  <!-- Mobile Layout: Board on Top, Compact Stats Below -->
+  <div class="md:hidden flex flex-col items-center w-full px-2 pb-4 pt-2 gap-4">
+    <!-- Board -->
+    <div class="flex flex-col items-center gap-3 flex-shrink-0 relative">
+      <GomokuBoard 
+        {board} 
+        onCellClick={handleCellClick}
+        currentPlayer={currentPlayer === 1 ? 'black' : 'white'}
+        {doubleThreePositions}
+        {aiHintPosition}
+        {lastMovePosition}
+      />
+    </div>
+    
+    <!-- Mobile Compact Game Info -->
+    <div class="w-full max-w-md px-2">
+      <!-- Game Over Message -->
+      {#if isGameOver && winnerPlayer !== null}
+        {@const winnerName = winnerPlayer === 1 ? player1Name : player2Name}
+        {@const cleanWinnerName = winnerName?.replace(/\s*\((Black|White)\)\s*/i, '').trim() || winnerName}
+        {@const winnerColor = winnerPlayer === 1 ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2}
+        <div 
+          class="rounded-lg px-4 py-3 mb-3 text-center animate-fade-in"
+          style="background: {$currentTheme.background}; border: 3px solid {winnerColor}; box-shadow: 0 0 20px {winnerColor}60;"
+        >
+          <div class="flex items-center justify-center gap-2 mb-1">
+            <svg width="24" height="24" class="inline-block">
+              <defs>
+                <radialGradient id="winnerMobileGradient">
+                  <stop offset="30%" stop-color={winnerColor} stop-opacity="0.9" />
+                  <stop offset="100%" stop-color={winnerColor} stop-opacity="1" />
+                </radialGradient>
+                <filter id="winnerMobileShadow">
+                  <feDropShadow dx="1" dy="2" stdDeviation="2" flood-opacity="0.7"/>
+                </filter>
+              </defs>
+              <circle
+                cx="12"
+                cy="12"
+                r="10"
+                fill="url(#winnerMobileGradient)"
+                filter="url(#winnerMobileShadow)"
+              />
+            </svg>
+            <p 
+              class="text-xl font-bold"
+              style="color: {winnerColor};"
+            >
+              {cleanWinnerName} Wins!
+            </p>
+            <svg width="24" height="24" class="inline-block">
+              <circle
+                cx="12"
+                cy="12"
+                r="10"
+                fill="url(#winnerMobileGradient)"
+                filter="url(#winnerMobileShadow)"
+              />
+            </svg>
+          </div>
+        </div>
+      {/if}
+
+      <!-- Scores Row -->
+      <div 
+        class="rounded-lg p-3 mb-3 flex justify-between items-center"
+        style="background: {$currentTheme.background}99; border: 2px solid {$currentTheme.primary}; box-shadow: {$currentTheme.glowPrimary};"
+      >
+        <!-- Player 1 Score -->
+        <div class="flex items-center gap-2">
+          <svg width="20" height="20" class="inline-block">
+            <defs>
+              <radialGradient id="mobileCapturePlayer1Gradient">
+                <stop offset="30%" stop-color={$currentTheme.stonePlayer1} stop-opacity="0.9" />
+                <stop offset="100%" stop-color={$currentTheme.stonePlayer1} stop-opacity="1" />
+              </radialGradient>
+            </defs>
+            <circle cx="10" cy="10" r="9" fill="url(#mobileCapturePlayer1Gradient)" />
+          </svg>
+          <div class="text-center">
+            <div class="text-xs text-white/60">{player1Name?.replace(/\s*\((Black|White)\)\s*/i, '').trim()}</div>
+            <div class="text-lg font-bold" style="color: {$currentTheme.stonePlayer1};">
+              {player1Captures}
+            </div>
+          </div>
+        </div>
+
+        <!-- Total Moves in Center -->
+        <div class="text-center">
+          <div class="text-xs text-white/60">Turn</div>
+          <div 
+            class="text-2xl font-bold"
+            style="color: {$currentTheme.primary}; text-shadow: {$currentTheme.glowPrimary};"
+          >
+            {totalMoves}
+          </div>
+        </div>
+
+        <!-- Player 2 Score -->
+        <div class="flex items-center gap-2">
+          <div class="text-center">
+            <div class="text-xs text-white/60">{player2Name?.replace(/\s*\((Black|White)\)\s*/i, '').trim()}</div>
+            <div class="text-lg font-bold" style="color: {$currentTheme.stonePlayer2};">
+              {player2Captures}
+            </div>
+          </div>
+          <svg width="20" height="20" class="inline-block">
+            <defs>
+              <radialGradient id="mobileCapturePlayer2Gradient">
+                <stop offset="30%" stop-color={$currentTheme.stonePlayer2} stop-opacity="0.9" />
+                <stop offset="100%" stop-color={$currentTheme.stonePlayer2} stop-opacity="1" />
+              </radialGradient>
+            </defs>
+            <circle cx="10" cy="10" r="9" fill="url(#mobileCapturePlayer2Gradient)" />
+          </svg>
+        </div>
+      </div>
+
+      <!-- Mobile Controls -->
+      <div class="flex flex-wrap gap-2 justify-center">
+        <!-- Game Controls - Start button only for AI vs AI -->
+        {#if !isPlaying && !isPaused && isFullAI}
+          <Button variant="primary" size="sm" onclick={startGame} disabled={!gameInstance || isGameOver}>
+            Start Match
+          </Button>
+        {/if}
+        
+        <!-- AI vs AI Controls -->
+        {#if isFullAI}
+          {#if isPlaying}
+            <Button variant="primary" size="sm" onclick={pauseGame}>
+              Pause
+            </Button>
+          {/if}
+          
+          {#if isPaused && !isGameOver}
+            <Button variant="primary" size="sm" onclick={resumeGame}>
+              Resume
+            </Button>
+          {/if}
+        {/if}
+        
+        <!-- Undo button -->
+        <Button variant="primary" size="sm" onclick={undoMove} disabled={totalMoves === 0 || isGameOver}>
+          Undo
+        </Button>
+        
+        <!-- Continue button after undo (when it's AI's turn) -->
+        {#if needsAIContinue && hasHuman && !isFullAI}
+          <Button variant="primary" size="sm" onclick={continueAfterUndo}>
+            Continue
+          </Button>
+        {/if}
+        
+        <!-- New Game -->
+        <Button variant="primary" size="sm" onclick={async () => await resetGame()}>
+          New Game
+        </Button>
+        
+        <!-- Back button -->
+        {#if onBack}
+          <Button variant="primary" size="sm" onclick={onBack}>
+            Back
+          </Button>
+        {/if}
+      </div>
     </div>
   </div>
 </div>

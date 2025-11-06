@@ -21,28 +21,54 @@
     lastMovePosition = null
   }: Props = $props();
   
-  // Reactive size based on board
-  const actualSize = $derived(board.length || size);
-  const cellSize = 22; // px - reduced from 30 for better fit
-  const boardSize = $derived(cellSize * (actualSize - 1));
-  const padding = 30; // reduced from 40
-  const totalSize = $derived(boardSize + (padding * 2));
+  // Window width for responsive calculations
+  let windowWidth = $state(typeof window !== 'undefined' ? window.innerWidth : 768);
+  
+  // Update window width on resize
+  if (typeof window !== 'undefined') {
+    const updateWidth = () => {
+      windowWidth = window.innerWidth;
+    };
+    window.addEventListener('resize', updateWidth);
+    updateWidth();
+  }
   
   // Hover state
   let hoverRow = $state<number | null>(null);
   let hoverCol = $state<number | null>(null);
   
+  // Reactive size calculations
+  const actualSize = $derived(board.length || size);
+  const isMobile = $derived(windowWidth < 768);
+  
+  // Simple, fixed sizes that work well on both mobile and desktop
+  const cellSize = $derived(isMobile ? 18 : 22);
+  const boardSize = $derived(cellSize * (actualSize - 1));
+  const padding = $derived(isMobile ? 20 : 30);
+  const totalSize = $derived(boardSize + (padding * 2));
+  const stoneRadius = $derived(isMobile ? 9 : 11); // Increased stone size for better visibility
+  
   function handleClick(event: MouseEvent) {
     const svg = event.currentTarget as SVGSVGElement;
     const rect = svg.getBoundingClientRect();
-    const x = event.clientX - rect.left - padding;
-    const y = event.clientY - rect.top - padding;
+    
+    // Calculate the scale factor between the actual SVG size and displayed size
+    const scaleX = totalSize / rect.width;
+    const scaleY = totalSize / rect.height;
+    
+    // Convert screen coordinates to SVG coordinates
+    const svgX = (event.clientX - rect.left) * scaleX;
+    const svgY = (event.clientY - rect.top) * scaleY;
+    
+    // Convert to board coordinates
+    const x = svgX - padding;
+    const y = svgY - padding;
     
     const col = Math.round(x / cellSize);
     const row = Math.round(y / cellSize);
     
     if (row >= 0 && row < actualSize && col >= 0 && col < actualSize) {
-      console.log(`Clicked: row ${row}, col ${col}`);
+      console.log(`Clicked: row ${row}, col ${col}, svgCoords: (${svgX}, ${svgY}), boardCoords: (${x}, ${y})`);
       onCellClick?.(row, col);
     }
   }
@@ -50,8 +76,18 @@
   function handleMouseMove(event: MouseEvent) {
     const svg = event.currentTarget as SVGSVGElement;
     const rect = svg.getBoundingClientRect();
-    const x = event.clientX - rect.left - padding;
-    const y = event.clientY - rect.top - padding;
+    
+    // Calculate the scale factor between the actual SVG size and displayed size
+    const scaleX = totalSize / rect.width;
+    const scaleY = totalSize / rect.height;
+    
+    // Convert screen coordinates to SVG coordinates
+    const svgX = (event.clientX - rect.left) * scaleX;
+    const svgY = (event.clientY - rect.top) * scaleY;
+    
+    // Convert to board coordinates
+    const x = svgX - padding;
+    const y = svgY - padding;
     
     const col = Math.round(x / cellSize);
     const row = Math.round(y / cellSize);
@@ -83,18 +119,20 @@
 </script>
 
 <div class="flex items-center justify-center w-full">
-  <div class="rounded-lg p-4" style="background: {$currentTheme.background}99; border: 3px solid {$currentTheme.primary}; box-shadow: {$currentTheme.glowPrimary};">
+  <div class="rounded-lg p-2 md:p-4 max-w-[95vw] overflow-hidden" style="background: {$currentTheme.background}99; border: 3px solid {$currentTheme.primary}; box-shadow: {$currentTheme.glowPrimary};">
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <svg 
-      width={totalSize} 
-      height={totalSize}
-      class="cursor-pointer"
+      viewBox="0 0 {totalSize} {totalSize}"
+      class="cursor-pointer w-full h-auto max-w-[90vw] max-h-[60vh] md:max-w-[500px] md:max-h-[500px]"
       onclick={handleClick}
       onmousemove={handleMouseMove}
       onmouseleave={handleMouseLeave}
       role="button"
       tabindex="0"
+      preserveAspectRatio="xMidYMid meet"
     >
+
+      
       <!-- Board background -->
       <rect 
         x={padding} 
@@ -127,6 +165,10 @@
         />
       {/each}
       
+
+      
+      
+      
       <!-- Stones -->
       {#each board as rowData, row}
         {#each rowData as stone, col}
@@ -135,9 +177,10 @@
               <circle
                 cx={padding + col * cellSize}
                 cy={padding + row * cellSize}
-                r="10"
-                fill={stone === 'black' ? `url(#player1Gradient)` : `url(#player2Gradient)`}
-                filter="url(#stoneShadow)"
+                r={stoneRadius}
+                fill={stone === 'black' ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2}
+                stroke={stone === 'black' ? '#FFFFFF' : '#000000'}
+                stroke-width="1"
                 class="animate-fade-in"
               />
               <!-- Highlight ring for last move -->
@@ -145,7 +188,7 @@
                 <circle
                   cx={padding + col * cellSize}
                   cy={padding + row * cellSize}
-                  r="13"
+                  r={stoneRadius + 3}
                   fill="none"
                   stroke="{$currentTheme.accent}"
                   stroke-width="2.5"
@@ -164,19 +207,19 @@
           <g class="animate-fade-in">
             <!-- Red X mark -->
             <line
-              x1={padding + pos.col * cellSize - 6}
-              y1={padding + pos.row * cellSize - 6}
-              x2={padding + pos.col * cellSize + 6}
-              y2={padding + pos.row * cellSize + 6}
+              x1={padding + pos.col * cellSize - (isMobile ? 4 : 6)}
+              y1={padding + pos.row * cellSize - (isMobile ? 4 : 6)}
+              x2={padding + pos.col * cellSize + (isMobile ? 4 : 6)}
+              y2={padding + pos.row * cellSize + (isMobile ? 4 : 6)}
               stroke="#FF0000"
               stroke-width="2"
               stroke-linecap="round"
             />
             <line
-              x1={padding + pos.col * cellSize + 6}
-              y1={padding + pos.row * cellSize - 6}
-              x2={padding + pos.col * cellSize - 6}
-              y2={padding + pos.row * cellSize + 6}
+              x1={padding + pos.col * cellSize + (isMobile ? 4 : 6)}
+              y1={padding + pos.row * cellSize - (isMobile ? 4 : 6)}
+              x2={padding + pos.col * cellSize - (isMobile ? 4 : 6)}
+              y2={padding + pos.row * cellSize + (isMobile ? 4 : 6)}
               stroke="#FF0000"
               stroke-width="2"
               stroke-linecap="round"
@@ -185,7 +228,7 @@
             <circle
               cx={padding + pos.col * cellSize}
               cy={padding + pos.row * cellSize}
-              r="8"
+              r={isMobile ? "6" : "8"}
               fill="none"
               stroke="#FF0000"
               stroke-width="1"
@@ -200,7 +243,7 @@
         <circle
           cx={padding + hoverCol * cellSize}
           cy={padding + hoverRow * cellSize}
-          r="10"
+          r={stoneRadius}
           fill={currentPlayer === 'black' ? `url(#player1GhostGradient)` : `url(#player2GhostGradient)`}
           opacity="0.5"
           class="pointer-events-none"
@@ -214,7 +257,7 @@
           <circle
             cx={padding + aiHintPosition.col * cellSize}
             cy={padding + aiHintPosition.row * cellSize}
-            r="12"
+            r={isMobile ? "9" : "12"}
             fill="none"
             stroke="#FFD700"
             stroke-width="2"
@@ -224,7 +267,7 @@
           <circle
             cx={padding + aiHintPosition.col * cellSize}
             cy={padding + aiHintPosition.row * cellSize}
-            r="4"
+            r={isMobile ? "3" : "4"}
             fill="#FFD700"
             opacity="0.6"
           />
