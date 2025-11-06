@@ -313,13 +313,15 @@
       </div>
     {/if}
     
+    <!-- Game Controls - Start button only for AI vs AI -->
+    {#if !isPlaying && !isPaused && isFullAI}
+      <Button variant="primary" size="sm" onclick={onStartGame} disabled={!gameInstance || isGameOver} fullWidth>
+        {$_('game.stats.startMatch')}
+      </Button>
+    {/if}
+    
     <!-- AI vs AI Controls -->
     {#if isFullAI}
-      {#if !isPlaying && !isPaused}
-        <Button variant="primary" size="sm" onclick={onStartGame} disabled={!gameInstance || isGameOver} fullWidth>
-          {$_('game.stats.startMatch')}
-        </Button>
-      {/if}
       
       {#if isPlaying}
         <Button variant="primary" size="sm" onclick={onPauseGame} fullWidth>
@@ -354,7 +356,7 @@
     {/if}
     
     <!-- New Game -->
-    <Button variant="primary" size="sm" onclick={onResetGame} fullWidth>
+    <Button variant="primary" size="sm" onclick={async () => await onResetGame?.()} fullWidth>
       {$_('game.stats.newGame')}
     </Button>
     

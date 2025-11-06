@@ -96,10 +96,8 @@
       isGameOver = false;
       gameStatus = 'Ready to start';
       
-      // Auto-start for AI vs AI
+      // Auto-start only for AI vs AI mode when autoStart is true
       if (autoStart && isFullAI) {
-        startGame();
-      } else if (hasHuman) {
         startGame();
       }
     } catch (error) {
@@ -217,7 +215,19 @@
   }
   
   async function handleCellClick(row: number, col: number) {
-    if (!gameInstance || isGameOver || !waitingForHumanMove || needsAIContinue) {
+    if (!gameInstance || isGameOver || needsAIContinue) {
+      return;
+    }
+    
+    // If game hasn't started yet and this is a game with humans, start it
+    if (!isPlaying && hasHuman) {
+      startGame();
+      // Wait a moment for the game to start
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    
+    // Now check if we're waiting for human move
+    if (!waitingForHumanMove) {
       return;
     }
     
@@ -413,13 +423,20 @@
     playGameLoop();
   }
   
-  function resetGame() {
+  async function resetGame() {
     if (gameInstance) {
+      // First stop any running game loop
+      shouldStop = true;
+      isPlaying = false;
+      
+      // Wait a moment for any running loop to stop
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Now reset the game state
       shouldStop = false;
       gameInstance.reset();
       updateBoardFromWasm();
       isGameOver = false;
-      isPlaying = false;
       isPaused = false;
       waitingForHumanMove = false;
       needsAIContinue = false;
@@ -437,12 +454,11 @@
       lastNodesSearched = 0;
       lastAIScore = 0;
       lastMovePosition = null;
+      aiHintPosition = null;
       
-      // Auto-restart for AI vs AI
+      // Auto-restart for AI vs AI only
       if (autoStart && isFullAI) {
         setTimeout(() => startGame(), 500);
-      } else if (hasHuman) {
-        startGame();
       }
     }
   }
