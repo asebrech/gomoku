@@ -94,9 +94,9 @@
   }
 </script>
 
-<div class="flex flex-col items-stretch w-full h-full">
+<div class="flex flex-col items-stretch w-full h-full max-h-full overflow-auto">
   <div 
-    class="rounded-lg p-4 min-w-[280px] max-w-[320px] flex-shrink-0"
+    class="rounded-lg p-4 w-full min-w-[280px] max-w-[320px] flex-shrink-0"
     style="background: {$currentTheme.background}99; border: 3px solid {$currentTheme.primary}; box-shadow: {$currentTheme.glowPrimary};"
   >
     <h2 

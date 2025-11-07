@@ -540,24 +540,26 @@
   });
 </script>
 
-<div class="w-full max-h-[calc(100vh-5rem)] flex flex-col items-center">
+<div class="w-full h-[calc(100vh-5rem)] flex flex-col items-center overflow-hidden">
   <!-- Desktop Layout: Board and Stats Side by Side -->
-  <div class="hidden md:flex justify-center items-start gap-6 flex-1 min-h-0 px-4 pb-4 pt-2">
-    <!-- Board Column -->
-    <div class="flex flex-col items-center gap-3 flex-shrink-0 relative">
+  <div class="hidden md:flex justify-center items-center gap-6 w-full h-full px-4 pb-4 pt-2">
+    <!-- Board Column - Flexible size -->
+    <div class="flex flex-col items-center justify-center gap-3 flex-1 min-w-0 min-h-0 h-full">
       <!-- Board -->
-      <GomokuBoard 
-        {board} 
-        onCellClick={handleCellClick}
-        currentPlayer={currentPlayer === 1 ? 'black' : 'white'}
-        {doubleThreePositions}
-        {aiHintPosition}
-        {lastMovePosition}
-      />
+      <div class="w-full h-full flex items-center justify-center">
+        <GomokuBoard 
+          {board} 
+          onCellClick={handleCellClick}
+          currentPlayer={currentPlayer === 1 ? 'black' : 'white'}
+          {doubleThreePositions}
+          {aiHintPosition}
+          {lastMovePosition}
+        />
+      </div>
     </div>
     
     <!-- Stats Panel Aligned with Board -->
-    <div class="flex-shrink-0">
+    <div class="flex-shrink-0 h-full flex items-center">
       <GameStats
         gameMode={gameModeDisplay()}
         boardSize={$gameSettings.boardSize}
@@ -605,17 +607,19 @@
   </div>
 
   <!-- Mobile Layout: Board on Top, Compact Stats Below -->
-  <div class="md:hidden flex flex-col items-center w-full px-2 pb-4 pt-2 gap-4">
-    <!-- Board -->
-    <div class="flex flex-col items-center gap-3 flex-shrink-0 relative">
-      <GomokuBoard 
-        {board} 
-        onCellClick={handleCellClick}
-        currentPlayer={currentPlayer === 1 ? 'black' : 'white'}
-        {doubleThreePositions}
-        {aiHintPosition}
-        {lastMovePosition}
-      />
+  <div class="md:hidden flex flex-col items-center w-full h-full px-2 pb-4 pt-2 gap-4 overflow-auto">
+    <!-- Board - Takes available space -->
+    <div class="flex flex-col items-center justify-center gap-3 flex-1 min-h-0 w-full">
+      <div class="w-full h-full flex items-center justify-center">
+        <GomokuBoard 
+          {board} 
+          onCellClick={handleCellClick}
+          currentPlayer={currentPlayer === 1 ? 'black' : 'white'}
+          {doubleThreePositions}
+          {aiHintPosition}
+          {lastMovePosition}
+        />
+      </div>
     </div>
     
     <!-- Mobile Compact Game Info -->

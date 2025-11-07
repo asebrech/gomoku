@@ -118,19 +118,33 @@
   }
 </script>
 
-<div class="flex items-center justify-center w-full">
-  <div class="rounded-lg p-2 md:p-4 max-w-[95vw] overflow-hidden" style="background: {$currentTheme.background}99; border: 3px solid {$currentTheme.primary}; box-shadow: {$currentTheme.glowPrimary};">
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <svg 
-      viewBox="0 0 {totalSize} {totalSize}"
-      class="cursor-pointer w-full h-auto max-w-[90vw] max-h-[60vh] md:max-w-[500px] md:max-h-[500px]"
-      onclick={handleClick}
-      onmousemove={handleMouseMove}
-      onmouseleave={handleMouseLeave}
-      role="button"
-      tabindex="0"
-      preserveAspectRatio="xMidYMid meet"
-    >
+<div class="flex items-center justify-center w-full h-full p-4">
+  <!-- Square container wrapper - ensures perfect square -->
+  <div style="
+    width: 100%; 
+    height: 100%; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center;
+    container-type: size;
+  ">
+    <div style="
+      width: min(100cqw, 100cqh);
+      height: min(100cqw, 100cqh);
+      position: relative;
+    ">
+      <div class="rounded-lg p-2 md:p-4 w-full h-full flex items-center justify-center" style="background: {$currentTheme.background}99; border: 3px solid {$currentTheme.primary}; box-shadow: {$currentTheme.glowPrimary};">
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <svg 
+          viewBox="0 0 {totalSize} {totalSize}"
+          class="cursor-pointer w-full h-full"
+          onclick={handleClick}
+          onmousemove={handleMouseMove}
+          onmouseleave={handleMouseLeave}
+          role="button"
+          tabindex="0"
+          preserveAspectRatio="xMidYMid meet"
+        >
 
       
       <!-- Board background -->
@@ -305,5 +319,7 @@
         </filter>
       </defs>
     </svg>
+      </div>
+    </div>
   </div>
 </div>
