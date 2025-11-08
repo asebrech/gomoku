@@ -75,6 +75,9 @@
   const isFullAI = player1Type === 'ai' && player2Type === 'ai';
   const hasHuman = player1Type === 'human' || player2Type === 'human';
   
+  // Calculate turn number (a turn is one black move + one white move)
+  const turnNumber = $derived(Math.ceil(totalMoves / 2));
+  
   // Generate game mode display name
   const gameModeDisplay = $derived(() => {
     if (player1Type === 'ai' && player2Type === 'ai') return 'AI vs AI';
@@ -567,7 +570,7 @@
           player2Name={player2Name}
           player1Captures={player1Captures}
           player2Captures={player2Captures}
-          totalMoves={totalMoves}
+          totalMoves={turnNumber}
         />
       </div>
     </div>
@@ -582,7 +585,7 @@
         winnerPlayer={winnerPlayer}
         player1Name={player1Name}
         player2Name={player2Name}
-        {totalMoves}
+        totalMoves={turnNumber}
         {player1Captures}
         {player2Captures}
         {totalThinkingTime}
@@ -690,7 +693,7 @@
           player2Name={player2Name}
           player1Captures={player1Captures}
           player2Captures={player2Captures}
-          totalMoves={totalMoves}
+          totalMoves={turnNumber}
         />
       </div>
 

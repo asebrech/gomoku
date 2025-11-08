@@ -127,7 +127,8 @@
       "duplicate": "Duplicate",
       "export": "Export",
       "delete": "Delete",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "createNew": "Create New"
     },
     "messages": {
       "themeSaved": "Theme created successfully!",
