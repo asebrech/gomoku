@@ -29,15 +29,7 @@
 >
   <!-- Player 1 Score -->
   <div class="flex items-center gap-2">
-    <svg width="24" height="24" class="inline-block flex-shrink-0 md:w-5 md:h-5">
-      <defs>
-        <radialGradient id="scorePlayer1Gradient">
-          <stop offset="30%" stop-color={$currentTheme.stonePlayer1} stop-opacity="0.9" />
-          <stop offset="100%" stop-color={$currentTheme.stonePlayer1} stop-opacity="1" />
-        </radialGradient>
-      </defs>
-      <circle cx="12" cy="12" r="10" fill="url(#scorePlayer1Gradient)" />
-    </svg>
+    <div class="w-5 h-5 md:w-6 md:h-6 rounded-full flex-shrink-0" style="background: {$currentTheme.stonePlayer1};"></div>
     <div class="text-center">
       <div class="text-xs text-white/60 truncate max-w-[80px] md:max-w-none">{cleanPlayer1Name}</div>
       <div class="text-lg font-bold" style="color: {$currentTheme.stonePlayer1};">
@@ -65,14 +57,6 @@
         {player2Captures}
       </div>
     </div>
-    <svg width="24" height="24" class="inline-block flex-shrink-0 md:w-5 md:h-5">
-      <defs>
-        <radialGradient id="scorePlayer2Gradient">
-          <stop offset="30%" stop-color={$currentTheme.stonePlayer2} stop-opacity="0.9" />
-          <stop offset="100%" stop-color={$currentTheme.stonePlayer2} stop-opacity="1" />
-        </radialGradient>
-      </defs>
-      <circle cx="12" cy="12" r="10" fill="url(#scorePlayer2Gradient)" />
-    </svg>
+    <div class="w-5 h-5 md:w-6 md:h-6 rounded-full flex-shrink-0" style="background: {$currentTheme.stonePlayer2};"></div>
   </div>
 </div>
