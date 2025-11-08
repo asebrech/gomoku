@@ -4,6 +4,7 @@
   import { untrack } from 'svelte';
   import GomokuBoard from './GomokuBoard.svelte';
   import GameStats from './GameStats.svelte';
+  import Scoreboard from './Scoreboard.svelte';
   import Button from './Button.svelte';
   import Toggle from './Toggle.svelte';
   import { gameSettings } from '$lib/stores/gameSettings';
@@ -540,26 +541,39 @@
   });
 </script>
 
-<div class="w-full h-[calc(100vh-5rem)] flex flex-col items-center overflow-hidden">
+<div class="w-full max-h-[calc(100vh-5rem)] flex flex-col items-center">
   <!-- Desktop Layout: Board and Stats Side by Side -->
-  <div class="hidden md:flex justify-center items-center gap-6 w-full h-full px-4 pb-4 pt-2">
-    <!-- Board Column - Flexible size -->
-    <div class="flex flex-col items-center justify-center gap-3 flex-1 min-w-0 min-h-0 h-full">
-      <!-- Board -->
-      <div class="w-full h-full flex items-center justify-center">
-        <GomokuBoard 
-          {board} 
-          onCellClick={handleCellClick}
-          currentPlayer={currentPlayer === 1 ? 'black' : 'white'}
-          {doubleThreePositions}
-          {aiHintPosition}
-          {lastMovePosition}
+  <div class="hidden md:flex justify-center items-stretch gap-6 flex-1 min-h-0 px-4 pb-4 pt-2 w-full max-w-screen-xl">
+    <!-- Board Column with Scoreboard -->
+    <div class="flex flex-col items-center gap-3 flex-1 min-w-0 max-w-[600px]">
+      <!-- Board Container with max height constraint -->
+      <div class="w-full flex-1 min-h-0 max-h-full flex items-center justify-center overflow-hidden">
+        <div class="w-full h-full max-w-full max-h-full" style="aspect-ratio: 1/1;">
+          <GomokuBoard 
+            {board} 
+            onCellClick={handleCellClick}
+            currentPlayer={currentPlayer === 1 ? 'black' : 'white'}
+            {doubleThreePositions}
+            {aiHintPosition}
+            {lastMovePosition}
+          />
+        </div>
+      </div>
+      
+      <!-- Desktop Scoreboard (under board) -->
+      <div class="w-full flex-shrink-0">
+        <Scoreboard
+          player1Name={player1Name}
+          player2Name={player2Name}
+          player1Captures={player1Captures}
+          player2Captures={player2Captures}
+          totalMoves={totalMoves}
         />
       </div>
     </div>
     
-    <!-- Stats Panel Aligned with Board -->
-    <div class="flex-shrink-0 h-full flex items-center">
+    <!-- Stats Panel -->
+    <div class="flex-shrink-0">
       <GameStats
         gameMode={gameModeDisplay()}
         boardSize={$gameSettings.boardSize}
@@ -607,23 +621,21 @@
   </div>
 
   <!-- Mobile Layout: Board on Top, Compact Stats Below -->
-  <div class="md:hidden flex flex-col items-center w-full h-full px-2 pb-4 pt-2 gap-4 overflow-auto">
-    <!-- Board - Takes available space -->
-    <div class="flex flex-col items-center justify-center gap-3 flex-1 min-h-0 w-full">
-      <div class="w-full h-full flex items-center justify-center">
-        <GomokuBoard 
-          {board} 
-          onCellClick={handleCellClick}
-          currentPlayer={currentPlayer === 1 ? 'black' : 'white'}
-          {doubleThreePositions}
-          {aiHintPosition}
-          {lastMovePosition}
-        />
-      </div>
+  <div class="md:hidden flex flex-col items-center w-full px-2 pb-4 pt-2 gap-4">
+    <!-- Board -->
+    <div class="w-full max-w-[95vw] aspect-square">
+      <GomokuBoard 
+        {board} 
+        onCellClick={handleCellClick}
+        currentPlayer={currentPlayer === 1 ? 'black' : 'white'}
+        {doubleThreePositions}
+        {aiHintPosition}
+        {lastMovePosition}
+      />
     </div>
     
     <!-- Mobile Compact Game Info -->
-    <div class="w-full max-w-md px-2">
+    <div class="w-full max-w-[95vw] px-2">
       <!-- Game Over Message -->
       {#if isGameOver && winnerPlayer !== null}
         {@const winnerName = winnerPlayer === 1 ? player1Name : player2Name}
@@ -671,59 +683,15 @@
         </div>
       {/if}
 
-      <!-- Scores Row -->
-      <div 
-        class="rounded-lg p-3 mb-3 flex justify-between items-center"
-        style="background: {$currentTheme.background}99; border: 2px solid {$currentTheme.primary}; box-shadow: {$currentTheme.glowPrimary};"
-      >
-        <!-- Player 1 Score -->
-        <div class="flex items-center gap-2">
-          <svg width="20" height="20" class="inline-block">
-            <defs>
-              <radialGradient id="mobileCapturePlayer1Gradient">
-                <stop offset="30%" stop-color={$currentTheme.stonePlayer1} stop-opacity="0.9" />
-                <stop offset="100%" stop-color={$currentTheme.stonePlayer1} stop-opacity="1" />
-              </radialGradient>
-            </defs>
-            <circle cx="10" cy="10" r="9" fill="url(#mobileCapturePlayer1Gradient)" />
-          </svg>
-          <div class="text-center">
-            <div class="text-xs text-white/60">{player1Name?.replace(/\s*\((Black|White)\)\s*/i, '').trim()}</div>
-            <div class="text-lg font-bold" style="color: {$currentTheme.stonePlayer1};">
-              {player1Captures}
-            </div>
-          </div>
-        </div>
-
-        <!-- Total Moves in Center -->
-        <div class="text-center">
-          <div class="text-xs text-white/60">Turn</div>
-          <div 
-            class="text-2xl font-bold"
-            style="color: {$currentTheme.primary}; text-shadow: {$currentTheme.glowPrimary};"
-          >
-            {totalMoves}
-          </div>
-        </div>
-
-        <!-- Player 2 Score -->
-        <div class="flex items-center gap-2">
-          <div class="text-center">
-            <div class="text-xs text-white/60">{player2Name?.replace(/\s*\((Black|White)\)\s*/i, '').trim()}</div>
-            <div class="text-lg font-bold" style="color: {$currentTheme.stonePlayer2};">
-              {player2Captures}
-            </div>
-          </div>
-          <svg width="20" height="20" class="inline-block">
-            <defs>
-              <radialGradient id="mobileCapturePlayer2Gradient">
-                <stop offset="30%" stop-color={$currentTheme.stonePlayer2} stop-opacity="0.9" />
-                <stop offset="100%" stop-color={$currentTheme.stonePlayer2} stop-opacity="1" />
-              </radialGradient>
-            </defs>
-            <circle cx="10" cy="10" r="9" fill="url(#mobileCapturePlayer2Gradient)" />
-          </svg>
-        </div>
+      <!-- Mobile Scoreboard -->
+      <div class="mb-3">
+        <Scoreboard
+          player1Name={player1Name}
+          player2Name={player2Name}
+          player1Captures={player1Captures}
+          player2Captures={player2Captures}
+          totalMoves={totalMoves}
+        />
       </div>
 
       <!-- Mobile Controls -->

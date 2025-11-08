@@ -94,9 +94,9 @@
   }
 </script>
 
-<div class="flex flex-col items-stretch w-full h-full max-h-full overflow-auto">
+<div class="flex flex-col items-stretch w-full h-full">
   <div 
-    class="rounded-lg p-4 w-full min-w-[280px] max-w-[320px] flex-shrink-0"
+    class="rounded-lg p-4 min-w-[280px] max-w-[320px] flex-shrink-0"
     style="background: {$currentTheme.background}99; border: 3px solid {$currentTheme.primary}; box-shadow: {$currentTheme.glowPrimary};"
   >
     <h2 
@@ -192,43 +192,6 @@
       <span class="text-white/80 font-medium text-sm">{$_('game.stats.currentTurn')}</span>
       <span class="font-bold" style="color: {$currentTheme.primary};">
         {currentPlayer}
-      </span>
-    </div>
-    
-    <!-- Captures -->
-    <div class="flex justify-between items-center">
-      <div class="flex items-center gap-1">
-        <svg width="16" height="16" class="inline-block">
-          <defs>
-            <radialGradient id="capturePlayer1Gradient">
-              <stop offset="30%" stop-color={$currentTheme.stonePlayer1} stop-opacity="0.9" />
-              <stop offset="100%" stop-color={$currentTheme.stonePlayer1} stop-opacity="1" />
-            </radialGradient>
-          </defs>
-          <circle cx="8" cy="8" r="7" fill="url(#capturePlayer1Gradient)" />
-        </svg>
-        <span class="text-white/80 font-medium text-sm">{$_('game.stats.captures')}</span>
-      </div>
-      <span class="font-bold" style="color: {$currentTheme.stonePlayer1};">
-        {player1Captures}
-      </span>
-    </div>
-    
-    <div class="flex justify-between items-center">
-      <div class="flex items-center gap-1">
-        <svg width="16" height="16" class="inline-block">
-          <defs>
-            <radialGradient id="capturePlayer2Gradient">
-              <stop offset="30%" stop-color={$currentTheme.stonePlayer2} stop-opacity="0.9" />
-              <stop offset="100%" stop-color={$currentTheme.stonePlayer2} stop-opacity="1" />
-            </radialGradient>
-          </defs>
-          <circle cx="8" cy="8" r="7" fill="url(#capturePlayer2Gradient)" />
-        </svg>
-        <span class="text-white/80 font-medium text-sm">{$_('game.stats.captures')}</span>
-      </div>
-      <span class="font-bold" style="color: {$currentTheme.stonePlayer2};">
-        {player2Captures}
       </span>
     </div>
     
