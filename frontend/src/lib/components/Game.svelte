@@ -546,9 +546,9 @@
   <div class="hidden md:flex justify-center items-stretch gap-6 flex-1 min-h-0 px-4 pb-4 pt-2 w-full max-w-screen-xl">
     <!-- Board Column with Scoreboard -->
     <div class="flex flex-col items-center gap-3 flex-1 min-w-0 max-w-[600px]">
-      <!-- Board Container with max height constraint -->
-      <div class="w-full flex-1 min-h-0 max-h-full flex items-center justify-center overflow-hidden">
-        <div class="w-full h-full max-w-full max-h-full" style="aspect-ratio: 1/1;">
+      <!-- Board Container with aspect ratio constraint -->
+      <div class="w-full flex-shrink-0 flex items-center justify-center" style="aspect-ratio: 1/1; max-width: min(100%, calc(100vh - 16rem)); max-height: calc(100vh - 16rem);">
+        <div class="w-full h-full">
           <GomokuBoard 
             {board} 
             onCellClick={handleCellClick}
@@ -621,9 +621,9 @@
   </div>
 
   <!-- Mobile Layout: Board on Top, Compact Stats Below -->
-  <div class="md:hidden flex flex-col items-center w-full px-2 pb-4 pt-2 gap-4">
+  <div class="md:hidden flex flex-col items-center w-full h-[calc(100vh-5rem)] px-2 pb-4 pt-2 gap-3 overflow-y-auto">
     <!-- Board -->
-    <div class="w-full max-w-[95vw] aspect-square">
+    <div class="w-full flex-shrink-0" style="max-width: min(95vw, calc(100vh - 20rem)); aspect-ratio: 1/1;">
       <GomokuBoard 
         {board} 
         onCellClick={handleCellClick}
@@ -635,7 +635,7 @@
     </div>
     
     <!-- Mobile Compact Game Info -->
-    <div class="w-full max-w-[95vw] px-2">
+    <div class="flex-shrink-0" style="width: 100%; max-width: min(95vw, calc(100vh - 20rem));">
       <!-- Game Over Message -->
       {#if isGameOver && winnerPlayer !== null}
         {@const winnerName = winnerPlayer === 1 ? player1Name : player2Name}

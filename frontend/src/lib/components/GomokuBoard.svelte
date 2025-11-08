@@ -119,18 +119,18 @@
 </script>
 
 <div class="w-full h-full flex items-center justify-center">
-  <div class="rounded-lg p-2 md:p-4 w-full h-full flex items-center justify-center" style="background: {$currentTheme.background}99; border: 3px solid {$currentTheme.primary}; box-shadow: {$currentTheme.glowPrimary};">
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <svg 
-      viewBox="0 0 {totalSize} {totalSize}"
-      class="cursor-pointer block w-full h-full"
-      onclick={handleClick}
-      onmousemove={handleMouseMove}
-      onmouseleave={handleMouseLeave}
-      role="button"
-      tabindex="0"
-      preserveAspectRatio="xMidYMid meet"
-    >
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <svg 
+    viewBox="0 0 {totalSize} {totalSize}"
+    class="cursor-pointer block rounded-lg"
+    style="width: 100%; height: 100%; max-width: 100%; max-height: 100%; aspect-ratio: 1/1; background: {$currentTheme.background}99; border: 3px solid {$currentTheme.primary}; box-shadow: {$currentTheme.glowPrimary};"
+    onclick={handleClick}
+    onmousemove={handleMouseMove}
+    onmouseleave={handleMouseLeave}
+    role="button"
+    tabindex="0"
+    preserveAspectRatio="xMidYMid meet"
+  >
 
       
       <!-- Board background -->
@@ -179,8 +179,6 @@
                 cy={padding + row * cellSize}
                 r={stoneRadius}
                 fill={stone === 'black' ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2}
-                stroke={stone === 'black' ? '#FFFFFF' : '#000000'}
-                stroke-width="1"
                 class="animate-fade-in"
               />
               <!-- Highlight ring for last move -->
@@ -305,5 +303,4 @@
         </filter>
       </defs>
     </svg>
-  </div>
 </div>
