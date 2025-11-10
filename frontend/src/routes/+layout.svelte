@@ -70,7 +70,7 @@
 				<div class="flex items-center justify-between h-16">
 					<div class="flex items-center gap-3">
 						<a href="/" class="flex items-center hover:opacity-80 transition-opacity duration-200">
-							<img src={logo} alt="Gomoku" class="h-10 w-auto drop-shadow-lg" />
+							<img src={logo} alt="Gomoku" class="h-14 w-auto drop-shadow-lg" />
 						</a>
 					</div>
 					
