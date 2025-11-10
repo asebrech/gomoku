@@ -21,6 +21,8 @@ wasm:
 dev:
 	cd frontend && pnpm dev
 
+run: all dev
+
 start: dev
 
 install:
@@ -42,4 +44,4 @@ fclean: clean
 
 re: fclean all
 
-.PHONY: all wasm dev start install install_frontend test clean fclean re
+.PHONY: all wasm dev run start install install_frontend test clean fclean re
