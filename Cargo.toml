@@ -17,6 +17,7 @@ rayon = "1.8"
 # WASM
 wasm-bindgen = "0.2.100"
 wasm-bindgen-rayon = "1.3"
+wasm-bindgen-futures = "0.4"
 js-sys = "0.3"
 getrandom = { version = "0.2", features = ["js"] }
 serde-wasm-bindgen = "0.6"

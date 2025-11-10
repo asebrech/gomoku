@@ -21,17 +21,13 @@
 				await initI18n();
 				
 				// Initialize WASM module and thread pool
-				console.log('Initializing WASM module...');
 				const wasmModule = await import('$lib/wasm/pkg/gomoku');
 				await wasmModule.default();
-				console.log('WASM module loaded');
 				
 				// Initialize thread pool for parallel AI search
 				// Use fewer threads for WASM to reduce coordination overhead
 				const numThreads = Math.min(navigator.hardwareConcurrency || 4, 4); // Cap at 4 for WASM
-				console.log(`Initializing thread pool with ${numThreads} threads...`);
 				await wasmModule.initThreadPool(numThreads);
-				console.log('Thread pool initialized successfully');
 				
 				wasmReady = true;
 			} catch (error) {
