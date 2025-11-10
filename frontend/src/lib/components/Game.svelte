@@ -467,8 +467,21 @@
     }
   }
   
-  function undoMove() {
+  async function undoMove() {
     if (gameInstance && totalMoves > 0) {
+      // First, stop any running game loop to prevent race conditions
+      const wasPlaying = isPlaying;
+      shouldStop = true;
+      isPlaying = false;
+      waitingForHumanMove = false;
+      needsAIContinue = false;
+      
+      // Wait for the game loop to stop
+      if (wasPlaying) {
+        await new Promise(resolve => setTimeout(resolve, 150));
+      }
+      
+      // Now perform the undo
       gameInstance.undo_last_move();
       totalMoves--;
       updateBoardFromWasm();
@@ -478,19 +491,36 @@
       aiHintPosition = null;
       lastMovePosition = null;
       
-      // Check whose turn it is now after undo
+      // Reset shouldStop flag
+      shouldStop = false;
+      
+      // Check whose turn it is now after undo (currentPlayer is already updated by updateBoardFromWasm)
       const currentPlayerType = currentPlayer === 1 ? player1Type : player2Type;
       
-      // If it's now an AI's turn, we need a continue button
+      // If it's now an AI's turn and we have at least one human player
       if (currentPlayerType === 'ai' && hasHuman) {
         needsAIContinue = true;
         waitingForHumanMove = false;
         gameStatus = 'Click Continue to let AI play';
-      } else {
+      } else if (currentPlayerType === 'human') {
         // It's a human's turn
         needsAIContinue = false;
-        waitingForHumanMove = true;
-        gameStatus = 'Your turn';
+        
+        // If there was a game running, restart it so the human can play
+        if (wasPlaying && hasHuman) {
+          waitingForHumanMove = true;
+          isPlaying = true;
+          gameStatus = 'Your turn';
+          playGameLoop();
+        } else {
+          waitingForHumanMove = false;
+          gameStatus = 'Your turn - Click Start to continue';
+        }
+      } else {
+        // AI vs AI or other edge case
+        needsAIContinue = false;
+        waitingForHumanMove = false;
+        gameStatus = 'Move undone - Click Start to continue';
       }
     }
   }
@@ -498,8 +528,11 @@
   function continueAfterUndo() {
     if (needsAIContinue) {
       needsAIContinue = false;
-      // Continue the game loop - it will handle the AI turn
-      // Don't need to call playGameLoop again, just let the existing loop continue
+      // Restart the game loop to handle AI turn
+      shouldStop = false;
+      isPlaying = true;
+      gameStatus = 'AI is thinking...';
+      playGameLoop();
     }
   }
   
