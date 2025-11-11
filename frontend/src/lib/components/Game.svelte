@@ -562,7 +562,14 @@
         // AI vs AI or other edge case
         needsAIContinue = false;
         waitingForHumanMove = false;
-        gameStatus = 'Move undone - Click Start to continue';
+        
+        // If the game was playing, set it to paused so the "Resume" button appears
+        if (wasPlaying && isFullAI) {
+          isPaused = true;
+          gameStatus = 'Game paused';
+        } else {
+          gameStatus = 'Move undone - Click Start to continue';
+        }
       }
     }
   }
