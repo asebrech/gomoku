@@ -76,6 +76,18 @@
   const isFullAI = player1Type === 'ai' && player2Type === 'ai';
   const hasHuman = player1Type === 'human' || player2Type === 'human';
   
+  // Determine if a human can currently play (for showing hover preview)
+  const canHumanPlay = $derived(() => {
+    if (isGameOver || needsAIContinue || isAIThinking) return false;
+    const currentPlayerType = currentPlayer === 1 ? player1Type : player2Type;
+    // Show preview if:
+    // 1. It's a human's turn
+    // 2. Game hasn't started yet (before first move)
+    // 3. OR game is playing and waiting for human move
+    if (currentPlayerType !== 'human') return false;
+    return !isPlaying || waitingForHumanMove;
+  });
+  
   // Calculate turn number (a turn is one black move + one white move)
   const turnNumber = $derived(Math.ceil(totalMoves / 2));
   
@@ -199,7 +211,8 @@
   
   async function calculateAIHint() {
     // Only calculate hints for human players during their turn
-    if (!gameInstance || isGameOver || !showAIHint || !waitingForHumanMove) {
+    const currentPlayerType = currentPlayer === 1 ? player1Type : player2Type;
+    if (!gameInstance || isGameOver || !showAIHint || currentPlayerType !== 'human') {
       aiHintPosition = null;
       return;
     }
@@ -597,7 +610,8 @@
   
   $effect(() => {
     // Calculate AI hint when toggle is on and it's human's turn
-    if (gameInstance && !isGameOver && showAIHint && waitingForHumanMove && hasHuman) {
+    const currentPlayerType = currentPlayer === 1 ? player1Type : player2Type;
+    if (gameInstance && !isGameOver && showAIHint && currentPlayerType === 'human' && hasHuman) {
       calculateAIHint();
     } else if (!showAIHint) {
       // Clear hint when toggle is off
@@ -623,6 +637,7 @@
             {doubleThreePositions}
             {aiHintPosition}
             {lastMovePosition}
+            canHumanPlay={canHumanPlay()}
           />
         </div>
       </div>
@@ -698,6 +713,7 @@
         {doubleThreePositions}
         {aiHintPosition}
         {lastMovePosition}
+        canHumanPlay={canHumanPlay()}
       />
     </div>
     

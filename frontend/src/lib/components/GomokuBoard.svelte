@@ -9,6 +9,7 @@
     doubleThreePositions?: Array<{row: number, col: number}>;
     aiHintPosition?: {row: number, col: number} | null;
     lastMovePosition?: {row: number, col: number} | null;
+    canHumanPlay?: boolean;
   }
   
   let { 
@@ -18,7 +19,8 @@
     onCellClick,
     doubleThreePositions = [],
     aiHintPosition = null,
-    lastMovePosition = null
+    lastMovePosition = null,
+    canHumanPlay = true
   }: Props = $props();
   
   // Window width for responsive calculations
@@ -93,9 +95,9 @@
     const row = Math.round(y / cellSize);
     
     if (row >= 0 && row < actualSize && col >= 0 && col < actualSize) {
-      // Only show hover if the cell is empty and not a double-three position
+      // Only show hover if the cell is empty, not a double-three position, and human can play
       const isDoubleThree = doubleThreePositions.some(pos => pos.row === row && pos.col === col);
-      if (!board[row]?.[col] && !isDoubleThree) {
+      if (!board[row]?.[col] && !isDoubleThree && canHumanPlay) {
         hoverRow = row;
         hoverCol = col;
       } else {
