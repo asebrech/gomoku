@@ -8,20 +8,11 @@
 
 <div class="flex items-center justify-center min-h-[calc(100vh-4rem)]">
   <div class="relative z-10 text-center px-4 max-w-2xl animate-fade-in">
-    <div class="mb-8">
-      <img src={logo} alt="Gomoku Logo" class="w-32 h-auto mx-auto drop-shadow-2xl animate-float" />
+    <div class="mb-12">
+      <img src={logo} alt="Gomoku Logo" class="w-64 sm:w-64 md:w-80 h-auto mx-auto drop-shadow-2xl animate-float" />
     </div>
     
-    <h1 class="text-7xl font-black text-transparent bg-clip-text mb-4 tracking-tight"
-        style="background-image: {$currentTheme.gradientPrimary}; -webkit-background-clip: text; background-clip: text;">
-      {$_('home.title')}
-    </h1>
-    
-    <p class="text-xl text-white/90 mb-12 font-light tracking-wide">
-      {$_('home.subtitle')}
-    </p>
-    
-    <div class="flex flex-col gap-4 max-w-xs mx-auto mb-8">
+    <div class="flex flex-col gap-4 w-full max-w-xs sm:max-w-sm mx-auto mb-8">
       <Button variant="primary" size="lg" onclick={() => goto('/game')}>
         {$_('home.play')}
       </Button>

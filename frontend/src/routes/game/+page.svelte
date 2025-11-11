@@ -16,7 +16,7 @@
       Choose your game mode
     </p>
     
-    <div class="flex flex-col gap-4 max-w-md mx-auto mb-8">
+    <div class="flex flex-col gap-4 w-full max-w-xs sm:max-w-sm mx-auto mb-8">
       <Button variant="primary" size="lg" onclick={() => goto('/game/player-vs-ai')}>
         {$_('game.menu.playerVsAi')}
       </Button>
