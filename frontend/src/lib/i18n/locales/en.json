@@ -4,6 +4,7 @@
     "subtitle": "AI-Powered Strategy Game",
     "play": "Play Game",
     "settings": "Settings",
+    "themeEditor": "Theme Editor",
     "credits": "Credits",
     "techStack": "Built with Rust, WASM & Svelte"
   },

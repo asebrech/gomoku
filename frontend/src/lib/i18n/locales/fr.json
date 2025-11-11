@@ -4,6 +4,7 @@
     "subtitle": "Jeu de Stratégie avec IA",
     "play": "Jouer",
     "settings": "Paramètres",
+    "themeEditor": "Éditeur de Thèmes",
     "credits": "Crédits",
     "techStack": "Créé avec Rust, WASM & Svelte"
   },

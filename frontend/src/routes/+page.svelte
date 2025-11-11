@@ -22,7 +22,7 @@
       </Button>
       
       <Button variant="primary" size="lg" onclick={() => goto('/themes')}>
-        Theme Editor
+        {$_('home.themeEditor')}
       </Button>
       
       <Button variant="primary" size="lg" onclick={() => goto('/credits')}>

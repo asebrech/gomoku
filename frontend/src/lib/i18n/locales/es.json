@@ -1,12 +1,10 @@
 {
   "home": {
     "title": "Gomoku",
-    "subtitle": "Juego d    "visualAids": "Ayudas Visuales",
-    "showDoubleThree": "Mostrar Doble-Tres del Oponente",
-    "showDoubleThreeHint": "Resalta posiciones doble-tres ilegales del oponente con marcadores X rojos (tus posiciones siempre se muestran)",
-    "showAIHint": "Mostrar Pista de IA",trategia con IA",
+    "subtitle": "Juego de Estrategia con IA",
     "play": "Jugar",
     "settings": "Configuración",
+    "themeEditor": "Editor de Temas",
     "credits": "Créditos",
     "techStack": "Creado con Rust, WASM y Svelte"
   },
