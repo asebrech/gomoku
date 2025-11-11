@@ -5,6 +5,7 @@
   import GomokuBoard from './GomokuBoard.svelte';
   import GameStats from './GameStats.svelte';
   import Scoreboard from './Scoreboard.svelte';
+  import WinnerModal from './WinnerModal.svelte';
   import Button from './Button.svelte';
   import Toggle from './Toggle.svelte';
   import { gameSettings } from '$lib/stores/gameSettings';
@@ -44,6 +45,7 @@
   let currentPlayer = $state(1); // 1 or 2
   let currentPlayerName = $state(player1Name);
   let winnerPlayer = $state<number | null>(null); // Track winner (1 or 2)
+  let showWinnerModal = $state(false); // Control winner modal visibility
   let aiMoveDelay = $state(moveDelay);
   let waitingForHumanMove = $state(false);
   let shouldStop = $state(false);
@@ -293,6 +295,7 @@
         if (winner !== undefined) {
           winnerPlayer = winner === 0 ? 1 : 2; // Convert to player number
           gameStatus = 'wins!';
+          showWinnerModal = true; // Show the winner modal
           
           // Play win/lose sounds based on game mode
           if (player1Type === 'human' && player2Type === 'ai') {
@@ -487,6 +490,7 @@
       waitingForHumanMove = false;
       needsAIContinue = false;
       winnerPlayer = null;
+      showWinnerModal = false;
       gameStatus = 'Ready to start';
       
       // Reset stats
@@ -835,3 +839,14 @@
     </div>
   </div>
 </div>
+
+<!-- Winner Modal -->
+{#if showWinnerModal && winnerPlayer !== null}
+  <WinnerModal
+    {winnerPlayer}
+    {player1Name}
+    {player2Name}
+    onClose={() => showWinnerModal = false}
+    onNewGame={resetGame}
+  />
+{/if}
