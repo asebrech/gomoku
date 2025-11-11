@@ -17,6 +17,9 @@
       "aiVsAi": "IA vs IA",
       "back": "Retour au Menu"
     },
+    "scoreboard": {
+      "captures": "Captures"
+    },
     "stats": {
       "turn": "Tour :",
       "boardSize": "Taille du Plateau :",

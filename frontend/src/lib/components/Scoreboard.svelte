@@ -1,5 +1,6 @@
 <script lang="ts">
   import { currentTheme } from '$lib/theme/themeStore';
+  import { _ } from 'svelte-i18n';
   
   interface Props {
     player1Name: string;
@@ -31,7 +32,7 @@
   <div class="flex items-center gap-2">
     <div class="w-5 h-5 md:w-6 md:h-6 rounded-full flex-shrink-0" style="background: {$currentTheme.stonePlayer1};"></div>
     <div class="text-center">
-      <div class="text-xs text-white/60 truncate max-w-[80px] md:max-w-none">{cleanPlayer1Name}</div>
+      <div class="text-xs text-white/60 truncate max-w-[80px] md:max-w-none">{cleanPlayer1Name} {$_('game.scoreboard.captures')}</div>
       <div class="text-lg font-bold" style="color: {$currentTheme.stonePlayer1};">
         {player1Captures}
       </div>
@@ -40,7 +41,7 @@
 
   <!-- Total Moves in Center -->
   <div class="text-center flex-shrink-0">
-    <div class="text-xs text-white/60">Turn</div>
+    <div class="text-xs text-white/60">{$_('game.stats.turn')}</div>
     <div 
       class="text-2xl font-bold"
       style="color: {$currentTheme.primary}; text-shadow: {$currentTheme.glowPrimary};"
@@ -52,7 +53,7 @@
   <!-- Player 2 Score -->
   <div class="flex items-center gap-2">
     <div class="text-center">
-      <div class="text-xs text-white/60 truncate max-w-[80px] md:max-w-none">{cleanPlayer2Name}</div>
+      <div class="text-xs text-white/60 truncate max-w-[80px] md:max-w-none">{cleanPlayer2Name} {$_('game.scoreboard.captures')}</div>
       <div class="text-lg font-bold" style="color: {$currentTheme.stonePlayer2};">
         {player2Captures}
       </div>
