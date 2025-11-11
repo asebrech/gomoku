@@ -167,8 +167,12 @@
       return;
     }
     
-    // Only update if showDoubleThree is enabled
-    if (!showDoubleThree) {
+    // Determine if current player is human
+    const currentPlayerType = currentPlayer === 1 ? player1Type : player2Type;
+    const isCurrentPlayerHuman = currentPlayerType === 'human';
+    
+    // Always show for human players, only show for AI/opponent if toggle is on
+    if (!isCurrentPlayerHuman && !showDoubleThree) {
       doubleThreePositions = [];
       return;
     }
@@ -574,15 +578,17 @@
   });
   
   $effect(() => {
-    // Update double-three positions when toggle changes or board updates
-    // Only run if game instance exists and game is not over
+    // Update double-three positions when toggle changes, board updates, or current player changes
+    // Always show for human players, only show for opponent if toggle is on
     // Use untrack to prevent infinite loops when updating doubleThreePositions
-    if (gameInstance && !isGameOver && showDoubleThree) {
+    if (gameInstance && !isGameOver) {
+      // Track currentPlayer so we update when turn changes
+      const _ = currentPlayer;
       untrack(() => {
         updateDoubleThreePositions();
       });
-    } else if (!showDoubleThree) {
-      // Clear positions when toggle is off
+    } else {
+      // Clear positions when game is over
       untrack(() => {
         doubleThreePositions = [];
       });
