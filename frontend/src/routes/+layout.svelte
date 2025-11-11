@@ -61,11 +61,11 @@
 		</video>
 		
 		<!-- Gradient overlay -->
-		<div class="fixed inset-0 bg-gradient-to-br from-black/60 to-indigo-900/70 -z-10"></div>
+		<div class="fixed inset-0 bg-gradient-to-br from-black/30 to-indigo-900/40 -z-10"></div>
 		
 		<!-- Persistent navbar -->
 		<nav class="fixed top-0 left-0 right-0 z-50 backdrop-blur-md border-b"
-		     style="background-color: rgba(17, 24, 39, 0.7); border-color: rgba(139, 92, 246, 0.2);">
+		     style="background-color: rgba(17, 24, 39, 0.7); border-color: rgba(139, 92, 246, 0.3);">
 			<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 				<div class="flex items-center justify-between h-16">
 					<div class="flex items-center gap-3">

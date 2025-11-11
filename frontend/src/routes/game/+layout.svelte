@@ -11,7 +11,7 @@
 		muted 
 		loop 
 		playsinline
-		class="fixed inset-0 w-full h-full object-cover -z-10 top-16"
+		class="fixed inset-0 w-full h-full object-cover z-0"
 	>
 		<source src={ingameVideo} type="video/webm" />
 	</video>
