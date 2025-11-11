@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { currentTheme } from '$lib/theme/themeStore';
+  import { playClickSound } from '$lib/utils/soundEffects';
   
   interface Props {
     variant?: 'primary' | 'secondary' | 'ghost';
@@ -19,6 +20,13 @@
     fullWidth = false,
     children 
   }: Props = $props();
+  
+  function handleClick() {
+    if (!disabled) {
+      playClickSound();
+      onclick?.();
+    }
+  }
   
   const baseClasses = 'font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed';
   
@@ -93,7 +101,7 @@
 <button 
   class="{baseClasses} {sizeClasses[size]} {fullWidth ? 'w-full' : ''}"
   style={styleString}
-  {onclick}
+  onclick={handleClick}
   {disabled}
   onmouseenter={() => isHovered = true}
   onmouseleave={() => isHovered = false}

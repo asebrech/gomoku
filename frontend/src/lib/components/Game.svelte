@@ -9,6 +9,7 @@
   import Toggle from './Toggle.svelte';
   import { gameSettings } from '$lib/stores/gameSettings';
   import { currentTheme } from '$lib/theme/themeStore';
+  import { playStoneSound, playWinSound, playLoseSound } from '$lib/utils/soundEffects';
   
   interface Props {
     player1Type: 'human' | 'ai';
@@ -257,6 +258,9 @@
       gameInstance.make_move_coords(row, col);
       totalMoves++;
       
+      // Play stone placement sound
+      playStoneSound();
+      
       // Track the last move position for visual effect
       lastMovePosition = { row, col };
       
@@ -272,6 +276,27 @@
         if (winner !== undefined) {
           winnerPlayer = winner === 0 ? 1 : 2; // Convert to player number
           gameStatus = 'wins!';
+          
+          // Play win/lose sounds based on game mode
+          if (player1Type === 'human' && player2Type === 'ai') {
+            // Player vs AI: Human is player 1
+            if (winnerPlayer === 1) {
+              playWinSound();
+            } else {
+              playLoseSound();
+            }
+          } else if (player1Type === 'ai' && player2Type === 'human') {
+            // Player vs AI: Human is player 2
+            if (winnerPlayer === 2) {
+              playWinSound();
+            } else {
+              playLoseSound();
+            }
+          } else if (player1Type === 'human' && player2Type === 'human') {
+            // Player vs Player: Just play win sound for whoever wins
+            playWinSound();
+          }
+          // AI vs AI: no sounds (both are AI)
         } else {
           winnerPlayer = null;
           gameStatus = 'Game Over - Draw';

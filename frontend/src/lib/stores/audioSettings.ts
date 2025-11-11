@@ -3,10 +3,14 @@ import { browser } from '$app/environment';
 
 export interface AudioSettings {
   musicVolume: number; // 0 to 1
+  sfxVolume: number; // 0 to 1
+  isMuted: boolean; // Master mute state
 }
 
 const DEFAULT_SETTINGS: AudioSettings = {
-  musicVolume: 0.5
+  musicVolume: 0.5,
+  sfxVolume: 0.7,
+  isMuted: false
 };
 
 // Load settings from localStorage if in browser
