@@ -16,39 +16,36 @@ pub struct MoveGenerator;
 impl MoveGenerator {
     /// Generates prioritized candidate moves for the given player
     /// 
-    /// Priority order:
-    /// 1. Winning moves (immediate five-in-a-row)
-    /// 2. Must-block moves (prevent opponent from winning)
-    /// 3. Threat moves (create or block threats)
-    /// 4. Zone-based moves (around existing stones)
+    /// Simplified priority order:
+    /// 1. Winning moves (immediate five-in-a-row) - return single move
+    /// 2. All threat moves (four-threats, three-threats, etc.) with smart filtering:
+    ///    - If any four-threats exist, return ONLY four-threats
+    ///    - Otherwise return all threats (prioritized)
+    /// 3. Zone-based moves (around existing stones)
     /// 
     /// Returns empty board center if board is empty
     pub fn get_candidate_moves(board: &Board, player: Player) -> Vec<(usize, usize)> {
         if board.is_empty() {
             return vec![board.center()];
         }
+        
+        // 1. Check for immediate winning moves
         if let Some(winning_move) = Self::find_winning_move(board, player) {
             if !DoubleThreeDetection::creates_double_three(board, winning_move.0, winning_move.1, player) {
                 return vec![winning_move];
             }
         }
-        if let Some(block_moves) = Self::find_must_block_moves(board, player.opponent()) {
-            if !block_moves.is_empty() {
-                let legal_blocks = Self::filter_double_three_moves(board, block_moves, player);
-                if !legal_blocks.is_empty() {
-                    return legal_blocks;
-                }
-            }
-        }
-        let threat_moves = Self::find_threat_moves(board, player);
+        
+        // 2. Find all threat moves (offensive + defensive, including gapped patterns)
+        let threat_moves = Self::find_all_threat_moves(board, player);
         if !threat_moves.is_empty() {
             let legal_threats = Self::filter_double_three_moves(board, threat_moves, player);
             if !legal_threats.is_empty() {
                 return legal_threats;
             }
-            // If all threat moves are illegal, fall through to zone-based moves
         }
         
+        // 3. Fall back to zone-based moves
         let zone_moves = Self::get_zone_based_moves(board, player);
         let legal_zone_moves = Self::filter_double_three_moves(board, zone_moves, player);
         
@@ -121,54 +118,103 @@ impl MoveGenerator {
         false
     }
 
-    /// Finds moves that must be played to prevent opponent from winning
+    /// Unified threat move finder that detects all tactical opportunities
     /// 
-    /// Priority order:
-    /// 1. Block immediate opponent wins
-    /// 2. Block open four threats (unblocked fours)
-    /// 3. Block gapped threats (patterns like X.X.X)
-    fn find_must_block_moves(board: &Board, opponent: Player) -> Option<Vec<(usize, usize)>> {
-        if let Some(opp_win) = Self::find_winning_move(board, opponent) {
-            return Some(vec![opp_win]);
+    /// Combines:
+    /// - Offensive threats (our patterns)
+    /// - Defensive threats (opponent patterns)
+    /// - Standard consecutive patterns
+    /// - Gapped patterns (X.X.X, XX.X, etc.)
+    /// 
+    /// Returns moves prioritized by threat level:
+    /// - If any four-threats found, returns ONLY four-threats
+    /// - Otherwise returns all threats sorted by priority
+    fn find_all_threat_moves(board: &Board, player: Player) -> Vec<(usize, usize)> {
+        let mut all_moves: HashSet<(usize, usize)> = HashSet::new();
+        
+        // Collect threats for both players (offense + defense)
+        for &check_player in &[player, player.opponent()] {
+            // Standard consecutive threats
+            let consecutive_threats = Self::find_consecutive_threats(board, check_player);
+            all_moves.extend(consecutive_threats);
+            
+            // Gapped pattern threats
+            let gapped_threats = Self::find_gapped_threats(board, check_player);
+            all_moves.extend(gapped_threats);
         }
-        let open_fours = Self::find_open_four_threats(board, opponent);
-        if !open_fours.is_empty() {
-            return Some(open_fours);
+        
+        // Convert to vec and prioritize
+        let mut moves_with_priority: Vec<((usize, usize), i32, bool)> = all_moves
+            .into_iter()
+            .map(|mv| {
+                let priority = Self::calculate_threat_priority(board, mv, player);
+                let is_four_threat = Self::is_four_threat(board, mv, player);
+                (mv, priority, is_four_threat)
+            })
+            .collect();
+        
+        // If we have any four-threats, ONLY return those (critical situations)
+        let has_four_threats = moves_with_priority.iter().any(|(_, _, is_four)| *is_four);
+        if has_four_threats {
+            moves_with_priority.retain(|(_, _, is_four)| *is_four);
         }
-        let gapped_threats = Self::find_gapped_threats(board, opponent);
-        if !gapped_threats.is_empty() {
-            return Some(gapped_threats);
-        }
-        None
+        
+        // Sort by priority (highest first)
+        moves_with_priority.sort_by_key(|(_, priority, _)| -priority);
+        
+        // Limit to reasonable number
+        let limit = if has_four_threats { 10 } else { 25 };
+        moves_with_priority.truncate(limit);
+        
+        moves_with_priority.into_iter().map(|(mv, _, _)| mv).collect()
     }
-
-    /// Finds positions that block opponent's open four threats
-    /// 
-    /// An open four is a line of four stones with empty spaces on both ends,
-    /// creating an immediate winning threat that must be blocked
-    fn find_open_four_threats(board: &Board, player: Player) -> Vec<(usize, usize)> {
+    
+    /// Finds threat moves from standard consecutive patterns
+    fn find_consecutive_threats(board: &Board, player: Player) -> HashSet<(usize, usize)> {
         let mut threats = HashSet::new();
         let player_bits = board.get_player_bits(player);
+        
         board.iterate_bits(player_bits, |row, col| {
             for &(dx, dy) in &DIRECTIONS {
-                let backward =
-                    PatternAnalyzer::count_consecutive(board, row, col, -dx, -dy, player);
+                let backward = PatternAnalyzer::count_consecutive(board, row, col, -dx, -dy, player);
                 let forward = PatternAnalyzer::count_consecutive(board, row, col, dx, dy, player);
-                if backward + forward + 1 == 4 {
-                    let back_row = row as isize - dx * (backward as isize + 1);
-                    let back_col = col as isize - dy * (backward as isize + 1);
-                    let fwd_row = row as isize + dx * (forward as isize + 1);
-                    let fwd_col = col as isize + dy * (forward as isize + 1);
-                    if PatternAnalyzer::is_valid_empty(board, back_row, back_col) {
-                        threats.insert((back_row as usize, back_col as usize));
-                    }
-                    if PatternAnalyzer::is_valid_empty(board, fwd_row, fwd_col) {
-                        threats.insert((fwd_row as usize, fwd_col as usize));
+                let total = backward + forward + 1;
+                
+                // Only consider meaningful patterns (2-4 stones)
+                if total >= 2 && total <= 4 {
+                    // Add all adjacent empty positions
+                    for offset in -(backward as isize + 1)..=(forward as isize + 1) {
+                        let r = row as isize + dx * offset;
+                        let c = col as isize + dy * offset;
+                        if PatternAnalyzer::is_valid_empty(board, r, c) {
+                            threats.insert((r as usize, c as usize));
+                        }
                     }
                 }
             }
         });
-        threats.into_iter().collect()
+        
+        threats
+    }
+    
+    /// Checks if placing a move creates or blocks a four-threat
+    fn is_four_threat(board: &Board, mv: (usize, usize), player: Player) -> bool {
+        let (row, col) = mv;
+        
+        // Check both our four-threats and opponent's four-threats we'd be blocking
+        for &check_player in &[player, player.opponent()] {
+            for &(dx, dy) in &DIRECTIONS {
+                let backward = PatternAnalyzer::count_consecutive(board, row, col, -dx, -dy, check_player);
+                let forward = PatternAnalyzer::count_consecutive(board, row, col, dx, dy, check_player);
+                let total = backward + forward + 1;
+                
+                if total == 4 {
+                    return true;
+                }
+            }
+        }
+        
+        false
     }
 
     /// Finds positions that block opponent's gapped threats
@@ -256,30 +302,7 @@ impl MoveGenerator {
         threats.into_iter().collect()
     }
 
-    /// Finds moves that create or block tactical threats
-    /// 
-    /// Combines offensive moves (create our threats) and defensive moves
-    /// (block opponent threats), prioritized by threat strength
-    fn find_threat_moves(board: &Board, player: Player) -> Vec<(usize, usize)> {
-        let mut moves = HashSet::new();
-        let our_threats = Self::find_threat_creating_moves(board, player);
-        moves.extend(our_threats);
-        let opp_threats = Self::find_threat_creating_moves(board, player.opponent());
-        moves.extend(opp_threats);
-        let filtered_moves: Vec<(usize, usize)> = moves.into_iter().collect();
-        let mut prioritized_moves: Vec<((usize, usize), i32)> = filtered_moves
-            .into_iter()
-            .map(|mv| {
-                let priority = Self::calculate_threat_priority(board, mv, player);
-                (mv, priority)
-            })
-            .collect();
-        prioritized_moves.sort_by_key(|(_, priority)| -priority);
-        if prioritized_moves.len() > 25 {
-            prioritized_moves.truncate(25);
-        }
-        prioritized_moves.into_iter().map(|(mv, _)| mv).collect()
-    }
+
 
     /// Calculates priority score for a move based on multiple factors
     /// 
@@ -391,28 +414,7 @@ impl MoveGenerator {
         bonus
     }
 
-    fn find_threat_creating_moves(board: &Board, player: Player) -> HashSet<(usize, usize)> {
-        let mut moves = HashSet::new();
-        let player_bits = board.get_player_bits(player);
-        board.iterate_bits(player_bits, |row, col| {
-            for &(dx, dy) in &DIRECTIONS {
-                let backward =
-                    PatternAnalyzer::count_consecutive(board, row, col, -dx, -dy, player);
-                let forward = PatternAnalyzer::count_consecutive(board, row, col, dx, dy, player);
-                let total = backward + forward + 1;
-                if total >= 2 && total <= 4 {
-                    for offset in -(backward as isize + 1)..=(forward as isize + 1) {
-                        let r = row as isize + dx * offset;
-                        let c = col as isize + dy * offset;
-                        if PatternAnalyzer::is_valid_empty(board, r, c) {
-                            moves.insert((r as usize, c as usize));
-                        }
-                    }
-                }
-            }
-        });
-        moves
-    }
+
 
     /// Generates moves in zones around existing stones for general play
     /// 
