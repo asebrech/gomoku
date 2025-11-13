@@ -98,14 +98,7 @@ fn lazy_smp_worker(
     let worker_start = Instant::now();
     
     let mut local_state = state.clone();
-    
-    // Reduce TT size in WASM to minimize allocation overhead
-    #[cfg(target_arch = "wasm32")]
-    let tt_size = 500_000; // Smaller TT for WASM
-    #[cfg(not(target_arch = "wasm32"))]
-    let tt_size = 2_000_000;
-    
-    let mut tt = TranspositionTable::new(tt_size);
+    let mut tt = TranspositionTable::new(500_000);
 
     let mut best_move = None;
     let mut best_score = 0;
@@ -196,23 +189,11 @@ pub fn lazy_smp_search(
     let time_limit = Duration::from_millis(time_limit_ms);
 
     let threads = num_threads.unwrap_or_else(|| {
-        // In WASM, limit threads to reduce overhead
-        // Web Workers have high coordination costs
-        #[cfg(target_arch = "wasm32")]
-        {
-            let hardware_threads = rayon::current_num_threads();
-            // Use at most 2-3 threads in WASM for better performance
-            hardware_threads.min(2)
-        }
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            rayon::current_num_threads()
-        }
+        let available_cores = rayon::current_num_threads();
+        (available_cores * 3 / 5).max(1)
     });
 
-    let initial_moves = state.get_candidate_moves();
-
-    if initial_moves.is_empty() {
+    if state.get_candidate_moves().is_empty() {
         return SearchResult {
             best_move: None,
             score: 0,
