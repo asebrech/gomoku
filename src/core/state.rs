@@ -19,21 +19,6 @@ use crate::core::rules::{WinDetection, DoubleThreeDetection, CaptureBreaking};
 use std::hash::Hash;
 use wasm_bindgen::prelude::*;
 
-// Conditional logging macro: uses web_sys::console in WASM, silent in native
-macro_rules! log {
-    ($($arg:tt)*) => {
-        #[cfg(target_arch = "wasm32")]
-        {
-            use wasm_bindgen::JsValue;
-            web_sys::console::log_1(&JsValue::from_str(&format!($($arg)*)));
-        }
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            // Silent in native builds
-        }
-    };
-}
-
 #[wasm_bindgen]
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Copy)]
 pub enum WinReason {
@@ -147,27 +132,17 @@ impl WasmGameState {
     }
 
     pub fn get_ai_move(&mut self, depth: i32, time_limit_ms: f64) -> Option<AIMoveResult> {
-        log!("[RUST] ===== get_ai_move ENTRY =====");
-        
         use crate::ai::lazy_smp::lazy_smp_search;
         
         let time_limit = time_limit_ms as u64;
-        log!("[RUST] get_ai_move: depth={}, time_limit={}ms", depth, time_limit);
         
         // Check if game is already over
         if self.inner.is_terminal() {
-            log!("[RUST] Game is terminal, returning None");
             return None;
         }
         
-        log!("[RUST] Calling lazy_smp_search with depth={}, time_limit={}ms", depth, time_limit);
-        
         // Pass None for num_threads - it will use rayon::current_num_threads() in WASM
         let result = lazy_smp_search(&mut self.inner, time_limit, depth, None);
-        
-        log!("[RUST] lazy_smp_search completed");
-        log!("[RUST] Depth reached: {}, Nodes: {}, Score: {}", 
-            result.depth_reached, result.nodes_searched, result.score);
         
         result.best_move.map(|(row, col)| AIMoveResult {
             row,
@@ -370,8 +345,6 @@ impl GameState {
 
         self.restore_captured_stones();
         
-        // CRITICAL: After undo, we need to re-check if there's a breakable five on the board
-        // that the current player must break
         self.recalculate_check_state();
     }
 
