@@ -1,20 +1,12 @@
 <script lang="ts">
-	import ingameVideo from '$lib/assets/backgrounds/ingame-background/in-game.webm';
+	import GameBackground from '$lib/components/GameBackground.svelte';
 	
 	let { children } = $props();
 </script>
 
 <div class="h-full w-full relative">
-	<!-- In-game background video -->
-	<video 
-		autoplay 
-		muted 
-		loop 
-		playsinline
-		class="fixed inset-0 w-full h-full object-cover z-0"
-	>
-		<source src={ingameVideo} type="video/webm" />
-	</video>
+	<!-- Dynamic synthwave background -->
+	<GameBackground />
 	
 	<!-- Game content -->
 	<div class="relative z-10 h-full w-full">
