@@ -55,7 +55,7 @@
   });
 </script>
 
-<div class="h-full w-full overflow-y-auto">
+<div class="h-full w-full overflow-y-auto flex items-center justify-center">
   <div class="max-w-2xl mx-auto px-4 py-8">
     <div class="text-center mb-8">
       <h1 class="text-5xl font-black text-transparent bg-clip-text mb-4"
