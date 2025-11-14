@@ -119,7 +119,7 @@ impl MoveGenerator {
                 backward_stones.append(&mut stones_found);
                 stones_found = backward_stones;
                 
-                if stones_found.len() >= 3 {
+                if stones_found.len() >= 2 {
                     let first = stones_found.first().unwrap();
                     let last = stones_found.last().unwrap();
                     let start_row = first.0 as isize;
