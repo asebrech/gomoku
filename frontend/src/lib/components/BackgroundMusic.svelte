@@ -4,6 +4,7 @@
   import { currentTheme } from '$lib/theme/themeStore';
   import Button from './Button.svelte';
   import { setBackgroundMusicElement } from '$lib/utils/soundEffects';
+  import menuTheme from '$lib/assets/sound/menu-theme.mp3';
   
   let audioElement: HTMLAudioElement | null = null;
   let showVolumeSlider = $state(false);
@@ -11,7 +12,7 @@
   
   onMount(() => {
     // Create audio element
-    audioElement = new Audio('/menu-theme.mp3');
+    audioElement = new Audio(menuTheme);
     audioElement.loop = true;
     audioElement.volume = $audioSettings.musicVolume;
     
