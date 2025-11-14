@@ -2,9 +2,9 @@ use crate::core::board::{Board, Player};
 use crate::core::patterns::{DIRECTIONS, PatternAnalyzer, PatternFreedom};
 use crate::core::rules::DoubleThreeDetection;
 use crate::ai::heuristic::{
-    FIVE_IN_ROW_SCORE, LIVE_FOUR_SINGLE_SCORE, 
-    HALF_FREE_FOUR_SCORE, DEAD_FOUR_SCORE, LIVE_THREE_SCORE, 
-    HALF_FREE_THREE_SCORE, DEAD_THREE_SCORE, LIVE_TWO_SCORE, HALF_FREE_TWO_SCORE
+    WINNING_SCORE, LIVE_FOUR_SCORE, HALF_FREE_FOUR_SCORE,
+    LIVE_THREE_SCORE, HALF_FREE_THREE_SCORE,
+    LIVE_TWO_SCORE, HALF_FREE_TWO_SCORE
 };
 use std::collections::HashSet;
 
@@ -242,16 +242,16 @@ impl MoveGenerator {
 
 fn get_pattern_score(length: usize, freedom: PatternFreedom) -> i32 {
     match length {
-        5 => FIVE_IN_ROW_SCORE,
+        5 => WINNING_SCORE,
         4 => match freedom {
-            PatternFreedom::Free => LIVE_FOUR_SINGLE_SCORE,
+            PatternFreedom::Free => LIVE_FOUR_SCORE,
             PatternFreedom::HalfFree => HALF_FREE_FOUR_SCORE,
-            PatternFreedom::Flanked => DEAD_FOUR_SCORE,
+            PatternFreedom::Flanked => 0,
         },
         3 => match freedom {
             PatternFreedom::Free => LIVE_THREE_SCORE,
             PatternFreedom::HalfFree => HALF_FREE_THREE_SCORE,
-            PatternFreedom::Flanked => DEAD_THREE_SCORE,
+            PatternFreedom::Flanked => 0,
         },
         2 => match freedom {
             PatternFreedom::Free => LIVE_TWO_SCORE,
