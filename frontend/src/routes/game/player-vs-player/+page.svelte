@@ -3,8 +3,8 @@
   import Game from '$lib/components/Game.svelte';
 </script>
 
-<div class="min-h-[calc(100vh-4rem)] py-8">
-  <div class="max-w-6xl mx-auto px-4">
+<div class="h-full w-full">
+  <div class="h-full w-full px-4">
     <Game 
       player1Type="human"
       player2Type="human"

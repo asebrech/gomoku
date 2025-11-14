@@ -6,7 +6,7 @@
   import logo from '$lib/assets/logo/gomoku-logo.png';
 </script>
 
-<div class="flex items-center justify-center min-h-[calc(100vh-4rem)]">
+<div class="h-full w-full flex items-center justify-center">
   <div class="relative z-10 text-center px-4 max-w-2xl animate-fade-in">
     <div class="mb-12">
       <img src={logo} alt="Gomoku Logo" class="w-64 sm:w-64 md:w-80 h-auto mx-auto drop-shadow-2xl animate-float" />

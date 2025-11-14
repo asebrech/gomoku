@@ -48,7 +48,7 @@
 		<div class="text-white text-xl">Loading...</div>
 	</div>
 {:else}
-	<div class="relative min-h-screen">
+	<div class="fixed inset-0 flex flex-col overflow-hidden">
 		<!-- Persistent dolphin background -->
 		<video 
 			autoplay 
@@ -64,7 +64,7 @@
 		<div class="fixed inset-0 bg-gradient-to-br from-black/30 to-indigo-900/40 -z-10"></div>
 		
 		<!-- Persistent navbar -->
-		<nav class="fixed top-0 left-0 right-0 z-50 backdrop-blur-md border-b"
+		<nav class="flex-shrink-0 z-50 backdrop-blur-md border-b"
 		     style="background-color: rgba(17, 24, 39, 0.7); border-color: rgba(139, 92, 246, 0.3);">
 			<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 				<div class="flex items-center justify-between h-16">
@@ -82,8 +82,8 @@
 			</div>
 		</nav>
 		
-		<!-- Main content with padding for navbar -->
-		<main class="pt-16 min-h-screen">
+		<!-- Main content area - flexbox takes remaining space -->
+		<main class="flex-1 overflow-hidden">
 			{@render children?.()}
 		</main>
 		

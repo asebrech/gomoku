@@ -633,11 +633,11 @@
   });
 </script>
 
-<div class="w-full max-h-[calc(100vh-5rem)] flex flex-col items-center">
+<div class="h-full w-full flex flex-col items-center overflow-hidden">
   <!-- Desktop Layout: Board and Stats Side by Side -->
-  <div class="hidden md:flex justify-center items-stretch gap-6 flex-1 min-h-0 px-4 pb-4 pt-2 w-full max-w-screen-xl">
+  <div class="hidden md:flex justify-center items-center gap-6 flex-1 min-h-0 px-4 py-4 w-full max-w-screen-xl">
     <!-- Board Column with Scoreboard -->
-    <div class="flex flex-col items-center gap-3 flex-1 min-w-0 max-w-[600px]">
+    <div class="flex flex-col items-center justify-center gap-3 flex-1 min-w-0 max-w-[600px]">
       <!-- Board Container with aspect ratio constraint -->
       <div class="w-full flex-shrink-0 flex items-center justify-center" style="aspect-ratio: 1/1; max-width: min(100%, calc(100vh - 16rem)); max-height: calc(100vh - 16rem);">
         <div class="w-full h-full">
@@ -666,7 +666,7 @@
     </div>
     
     <!-- Stats Panel -->
-    <div class="flex-shrink-0">
+    <div class="flex-shrink-0 overflow-y-auto">
       <GameStats
         gameMode={gameModeDisplay()}
         boardSize={$gameSettings.boardSize}
@@ -714,7 +714,7 @@
   </div>
 
   <!-- Mobile Layout: Board on Top, Compact Stats Below -->
-  <div class="md:hidden flex flex-col items-center w-full h-[calc(100vh-5rem)] px-2 pb-4 pt-2 gap-3 overflow-y-auto">
+  <div class="md:hidden flex flex-col items-center w-full h-full px-2 py-4 gap-3 overflow-y-auto">
     <!-- Board -->
     <div class="w-full flex-shrink-0" style="max-width: min(95vw, calc(100vh - 20rem)); aspect-ratio: 1/1;">
       <GomokuBoard 

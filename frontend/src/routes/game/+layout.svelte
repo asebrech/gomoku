@@ -4,7 +4,7 @@
 	let { children } = $props();
 </script>
 
-<div class="relative min-h-[calc(100vh-4rem)]">
+<div class="h-full w-full relative">
 	<!-- In-game background video -->
 	<video 
 		autoplay 
@@ -17,7 +17,7 @@
 	</video>
 	
 	<!-- Game content -->
-	<div class="relative z-10">
+	<div class="relative z-10 h-full w-full">
 		{@render children?.()}
 	</div>
 </div>

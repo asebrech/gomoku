@@ -5,7 +5,7 @@
   import { currentTheme } from '$lib/theme/themeStore';
 </script>
 
-<div class="flex items-center justify-center min-h-[calc(100vh-4rem)]">
+<div class="h-full w-full flex items-center justify-center">
   <div class="relative z-10 text-center px-4 max-w-2xl animate-fade-in">
     <h1 class="text-6xl font-black text-transparent bg-clip-text mb-4 tracking-tight"
         style="background-image: {$currentTheme.gradientPrimary}; -webkit-background-clip: text; background-clip: text;">
