@@ -23,14 +23,7 @@ impl MoveGenerator {
             }
         }
         
-        let zone_moves = Self::get_zone_based_moves(board, player);
-        let legal_zone_moves = Self::filter_double_three_moves(board, zone_moves, player);
-        
-        if legal_zone_moves.is_empty() {
-            return Self::find_any_legal_move(board, player);
-        }
-        
-        legal_zone_moves
+        Self::find_any_legal_move(board, player)
     }
 
     fn find_all_threat_moves(board: &Board, player: Player) -> Vec<(usize, usize)> {
@@ -42,6 +35,11 @@ impl MoveGenerator {
             
             let gapped_threats = Self::find_gapped_threats(board, check_player);
             all_moves.extend(gapped_threats);
+        }
+        
+        if all_moves.is_empty() {
+            let zone_moves = Self::get_zone_based_moves(board, player);
+            all_moves.extend(zone_moves);
         }
         
         let mut moves_with_priority: Vec<((usize, usize), i32)> = all_moves
@@ -200,11 +198,10 @@ impl MoveGenerator {
         max_value
     }
 
-    fn get_zone_based_moves(board: &Board, player: Player) -> Vec<(usize, usize)> {
+    fn get_zone_based_moves(board: &Board, _player: Player) -> Vec<(usize, usize)> {
         let mut candidates = HashSet::new();
-        let stone_count = board.count_stones();
-        let zone_radius = if stone_count < 10 { 3 } else { 2 };
-        let max_zone_moves = if stone_count < 10 { 25 } else { 20 };
+        let zone_radius = 2;
+        
         board.iterate_bits(&board.occupied, |row, col| {
             for dr in -(zone_radius as isize)..=(zone_radius as isize) {
                 for dc in -(zone_radius as isize)..=(zone_radius as isize) {
@@ -219,10 +216,8 @@ impl MoveGenerator {
                 }
             }
         });
-        let mut filtered_moves: Vec<(usize, usize)> = candidates.into_iter().collect();
-        filtered_moves.sort_by_key(|&mv| -Self::calculate_threat_priority(board, mv, player));
-        filtered_moves.truncate(max_zone_moves);
-        filtered_moves
+        
+        candidates.into_iter().collect()
     }
 
     fn filter_double_three_moves(board: &Board, moves: Vec<(usize, usize)>, player: Player) -> Vec<(usize, usize)> {
