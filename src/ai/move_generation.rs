@@ -1,6 +1,7 @@
 use crate::core::board::{Board, Player};
 use crate::core::patterns::{DIRECTIONS, PatternAnalyzer, PatternFreedom};
 use crate::core::rules::DoubleThreeDetection;
+use crate::core::captures::CaptureHandler;
 use crate::ai::heuristic::{
     WINNING_SCORE, LIVE_FOUR_SCORE, HALF_FREE_FOUR_SCORE,
     LIVE_THREE_SCORE, HALF_FREE_THREE_SCORE,
@@ -35,6 +36,10 @@ impl MoveGenerator {
             
             let gapped_threats = Self::find_gapped_threats(board, check_player);
             all_moves.extend(gapped_threats);
+            
+            // Add capture-generating moves for both player and opponent
+            let capture_moves = Self::find_capture_moves(board, check_player);
+            all_moves.extend(capture_moves);
         }
         
         if all_moves.is_empty() {
@@ -151,9 +156,74 @@ impl MoveGenerator {
         threats.into_iter().collect()
     }
 
+    fn find_capture_moves(board: &Board, player: Player) -> Vec<(usize, usize)> {
+        let mut capture_moves = HashSet::new();
+        let opponent = player.opponent();
+        let opponent_bits = board.get_player_bits(opponent);
+        
+        // Look for opponent stones that could be captured
+        board.iterate_bits(opponent_bits, |row, col| {
+            for &(dx, dy) in &DIRECTIONS {
+                // Check if there's another opponent stone in this direction
+                let next_row = row as isize + dx;
+                let next_col = col as isize + dy;
+                
+                if !PatternAnalyzer::is_in_bounds(board, next_row, next_col) {
+                    continue;
+                }
+                
+                let next_idx = board.index(next_row as usize, next_col as usize);
+                if !Board::is_bit_set(opponent_bits, next_idx) {
+                    continue;
+                }
+                
+                // Check both ends to see if placing a stone would create a capture
+                // Check before the first stone
+                let before_row = row as isize - dx;
+                let before_col = col as isize - dy;
+                if PatternAnalyzer::is_valid_empty(board, before_row, before_col) {
+                    // Check if there's already a player stone after the second opponent stone
+                    let after_row = next_row + dx;
+                    let after_col = next_col + dy;
+                    if PatternAnalyzer::is_in_bounds(board, after_row, after_col) {
+                        let after_idx = board.index(after_row as usize, after_col as usize);
+                        let player_bits = board.get_player_bits(player);
+                        if Board::is_bit_set(player_bits, after_idx) {
+                            capture_moves.insert((before_row as usize, before_col as usize));
+                        }
+                    }
+                }
+                
+                // Check after the second stone
+                let after_row = next_row + dx;
+                let after_col = next_col + dy;
+                if PatternAnalyzer::is_valid_empty(board, after_row, after_col) {
+                    // Check if there's already a player stone before the first opponent stone
+                    let before_row = row as isize - dx;
+                    let before_col = col as isize - dy;
+                    if PatternAnalyzer::is_in_bounds(board, before_row, before_col) {
+                        let before_idx = board.index(before_row as usize, before_col as usize);
+                        let player_bits = board.get_player_bits(player);
+                        if Board::is_bit_set(player_bits, before_idx) {
+                            capture_moves.insert((after_row as usize, after_col as usize));
+                        }
+                    }
+                }
+            }
+        });
+        
+        capture_moves.into_iter().collect()
+    }
+
     fn calculate_threat_priority(board: &Board, mv: (usize, usize), player: Player) -> i32 {
         let (row, col) = mv;
         let mut priority = 0;
+        
+        // Add bonus for captures
+        let captures = CaptureHandler::detect_captures(board, row, col, player);
+        let capture_bonus = (captures.len() as i32 / 2) * 5000; // Each pair of captured stones
+        priority += capture_bonus;
+        
         for &check_player in &[player, player.opponent()] {
             priority += Self::calculate_player_threat_value(board, row, col, check_player);
         }
