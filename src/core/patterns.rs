@@ -173,5 +173,168 @@ impl PatternAnalyzer {
         }
     }
 
+    /// Analyzes a consecutive pattern from a stone position in a given direction.
+    /// Returns (pattern_length, pattern_start_row, pattern_start_col, total_space, freedom)
+    /// or None if the pattern is too short or doesn't have enough space.
+    pub fn analyze_consecutive_from_position(
+        board: &Board,
+        row: usize,
+        col: usize,
+        dx: isize,
+        dy: isize,
+        player: Player,
+        win_condition: usize,
+    ) -> Option<(usize, usize, usize, usize, PatternFreedom)> {
+        let backward = Self::count_consecutive(board, row, col, -dx, -dy, player);
+        let forward = Self::count_consecutive(board, row, col, dx, dy, player);
+        let length = backward + forward + 1;
+        
+        if length < 2 {
+            return None;
+        }
+        
+        let pattern_start_row = (row as isize - dx * backward as isize) as usize;
+        let pattern_start_col = (col as isize - dy * backward as isize) as usize;
+        
+        let total_space = Self::count_total_space(
+            board,
+            pattern_start_row,
+            pattern_start_col,
+            dx,
+            dy,
+            length,
+        );
+        
+        if total_space < win_condition {
+            return None;
+        }
+        
+        let freedom = Self::analyze_pattern_freedom(
+            board,
+            pattern_start_row,
+            pattern_start_col,
+            dx,
+            dy,
+            length,
+        );
+        
+        Some((length, pattern_start_row, pattern_start_col, total_space, freedom))
+    }
 
+    /// Collects all stones (with gaps) in a direction from a starting position.
+    /// Returns a vector of stone positions found within the scan distance.
+    /// Stops when hitting an opponent stone or board edge.
+    pub fn collect_gapped_stones(
+        board: &Board,
+        row: usize,
+        col: usize,
+        dx: isize,
+        dy: isize,
+        player: Player,
+        max_distance: isize,
+    ) -> Vec<(usize, usize)> {
+        let player_bits = board.get_player_bits(player);
+        let mut stones = vec![(row, col)];
+        
+        // Collect forward
+        for dist in 1..=max_distance {
+            let check_row = row as isize + dx * dist;
+            let check_col = col as isize + dy * dist;
+            if Self::is_in_bounds(board, check_row, check_col) {
+                let idx = board.index(check_row as usize, check_col as usize);
+                if Board::is_bit_set(&player_bits, idx) {
+                    stones.push((check_row as usize, check_col as usize));
+                } else if Board::is_bit_set(&board.occupied, idx) {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        
+        // Collect backward
+        let mut backward_stones = Vec::new();
+        for dist in 1..=max_distance {
+            let check_row = row as isize - dx * dist;
+            let check_col = col as isize - dy * dist;
+            if Self::is_in_bounds(board, check_row, check_col) {
+                let idx = board.index(check_row as usize, check_col as usize);
+                if Board::is_bit_set(&player_bits, idx) {
+                    backward_stones.push((check_row as usize, check_col as usize));
+                } else if Board::is_bit_set(&board.occupied, idx) {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        
+        backward_stones.reverse();
+        backward_stones.append(&mut stones);
+        backward_stones
+    }
+
+    /// Analyzes a gapped pattern and returns (stones_count, gaps_count, span) or None.
+    /// A valid gapped pattern has:
+    /// - At least 2 stones
+    /// - Span of 7 or less
+    /// - At least 1 gap
+    /// - Total potential (stones + gaps) >= 4
+    /// - Gaps <= 3
+    pub fn analyze_gapped_pattern(
+        stones: &[(usize, usize)],
+    ) -> Option<(usize, usize, isize)> {
+        if stones.len() < 2 {
+            return None;
+        }
+        
+        let first = stones.first().unwrap();
+        let last = stones.last().unwrap();
+        let span = ((last.0 as isize - first.0 as isize).abs()
+            .max((last.1 as isize - first.1 as isize).abs())) + 1;
+        
+        let gaps = (span as usize) - stones.len();
+        
+        if gaps > 0 && span <= 7 && stones.len() + gaps >= 4 && gaps <= 3 {
+            Some((stones.len(), gaps, span))
+        } else {
+            None
+        }
+    }
+
+    /// Extracts gap positions from a gapped pattern.
+    /// Returns positions between first and last stone that are empty.
+    pub fn extract_gap_positions(
+        board: &Board,
+        stones: &[(usize, usize)],
+        dx: isize,
+        dy: isize,
+    ) -> Vec<(usize, usize)> {
+        if stones.len() < 2 {
+            return Vec::new();
+        }
+        
+        let first = stones.first().unwrap();
+        let last = stones.last().unwrap();
+        let start_row = first.0 as isize;
+        let start_col = first.1 as isize;
+        let end_row = last.0 as isize;
+        let end_col = last.1 as isize;
+        
+        let steps = ((end_row - start_row) / dx.max(1)).max((end_col - start_col) / dy.max(1));
+        let mut gap_positions = Vec::new();
+        
+        for step in 1..steps {
+            let gap_row = start_row + dx * step;
+            let gap_col = start_col + dy * step;
+            if Self::is_valid_empty(board, gap_row, gap_col) {
+                gap_positions.push((gap_row as usize, gap_col as usize));
+            }
+        }
+        
+        gap_positions
+    }
 }
+
+
+

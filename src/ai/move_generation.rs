@@ -1,11 +1,7 @@
 use crate::core::board::{Board, Player};
-use crate::core::patterns::{DIRECTIONS, PatternAnalyzer, PatternFreedom};
+use crate::core::patterns::{DIRECTIONS, PatternAnalyzer};
 use crate::core::rules::DoubleThreeDetection;
-use crate::ai::heuristic::{
-    WINNING_SCORE, LIVE_FOUR_SCORE, HALF_FREE_FOUR_SCORE,
-    LIVE_THREE_SCORE, HALF_FREE_THREE_SCORE,
-    LIVE_TWO_SCORE, HALF_FREE_TWO_SCORE
-};
+use crate::ai::heuristic::{score_consecutive_pattern, score_gapped_pattern};
 
 pub struct MoveGenerator;
 impl MoveGenerator {
@@ -58,43 +54,39 @@ impl MoveGenerator {
         
         board.iterate_bits(player_bits, |row, col| {
             for &(dx, dy) in &DIRECTIONS {
+                // Use the unified pattern analyzer
+                let pattern_info = PatternAnalyzer::analyze_consecutive_from_position(
+                    board,
+                    row,
+                    col,
+                    dx,
+                    dy,
+                    player,
+                    5, // win_condition
+                );
+                
+                let Some((length, _pattern_start_row, _pattern_start_col, _total_space, freedom)) = pattern_info else {
+                    continue;
+                };
+                
+                // Only consider patterns of length 2-4 for move generation
+                if length < 2 || length > 4 {
+                    continue;
+                }
+                
+                let score = score_consecutive_pattern(length, freedom);
+                
+                // Calculate backward and forward distances for move placement
                 let backward = PatternAnalyzer::count_consecutive(board, row, col, -dx, -dy, player);
                 let forward = PatternAnalyzer::count_consecutive(board, row, col, dx, dy, player);
-                let total = backward + forward + 1;
                 
-                if total >= 2 && total <= 4 {
-                    // Calculate pattern score once
-                    let pattern_start_row = row as isize - dx * backward as isize;
-                    let pattern_start_col = col as isize - dy * backward as isize;
-                    let total_space = PatternAnalyzer::count_total_space(
-                        board,
-                        pattern_start_row as usize,
-                        pattern_start_col as usize,
-                        dx,
-                        dy,
-                        total,
-                    );
-                    
-                    if total_space >= 5 {
-                        let freedom = PatternAnalyzer::analyze_pattern_freedom(
-                            board,
-                            pattern_start_row as usize,
-                            pattern_start_col as usize,
-                            dx,
-                            dy,
-                            total,
-                        );
-                        let score = get_pattern_score(total, freedom);
-                        
-                        // Add score to each empty position around this pattern
-                        for offset in -(backward as isize + 1)..=(forward as isize + 1) {
-                            let r = row as isize + dx * offset;
-                            let c = col as isize + dy * offset;
-                            if PatternAnalyzer::is_valid_empty(board, r, c) {
-                                let pos = (r as usize, c as usize);
-                                *move_scores.entry(pos).or_insert(0) += score;
-                            }
-                        }
+                // Add score to each empty position around this pattern
+                for offset in -(backward as isize + 1)..=(forward as isize + 1) {
+                    let r = row as isize + dx * offset;
+                    let c = col as isize + dy * offset;
+                    if PatternAnalyzer::is_valid_empty(board, r, c) {
+                        let pos = (r as usize, c as usize);
+                        *move_scores.entry(pos).or_insert(0) += score;
                     }
                 }
             }
@@ -109,69 +101,21 @@ impl MoveGenerator {
         let player_bits = board.get_player_bits(player);
         board.iterate_bits(player_bits, |row, col| {
             for &(dx, dy) in &DIRECTIONS {
-                let mut stones_found = vec![(row, col)];
-                for dist in 1..=6 {
-                    let check_row = row as isize + dx * dist;
-                    let check_col = col as isize + dy * dist;
-                    if PatternAnalyzer::is_in_bounds(board, check_row, check_col) {
-                        let idx = board.index(check_row as usize, check_col as usize);
-                        if Board::is_bit_set(&player_bits, idx) {
-                            stones_found.push((check_row as usize, check_col as usize));
-                        } else if Board::is_bit_set(&board.occupied, idx) {
-                            break;
-                        }
-                    } else {
-                        break;
-                    }
-                }
-                let mut backward_stones = Vec::new();
-                for dist in 1..=6 {
-                    let check_row = row as isize - dx * dist;
-                    let check_col = col as isize - dy * dist;
-                    if PatternAnalyzer::is_in_bounds(board, check_row, check_col) {
-                        let idx = board.index(check_row as usize, check_col as usize);
-                        if Board::is_bit_set(&player_bits, idx) {
-                            backward_stones.push((check_row as usize, check_col as usize));
-                        } else if Board::is_bit_set(&board.occupied, idx) {
-                            break;
-                        }
-                    } else {
-                        break;
-                    }
-                }
-                backward_stones.reverse();
-                backward_stones.append(&mut stones_found);
-                stones_found = backward_stones;
+                // Use unified gapped stone collection
+                let stones = PatternAnalyzer::collect_gapped_stones(board, row, col, dx, dy, player, 6);
                 
-                if stones_found.len() >= 2 {
-                    let first = stones_found.first().unwrap();
-                    let last = stones_found.last().unwrap();
-                    let start_row = first.0 as isize;
-                    let start_col = first.1 as isize;
-                    let end_row = last.0 as isize;
-                    let end_col = last.1 as isize;
-                    let total_span = ((end_row - start_row).abs().max((end_col - start_col).abs())) + 1;
-                    if total_span <= 7 {
-                        let steps = ((end_row - start_row) / dx.max(1)).max((end_col - start_col) / dy.max(1));
-                        let mut empty_gaps = 0;
-                        let mut threat_positions = Vec::new();
-                        for step in 1..steps {
-                            let gap_row = start_row + dx * step;
-                            let gap_col = start_col + dy * step;
-                            if PatternAnalyzer::is_valid_empty(board, gap_row, gap_col) {
-                                empty_gaps += 1;
-                                threat_positions.push((gap_row as usize, gap_col as usize));
-                            }
-                        }
-                        if empty_gaps > 0 && stones_found.len() + empty_gaps >= 4 && empty_gaps <= 3 {
-                            // Calculate gapped pattern score once
-                            let score = score_gapped_pattern(stones_found.len(), empty_gaps);
-                            
-                            for pos in threat_positions {
-                                *move_scores.entry(pos).or_insert(0) += score;
-                            }
-                        }
-                    }
+                // Use unified gapped pattern analysis
+                let Some((stone_count, gaps, _span)) = PatternAnalyzer::analyze_gapped_pattern(&stones) else {
+                    continue;
+                };
+                
+                // Extract gap positions for move scoring
+                let threat_positions = PatternAnalyzer::extract_gap_positions(board, &stones, dx, dy);
+                
+                // Calculate score and add to each gap position
+                let score = score_gapped_pattern(stone_count, gaps);
+                for pos in threat_positions {
+                    *move_scores.entry(pos).or_insert(0) += score;
                 }
             }
         });
@@ -280,43 +224,5 @@ impl MoveGenerator {
             }
         }
         vec![]
-    }
-}
-
-fn get_pattern_score(length: usize, freedom: PatternFreedom) -> i32 {
-    match length {
-        5 => WINNING_SCORE,
-        4 => match freedom {
-            PatternFreedom::Free => LIVE_FOUR_SCORE,
-            PatternFreedom::HalfFree => HALF_FREE_FOUR_SCORE,
-            PatternFreedom::Flanked => 0,
-        },
-        3 => match freedom {
-            PatternFreedom::Free => LIVE_THREE_SCORE,
-            PatternFreedom::HalfFree => HALF_FREE_THREE_SCORE,
-            PatternFreedom::Flanked => 0,
-        },
-        2 => match freedom {
-            PatternFreedom::Free => LIVE_TWO_SCORE,
-            PatternFreedom::HalfFree => HALF_FREE_TWO_SCORE,
-            PatternFreedom::Flanked => 0,
-        },
-        _ => 0,
-    }
-}
-
-fn score_gapped_pattern(stones: usize, gaps: usize) -> i32 {
-    use crate::ai::heuristic::{
-        GAPPED_FOUR_SCORE, GAPPED_THREE_ONE_SCORE, GAPPED_THREE_TWO_SCORE,
-        GAPPED_TWO_ONE_SCORE, GAPPED_TWO_TWO_SCORE, GAPPED_OTHER_SCORE
-    };
-    
-    match (stones, gaps) {
-        (4, 1) => GAPPED_FOUR_SCORE,
-        (3, 1) => GAPPED_THREE_ONE_SCORE,
-        (3, 2) => GAPPED_THREE_TWO_SCORE,
-        (2, 1) => GAPPED_TWO_ONE_SCORE,
-        (2, 2) => GAPPED_TWO_TWO_SCORE,
-        _ => GAPPED_OTHER_SCORE,
     }
 }

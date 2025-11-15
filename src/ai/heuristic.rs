@@ -4,6 +4,7 @@ use crate::core::state::GameState;
 
 pub struct Heuristic;
 
+// Scoring constants
 pub const WINNING_SCORE: i32 = 1_000_000;
 pub const CAPTURE_BONUS_MULTIPLIER: i32 = 15_000;
 pub const LIVE_FOUR_SCORE: i32 = 15_000;         // _XXXX_ (guaranteed win next move)
@@ -19,6 +20,43 @@ pub const GAPPED_THREE_TWO_SCORE: i32 = 100;     // XX_X_X or X_X_X (3 stones, 2
 pub const GAPPED_TWO_ONE_SCORE: i32 = 25;        // XX_X or X_X (2 stones, 1 gap)
 pub const GAPPED_TWO_TWO_SCORE: i32 = 15;        // X__XX or X__X (2 stones, 2 gaps)
 pub const GAPPED_OTHER_SCORE: i32 = 5;           // Other gapped combinations
+
+/// Score a consecutive pattern based on its length and freedom
+#[inline]
+pub fn score_consecutive_pattern(length: usize, freedom: PatternFreedom) -> i32 {
+    match length {
+        5 => WINNING_SCORE,
+        4 => match freedom {
+            PatternFreedom::Free => LIVE_FOUR_SCORE,
+            PatternFreedom::HalfFree => HALF_FREE_FOUR_SCORE,
+            PatternFreedom::Flanked => 0,
+        },
+        3 => match freedom {
+            PatternFreedom::Free => LIVE_THREE_SCORE,
+            PatternFreedom::HalfFree => HALF_FREE_THREE_SCORE,
+            PatternFreedom::Flanked => 0,
+        },
+        2 => match freedom {
+            PatternFreedom::Free => LIVE_TWO_SCORE,
+            PatternFreedom::HalfFree => HALF_FREE_TWO_SCORE,
+            PatternFreedom::Flanked => 0,
+        },
+        _ => 0,
+    }
+}
+
+/// Score a gapped pattern based on stone count and gap count
+#[inline]
+pub fn score_gapped_pattern(stones: usize, gaps: usize) -> i32 {
+    match (stones, gaps) {
+        (4, 1) => GAPPED_FOUR_SCORE,
+        (3, 1) => GAPPED_THREE_ONE_SCORE,
+        (3, 2) => GAPPED_THREE_TWO_SCORE,
+        (2, 1) => GAPPED_TWO_ONE_SCORE,
+        (2, 2) => GAPPED_TWO_TWO_SCORE,
+        _ => GAPPED_OTHER_SCORE,
+    }
+}
 
 impl Heuristic {
     pub fn evaluate(state: &GameState, _depth: i32) -> i32 {
@@ -111,99 +149,43 @@ impl Heuristic {
         analyzed: &mut [Vec<u8>],
         bit_mask: u8,
     ) -> i32 {
-        let player_bits = board.get_player_bits(player);
-        let mut stones = vec![(row, col)];
-        
-        for dist in 1..=win_condition {
-            let check_row = row as isize + dx * dist as isize;
-            let check_col = col as isize + dy * dist as isize;
-            if PatternAnalyzer::is_in_bounds(board, check_row, check_col) {
-                let idx = board.index(check_row as usize, check_col as usize);
-                if Board::is_bit_set(&player_bits, idx) {
-                    stones.push((check_row as usize, check_col as usize));
-                } else {
-                    break;
-                }
-            } else {
-                break;
-            }
-        }
-        
-        let mut backward_stones = Vec::new();
-        for dist in 1..=win_condition {
-            let check_row = row as isize - dx * dist as isize;
-            let check_col = col as isize - dy * dist as isize;
-            if PatternAnalyzer::is_in_bounds(board, check_row, check_col) {
-                let idx = board.index(check_row as usize, check_col as usize);
-                if Board::is_bit_set(&player_bits, idx) {
-                    backward_stones.push((check_row as usize, check_col as usize));
-                } else {
-                    break;
-                }
-            } else {
-                break;
-            }
-        }
-        backward_stones.reverse();
-        backward_stones.append(&mut stones);
-        stones = backward_stones;
-        
-        let length = stones.len();
-        if length < 2 {
-            return 0;
-        }
-        
-        let first = stones.first().unwrap();
-        let pattern_start_row = first.0;
-        let pattern_start_col = first.1;
-        
-        let length = length.min(win_condition);
-        let total_available_space = PatternAnalyzer::count_total_space(
+        // Use the unified pattern analyzer
+        let pattern_info = PatternAnalyzer::analyze_consecutive_from_position(
             board,
-            pattern_start_row,
-            pattern_start_col,
+            row,
+            col,
             dx,
             dy,
-            length,
+            player,
+            win_condition,
         );
-        if total_available_space < win_condition {
+        
+        let Some((length, _pattern_start_row, _pattern_start_col, _total_space, freedom)) = pattern_info else {
             return 0;
-        }
+        };
         
-        let freedom = PatternAnalyzer::analyze_pattern_freedom(
-            board,
-            pattern_start_row,
-            pattern_start_col,
-            dx,
-            dy,
-            length,
-        );
+        // Mark all stones in the pattern as analyzed
+        let backward = PatternAnalyzer::count_consecutive(board, row, col, -dx, -dy, player);
+        let forward = PatternAnalyzer::count_consecutive(board, row, col, dx, dy, player);
         
-        for &(r, c) in &stones {
+        // Mark current stone
+        analyzed[row][col] |= bit_mask;
+        
+        // Mark backward stones
+        for dist in 1..=backward {
+            let r = (row as isize - dx * dist as isize) as usize;
+            let c = (col as isize - dy * dist as isize) as usize;
             analyzed[r][c] |= bit_mask;
         }
         
-        Self::score_consecutive_pattern(length, freedom)
-    }
-    fn score_consecutive_pattern(length: usize, freedom: PatternFreedom) -> i32 {
-        match length {
-            4 => match freedom {
-                PatternFreedom::Free => LIVE_FOUR_SCORE,
-                PatternFreedom::HalfFree => HALF_FREE_FOUR_SCORE,
-                PatternFreedom::Flanked => 0,
-            },
-            3 => match freedom {
-                PatternFreedom::Free => LIVE_THREE_SCORE,
-                PatternFreedom::HalfFree => HALF_FREE_THREE_SCORE,
-                PatternFreedom::Flanked => 0,
-            },
-            2 => match freedom {
-                PatternFreedom::Free => LIVE_TWO_SCORE,
-                PatternFreedom::HalfFree => HALF_FREE_TWO_SCORE,
-                PatternFreedom::Flanked => 0,
-            },
-            _ => 0,
+        // Mark forward stones
+        for dist in 1..=forward {
+            let r = (row as isize + dx * dist as isize) as usize;
+            let c = (col as isize + dy * dist as isize) as usize;
+            analyzed[r][c] |= bit_mask;
         }
+        
+        score_consecutive_pattern(length.min(win_condition), freedom)
     }
 
     fn analyze_gapped_pattern(
@@ -216,71 +198,20 @@ impl Heuristic {
         analyzed: &mut [Vec<u8>],
         bit_mask: u8,
     ) -> i32 {
-        let player_bits = board.get_player_bits(player);
-        let mut stones = vec![(row, col)];
+        // Use unified gapped stone collection
+        let stones = PatternAnalyzer::collect_gapped_stones(board, row, col, dx, dy, player, 6);
         
-        for dist in 1..=6 {
-            let check_row = row as isize + dx * dist;
-            let check_col = col as isize + dy * dist;
-            if PatternAnalyzer::is_in_bounds(board, check_row, check_col) {
-                let idx = board.index(check_row as usize, check_col as usize);
-                if Board::is_bit_set(&player_bits, idx) {
-                    stones.push((check_row as usize, check_col as usize));
-                } else if Board::is_bit_set(&board.occupied, idx) {
-                    break;
-                }
-            } else {
-                break;
-            }
+        // Use unified gapped pattern analysis
+        let Some((stone_count, gaps, _span)) = PatternAnalyzer::analyze_gapped_pattern(&stones) else {
+            return 0;
+        };
+        
+        // Mark all stones as analyzed
+        for &(r, c) in &stones {
+            analyzed[r][c] |= bit_mask;
         }
         
-        let mut backward_stones = Vec::new();
-        for dist in 1..=6 {
-            let check_row = row as isize - dx * dist;
-            let check_col = col as isize - dy * dist;
-            if PatternAnalyzer::is_in_bounds(board, check_row, check_col) {
-                let idx = board.index(check_row as usize, check_col as usize);
-                if Board::is_bit_set(&player_bits, idx) {
-                    backward_stones.push((check_row as usize, check_col as usize));
-                } else if Board::is_bit_set(&board.occupied, idx) {
-                    break;
-                }
-            } else {
-                break;
-            }
-        }
-        backward_stones.reverse();
-        backward_stones.append(&mut stones);
-        stones = backward_stones;
-        
-        if stones.len() >= 2 {
-            let first = stones.first().unwrap();
-            let last = stones.last().unwrap();
-            let span = ((last.0 as isize - first.0 as isize).abs()
-                .max((last.1 as isize - first.1 as isize).abs())) + 1;
-            
-            let gaps = (span as usize) - stones.len();
-            
-            if gaps > 0 && span <= 7 && stones.len() + gaps >= 4 && gaps <= 3 {
-                for &(r, c) in &stones {
-                    analyzed[r][c] |= bit_mask;
-                }
-                return Self::score_gapped_pattern(stones.len(), gaps);
-            }
-        }
-        
-        0
-    }
-
-    fn score_gapped_pattern(stones: usize, gaps: usize) -> i32 {
-        match (stones, gaps) {
-            (4, 1) => GAPPED_FOUR_SCORE,
-            (3, 1) => GAPPED_THREE_ONE_SCORE,
-            (3, 2) => GAPPED_THREE_TWO_SCORE,
-            (2, 1) => GAPPED_TWO_ONE_SCORE,
-            (2, 2) => GAPPED_TWO_TWO_SCORE,
-            _ => GAPPED_OTHER_SCORE,
-        }
+        score_gapped_pattern(stone_count, gaps)
     }
 
     fn calculate_capture_bonus(state: &GameState) -> i32 {
