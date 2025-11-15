@@ -21,43 +21,6 @@ pub const GAPPED_TWO_ONE_SCORE: i32 = 25;        // XX_X or X_X (2 stones, 1 gap
 pub const GAPPED_TWO_TWO_SCORE: i32 = 15;        // X__XX or X__X (2 stones, 2 gaps)
 pub const GAPPED_OTHER_SCORE: i32 = 5;           // Other gapped combinations
 
-/// Score a consecutive pattern based on its length and freedom
-#[inline]
-pub fn score_consecutive_pattern(length: usize, freedom: PatternFreedom) -> i32 {
-    match length {
-        5 => WINNING_SCORE,
-        4 => match freedom {
-            PatternFreedom::Free => LIVE_FOUR_SCORE,
-            PatternFreedom::HalfFree => HALF_FREE_FOUR_SCORE,
-            PatternFreedom::Flanked => 0,
-        },
-        3 => match freedom {
-            PatternFreedom::Free => LIVE_THREE_SCORE,
-            PatternFreedom::HalfFree => HALF_FREE_THREE_SCORE,
-            PatternFreedom::Flanked => 0,
-        },
-        2 => match freedom {
-            PatternFreedom::Free => LIVE_TWO_SCORE,
-            PatternFreedom::HalfFree => HALF_FREE_TWO_SCORE,
-            PatternFreedom::Flanked => 0,
-        },
-        _ => 0,
-    }
-}
-
-/// Score a gapped pattern based on stone count and gap count
-#[inline]
-pub fn score_gapped_pattern(stones: usize, gaps: usize) -> i32 {
-    match (stones, gaps) {
-        (4, 1) => GAPPED_FOUR_SCORE,
-        (3, 1) => GAPPED_THREE_ONE_SCORE,
-        (3, 2) => GAPPED_THREE_TWO_SCORE,
-        (2, 1) => GAPPED_TWO_ONE_SCORE,
-        (2, 2) => GAPPED_TWO_TWO_SCORE,
-        _ => GAPPED_OTHER_SCORE,
-    }
-}
-
 impl Heuristic {
     pub fn evaluate(state: &GameState, _depth: i32) -> i32 {
         if let Some(winner) = state.check_winner() {
@@ -226,5 +189,42 @@ impl Heuristic {
             0
         };
         max_bonus - min_bonus
+    }
+}
+
+/// Score a consecutive pattern based on its length and freedom
+#[inline]
+pub fn score_consecutive_pattern(length: usize, freedom: PatternFreedom) -> i32 {
+    match length {
+        5 => WINNING_SCORE,
+        4 => match freedom {
+            PatternFreedom::Free => LIVE_FOUR_SCORE,
+            PatternFreedom::HalfFree => HALF_FREE_FOUR_SCORE,
+            PatternFreedom::Flanked => 0,
+        },
+        3 => match freedom {
+            PatternFreedom::Free => LIVE_THREE_SCORE,
+            PatternFreedom::HalfFree => HALF_FREE_THREE_SCORE,
+            PatternFreedom::Flanked => 0,
+        },
+        2 => match freedom {
+            PatternFreedom::Free => LIVE_TWO_SCORE,
+            PatternFreedom::HalfFree => HALF_FREE_TWO_SCORE,
+            PatternFreedom::Flanked => 0,
+        },
+        _ => 0,
+    }
+}
+
+/// Score a gapped pattern based on stone count and gap count
+#[inline]
+pub fn score_gapped_pattern(stones: usize, gaps: usize) -> i32 {
+    match (stones, gaps) {
+        (4, 1) => GAPPED_FOUR_SCORE,
+        (3, 1) => GAPPED_THREE_ONE_SCORE,
+        (3, 2) => GAPPED_THREE_TWO_SCORE,
+        (2, 1) => GAPPED_TWO_ONE_SCORE,
+        (2, 2) => GAPPED_TWO_TWO_SCORE,
+        _ => GAPPED_OTHER_SCORE,
     }
 }
