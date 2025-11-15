@@ -1,7 +1,8 @@
 use crate::core::board::{Board, Player};
 use crate::core::patterns::{DIRECTIONS, PatternAnalyzer};
 use crate::core::rules::DoubleThreeDetection;
-use crate::ai::heuristic::{score_consecutive_pattern, score_gapped_pattern};
+use crate::core::captures::CaptureHandler;
+use crate::ai::heuristic::{score_consecutive_pattern, score_gapped_pattern, CAPTURE_BONUS_MULTIPLIER};
 
 pub struct MoveGenerator;
 impl MoveGenerator {
@@ -29,7 +30,6 @@ impl MoveGenerator {
         for &check_player in &[player, player.opponent()] {
             Self::collect_consecutive_threats(board, check_player, &mut move_scores);
             Self::collect_gapped_threats(board, check_player, &mut move_scores);
-            Self::collect_capture_moves(board, check_player, &mut move_scores);
         }
         
         // If no threats found, use zone-based moves
@@ -74,6 +74,11 @@ impl MoveGenerator {
                     continue;
                 }
                 
+                // Skip flanked patterns - they score 0 and are useless for move generation
+                if freedom == crate::core::patterns::PatternFreedom::Flanked {
+                    continue;
+                }
+                
                 let score = score_consecutive_pattern(length, freedom);
                 
                 // Calculate backward and forward distances for move placement
@@ -86,11 +91,42 @@ impl MoveGenerator {
                     let c = col as isize + dy * offset;
                     if PatternAnalyzer::is_valid_empty(board, r, c) {
                         let pos = (r as usize, c as usize);
-                        *move_scores.entry(pos).or_insert(0) += score;
+                        let mut move_score = score;
+                        
+                        // Check if this move would create a capture and add bonus
+                        if Self::would_capture(board, r as usize, c as usize, player) {
+                            move_score += CAPTURE_BONUS_MULTIPLIER;
+                        }
+                        
+                        *move_scores.entry(pos).or_insert(0) += move_score;
                     }
                 }
             }
         });
+    }
+    
+    /// Check if placing a stone at (row, col) would create any captures
+    /// Uses CaptureHandler to simulate the move
+    fn would_capture(
+        board: &Board,
+        row: usize,
+        col: usize,
+        player: Player,
+    ) -> bool {
+        // Simulate placing the stone temporarily
+        let mut temp_board = board.clone();
+        let idx = temp_board.index(row, col);
+        
+        // Place the stone
+        Board::set_bit(&mut temp_board.occupied, idx);
+        match player {
+            Player::Max => Board::set_bit(&mut temp_board.max_bits, idx),
+            Player::Min => Board::set_bit(&mut temp_board.min_bits, idx),
+        }
+        
+        // Check if this creates any captures
+        let captures = CaptureHandler::detect_captures(&temp_board, row, col, player);
+        !captures.is_empty()
     }
 
     fn collect_gapped_threats(
@@ -120,70 +156,6 @@ impl MoveGenerator {
             }
         });
     }
-
-    fn collect_capture_moves(
-        board: &Board,
-        player: Player,
-        move_scores: &mut std::collections::HashMap<(usize, usize), i32>,
-    ) {
-        let opponent = player.opponent();
-        let opponent_bits = board.get_player_bits(opponent);
-        let player_bits = board.get_player_bits(player);
-        const CAPTURE_MOVE_SCORE: i32 = 5000; // Score per capture opportunity
-        
-        // Look for opponent stones that could be captured
-        board.iterate_bits(opponent_bits, |row, col| {
-            for &(dx, dy) in &DIRECTIONS {
-                // Check if there's another opponent stone in this direction
-                let next_row = row as isize + dx;
-                let next_col = col as isize + dy;
-                
-                if !PatternAnalyzer::is_in_bounds(board, next_row, next_col) {
-                    continue;
-                }
-                
-                let next_idx = board.index(next_row as usize, next_col as usize);
-                if !Board::is_bit_set(opponent_bits, next_idx) {
-                    continue;
-                }
-                
-                // Check both ends to see if placing a stone would create a capture
-                // Check before the first stone
-                let before_row = row as isize - dx;
-                let before_col = col as isize - dy;
-                if PatternAnalyzer::is_valid_empty(board, before_row, before_col) {
-                    // Check if there's already a player stone after the second opponent stone
-                    let after_row = next_row + dx;
-                    let after_col = next_col + dy;
-                    if PatternAnalyzer::is_in_bounds(board, after_row, after_col) {
-                        let after_idx = board.index(after_row as usize, after_col as usize);
-                        if Board::is_bit_set(player_bits, after_idx) {
-                            let pos = (before_row as usize, before_col as usize);
-                            *move_scores.entry(pos).or_insert(0) += CAPTURE_MOVE_SCORE;
-                        }
-                    }
-                }
-                
-                // Check after the second stone
-                let after_row = next_row + dx;
-                let after_col = next_col + dy;
-                if PatternAnalyzer::is_valid_empty(board, after_row, after_col) {
-                    // Check if there's already a player stone before the first opponent stone
-                    let before_row = row as isize - dx;
-                    let before_col = col as isize - dy;
-                    if PatternAnalyzer::is_in_bounds(board, before_row, before_col) {
-                        let before_idx = board.index(before_row as usize, before_col as usize);
-                        if Board::is_bit_set(player_bits, before_idx) {
-                            let pos = (after_row as usize, after_col as usize);
-                            *move_scores.entry(pos).or_insert(0) += CAPTURE_MOVE_SCORE;
-                        }
-                    }
-                }
-            }
-        });
-    }
-
-
 
     fn get_zone_based_moves(board: &Board, _player: Player) -> Vec<(usize, usize)> {
         let mut candidates = std::collections::HashSet::new();
