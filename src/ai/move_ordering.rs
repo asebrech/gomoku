@@ -26,19 +26,16 @@ impl MoveGenerator {
         use std::collections::HashMap;
         let mut move_scores: HashMap<(usize, usize), i32> = HashMap::new();
         
-        // Collect all threats with their scores from both players
         for &check_player in &[player, player.opponent()] {
             Self::collect_consecutive_threats(board, check_player, &mut move_scores);
             Self::collect_gapped_threats(board, check_player, &mut move_scores);
         }
         
-        // If no threats found, use zone-based moves
         if move_scores.is_empty() {
             let zone_moves = Self::get_zone_based_moves(board, player);
             return zone_moves;
         }
         
-        // Sort by score (highest first)
         let mut moves: Vec<((usize, usize), i32)> = move_scores.into_iter().collect();
         moves.sort_by_key(|(_, score)| -score);
         
