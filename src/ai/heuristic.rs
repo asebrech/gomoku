@@ -4,7 +4,6 @@ use crate::core::state::GameState;
 
 pub struct Heuristic;
 
-// Scoring constants
 pub const WINNING_SCORE: i32 = 1_000_000;
 pub const CAPTURE_BONUS_MULTIPLIER: i32 = 15_000;
 pub const LIVE_FOUR_SCORE: i32 = 15_000;         // _XXXX_ (guaranteed win next move)
@@ -112,7 +111,6 @@ impl Heuristic {
         analyzed: &mut [Vec<u8>],
         bit_mask: u8,
     ) -> i32 {
-        // Use the unified pattern analyzer
         let pattern_info = PatternAnalyzer::analyze_consecutive_from_position(
             board,
             row,
@@ -127,21 +125,17 @@ impl Heuristic {
             return 0;
         };
         
-        // Mark all stones in the pattern as analyzed
         let backward = PatternAnalyzer::count_consecutive(board, row, col, -dx, -dy, player);
         let forward = PatternAnalyzer::count_consecutive(board, row, col, dx, dy, player);
         
-        // Mark current stone
         analyzed[row][col] |= bit_mask;
         
-        // Mark backward stones
         for dist in 1..=backward {
             let r = (row as isize - dx * dist as isize) as usize;
             let c = (col as isize - dy * dist as isize) as usize;
             analyzed[r][c] |= bit_mask;
         }
         
-        // Mark forward stones
         for dist in 1..=forward {
             let r = (row as isize + dx * dist as isize) as usize;
             let c = (col as isize + dy * dist as isize) as usize;
@@ -161,15 +155,12 @@ impl Heuristic {
         analyzed: &mut [Vec<u8>],
         bit_mask: u8,
     ) -> i32 {
-        // Use unified gapped stone collection
         let stones = PatternAnalyzer::collect_gapped_stones(board, row, col, dx, dy, player, 6);
         
-        // Use unified gapped pattern analysis
         let Some((stone_count, gaps, _span)) = PatternAnalyzer::analyze_gapped_pattern(&stones) else {
             return 0;
         };
         
-        // Mark all stones as analyzed
         for &(r, c) in &stones {
             analyzed[r][c] |= bit_mask;
         }
@@ -192,7 +183,6 @@ impl Heuristic {
     }
 }
 
-/// Score a consecutive pattern based on its length and freedom
 #[inline]
 pub fn score_consecutive_pattern(length: usize, freedom: PatternFreedom) -> i32 {
     match length {
@@ -216,7 +206,6 @@ pub fn score_consecutive_pattern(length: usize, freedom: PatternFreedom) -> i32 
     }
 }
 
-/// Score a gapped pattern based on stone count and gap count
 #[inline]
 pub fn score_gapped_pattern(stones: usize, gaps: usize) -> i32 {
     match (stones, gaps) {

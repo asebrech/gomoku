@@ -54,7 +54,6 @@ impl MoveGenerator {
         
         board.iterate_bits(player_bits, |row, col| {
             for &(dx, dy) in &DIRECTIONS {
-                // Use the unified pattern analyzer
                 let pattern_info = PatternAnalyzer::analyze_consecutive_from_position(
                     board,
                     row,
@@ -62,30 +61,26 @@ impl MoveGenerator {
                     dx,
                     dy,
                     player,
-                    5, // win_condition
+                    5,
                 );
                 
                 let Some((length, _pattern_start_row, _pattern_start_col, _total_space, freedom)) = pattern_info else {
                     continue;
                 };
                 
-                // Only consider patterns of length 2-4 for move generation
                 if length < 2 || length > 4 {
                     continue;
                 }
                 
-                // Skip flanked patterns - they score 0 and are useless for move generation
                 if freedom == crate::core::patterns::PatternFreedom::Flanked {
                     continue;
                 }
                 
                 let score = score_consecutive_pattern(length, freedom);
                 
-                // Calculate backward and forward distances for move placement
                 let backward = PatternAnalyzer::count_consecutive(board, row, col, -dx, -dy, player);
                 let forward = PatternAnalyzer::count_consecutive(board, row, col, dx, dy, player);
                 
-                // Add score to each empty position around this pattern
                 for offset in -(backward as isize + 1)..=(forward as isize + 1) {
                     let r = row as isize + dx * offset;
                     let c = col as isize + dy * offset;
@@ -93,7 +88,6 @@ impl MoveGenerator {
                         let pos = (r as usize, c as usize);
                         let mut move_score = score;
                         
-                        // Check if this move would create a capture and add bonus
                         if Self::would_capture(board, r as usize, c as usize, player) {
                             move_score += CAPTURE_BONUS_MULTIPLIER;
                         }
@@ -105,26 +99,21 @@ impl MoveGenerator {
         });
     }
     
-    /// Check if placing a stone at (row, col) would create any captures
-    /// Uses CaptureHandler to simulate the move
     fn would_capture(
         board: &Board,
         row: usize,
         col: usize,
         player: Player,
     ) -> bool {
-        // Simulate placing the stone temporarily
         let mut temp_board = board.clone();
         let idx = temp_board.index(row, col);
         
-        // Place the stone
         Board::set_bit(&mut temp_board.occupied, idx);
         match player {
             Player::Max => Board::set_bit(&mut temp_board.max_bits, idx),
             Player::Min => Board::set_bit(&mut temp_board.min_bits, idx),
         }
         
-        // Check if this creates any captures
         let captures = CaptureHandler::detect_captures(&temp_board, row, col, player);
         !captures.is_empty()
     }
@@ -137,18 +126,14 @@ impl MoveGenerator {
         let player_bits = board.get_player_bits(player);
         board.iterate_bits(player_bits, |row, col| {
             for &(dx, dy) in &DIRECTIONS {
-                // Use unified gapped stone collection
                 let stones = PatternAnalyzer::collect_gapped_stones(board, row, col, dx, dy, player, 6);
                 
-                // Use unified gapped pattern analysis
                 let Some((stone_count, gaps, _span)) = PatternAnalyzer::analyze_gapped_pattern(&stones) else {
                     continue;
                 };
                 
-                // Extract gap positions for move scoring
                 let threat_positions = PatternAnalyzer::extract_gap_positions(board, &stones, dx, dy);
                 
-                // Calculate score and add to each gap position
                 let score = score_gapped_pattern(stone_count, gaps);
                 for pos in threat_positions {
                     *move_scores.entry(pos).or_insert(0) += score;
