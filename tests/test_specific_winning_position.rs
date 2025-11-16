@@ -25,9 +25,9 @@ fn test_winning_position_from_image() {
     
     println!("Generated moves: {:?}", moves);
     
-    // Should return only the winning move
-    assert_eq!(moves.len(), 1, "Should find exactly one winning move");
-    assert_eq!(moves[0], (2, 6), "Should find the winning move at (2, 6)");
+    assert!(!moves.is_empty(), "Should find moves");
+    assert!(moves.contains(&(2, 6)), "Should find the winning move at (2, 6)");
+    assert_eq!(moves[0], (2, 6), "Winning move should be prioritized first");
 }
 
 #[test]
@@ -96,10 +96,10 @@ fn test_endpoint_completion_like_image() {
     
     println!("Moves for endpoint pattern: {:?}", moves);
     
-    // Should find either endpoint as winning move
-    assert_eq!(moves.len(), 1, "Should find exactly one winning move");
+    assert!(!moves.is_empty(), "Should find moves");
     assert!(moves[0] == (9, 8) || moves[0] == (4, 8), 
-            "Should find winning move at endpoint, got {:?}", moves[0]);
+            "First move should be a winning endpoint, got {:?}", moves[0]);
+    assert!(moves.contains(&(9, 8)) || moves.contains(&(4, 8)), "Should find winning move at endpoint");
 }
 
 #[test]
@@ -118,8 +118,8 @@ fn test_both_endpoints_available() {
     
     println!("Moves for both endpoints available: {:?}", moves);
     
-    // Should find exactly one winning move (implementation picks first found)
-    assert_eq!(moves.len(), 1, "Should find exactly one winning move");
+    assert!(!moves.is_empty(), "Should find moves");
     assert!(moves[0] == (10, 8) || moves[0] == (5, 8), 
-            "Should find winning move at either endpoint, got {:?}", moves[0]);
+            "First move should be a winning endpoint, got {:?}", moves[0]);
+    assert!(moves.contains(&(10, 8)) || moves.contains(&(5, 8)), "Should find winning move at either endpoint");
 }

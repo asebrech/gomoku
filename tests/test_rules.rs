@@ -1,5 +1,5 @@
 use gomoku::core::board::{Board, Player};
-use gomoku::core::rules::{WinDetection, DoubleThreeDetection, CaptureBreaking};
+use gomoku::core::rules::WinDetection;
 
 #[test]
 fn test_horizontal_win() {

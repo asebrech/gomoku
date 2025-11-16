@@ -1,6 +1,6 @@
 use gomoku::core::board::{Board, Player};
 use gomoku::core::state::GameState;
-use gomoku::core::rules::{WinDetection, DoubleThreeDetection, CaptureBreaking};
+use gomoku::core::rules::{WinDetection, CaptureBreaking};
 
 #[test]
 fn test_unbreakable_five_wins_immediately() {

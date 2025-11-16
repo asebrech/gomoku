@@ -141,7 +141,7 @@ fn test_corner_moves() {
 
 #[test] 
 fn test_double_three_moves_excluded() {
-    use gomoku::core::rules::{WinDetection, DoubleThreeDetection, CaptureBreaking};
+    use gomoku::core::rules::DoubleThreeDetection;
     
     let mut board = Board::new(19);
     

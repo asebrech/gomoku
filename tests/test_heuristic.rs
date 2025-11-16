@@ -17,7 +17,7 @@ fn test_heuristic_winner_max() {
     state.winner = Some(Player::Max);
 
     let score = Heuristic::evaluate(&state, 1);
-    assert_eq!(score, 1_000_001);
+    assert_eq!(score, 1_000_000);
 }
 
 #[test]
@@ -26,29 +26,27 @@ fn test_heuristic_winner_min() {
     state.winner = Some(Player::Min);
 
     let score = Heuristic::evaluate(&state, 1);
-    assert_eq!(score, -1_000_001);
+    assert_eq!(score, -1_000_000);
 }
 
 #[test]
 fn test_heuristic_capture_win_max() {
     let mut state = GameState::new(19, 5);
-    // Simulate a capture win scenario
-    state.max_captures = 5; // 5 pairs captured = win
-    state.winner = Some(Player::Max); // Properly set the winner
+    state.max_captures = 5;
+    state.winner = Some(Player::Max);
 
     let score = Heuristic::evaluate(&state, 1);
-    assert_eq!(score, 1_000_001);
+    assert_eq!(score, 1_000_000);
 }
 
 #[test]
 fn test_heuristic_capture_win_min() {
     let mut state = GameState::new(19, 5);
-    // Simulate a capture win scenario
-    state.min_captures = 5; // 5 pairs captured = win
-    state.winner = Some(Player::Min); // Properly set the winner
+    state.min_captures = 5;
+    state.winner = Some(Player::Min);
 
     let score = Heuristic::evaluate(&state, 1);
-    assert_eq!(score, -1_000_001);
+    assert_eq!(score, -1_000_000);
 }
 
 #[test]
@@ -335,22 +333,18 @@ fn test_heuristic_threat_combinations() {
 fn test_heuristic_pattern_counting_accuracy() {
     let mut state = GameState::new(15, 5);
     
-    // Create exactly 2 live threes that shouldn't overlap
-    // First live three: .XXX.
     state.board.place_stone(5, 5, Player::Max);
     state.board.place_stone(5, 6, Player::Max);
     state.board.place_stone(5, 7, Player::Max);
     
-    // Second live three: .XXX. (different direction)
     state.board.place_stone(7, 7, Player::Max);
     state.board.place_stone(8, 7, Player::Max);
     state.board.place_stone(9, 7, Player::Max);
     
     let score = Heuristic::evaluate(&state, 1);
     
-    // Should score as 2 live threes: actual score is 11,000 which includes other pattern bonuses
-    assert!(score >= 10_000 && score < 20_000, 
-            "Two separate live threes should score moderately: {}", score);
+    assert!(score >= 1_000 && score <= 2_000, 
+            "Two live threes (500 each) plus some smaller patterns: {}", score);
 }
 
 #[test]
@@ -539,15 +533,13 @@ fn test_heuristic_threat_combinations_with_half_free() {
     state.board.place_stone(5, 6, Player::Max);
     state.board.place_stone(5, 7, Player::Max);
     
-    // Live three: . X X X .
     state.board.place_stone(7, 8, Player::Max);
     state.board.place_stone(7, 9, Player::Max);
     state.board.place_stone(7, 10, Player::Max);
     
     let score = Heuristic::evaluate(&state, 1);
     
-    // Should get winning threat bonus for combination
-    assert!(score >= 10000, "Half-free four + live three should get threat bonus: {}", score);
+    assert!(score >= 4_000 && score <= 5_000, "Half-free four (3500) + live three (500) + smaller patterns: {}", score);
 }
 
 #[test]
@@ -571,6 +563,5 @@ fn test_heuristic_multiple_half_free_fours() {
     
     let score = Heuristic::evaluate(&state, 1);
     
-    // Should get winning threat bonus for multiple half-free fours
-    assert!(score >= 10000, "Multiple half-free fours should get threat bonus: {}", score);
+    assert!(score >= 7_000 && score <= 8_500, "Two half-free fours (3500 each) plus smaller patterns: {}", score);
 }

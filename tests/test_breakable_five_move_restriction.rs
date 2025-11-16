@@ -1,4 +1,4 @@
-use gomoku::core::board::{Board, Player};
+use gomoku::core::board::Player;
 use gomoku::core::state::GameState;
 use gomoku::core::rules::CaptureBreaking;
 

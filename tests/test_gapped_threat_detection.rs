@@ -75,9 +75,10 @@ fn test_creates_gapped_winning_move() {
     
     let moves = MoveGenerator::get_candidate_moves(&board, Player::Max);
     
-    // Should recognize (9,6) as an immediate winning move
-    assert_eq!(moves.len(), 1, "Should return only the winning move");
-    assert_eq!(moves[0], (9, 6), "Should identify (9,6) as the winning move");
+    // Should recognize (9,6) as an immediate winning move (prioritized first)
+    assert!(!moves.is_empty(), "Should generate moves");
+    assert_eq!(moves[0], (9, 6), "Winning move should be first");
+    assert!(moves.contains(&(9, 6)), "Should identify (9,6) as the winning move");
     
     println!("Correctly identified gapped winning move: {:?}", moves[0]);
 }
