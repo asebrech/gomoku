@@ -6,7 +6,7 @@ use crate::ai::heuristic::{score_consecutive_pattern, score_gapped_pattern, CAPT
 
 pub struct MoveGenerator;
 impl MoveGenerator {
-    pub fn get_candidate_moves(board: &Board, player: Player) -> Vec<(usize, usize)> {
+    pub fn order_moves(board: &Board, player: Player) -> Vec<(usize, usize)> {
         if board.is_empty() {
             return vec![board.center()];
         }

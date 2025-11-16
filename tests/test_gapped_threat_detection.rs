@@ -1,6 +1,6 @@
 //! Tests for gapped threat detection in move generation.
 
-use gomoku::ai::move_generation::MoveGenerator;
+use gomoku::ai::move_ordering::MoveGenerator;
 use gomoku::core::board::{Board, Player};
 
 #[test]
@@ -16,7 +16,7 @@ fn test_detects_gapped_winning_threat() {
     // Pattern: X . X . X . X (4 stones with gaps)
     
     // AI should detect that Max has a winning threat and block it
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Min);
+    let moves = MoveGenerator::order_moves(&board, Player::Min);
     
     // Should detect this as a must-block situation
     // The gaps at (9,5), (9,7), (9,9) are all winning for Max
@@ -48,7 +48,7 @@ fn test_detects_gapped_four_threat() {
     // Pattern: X X X . X (4 stones with 1 gap in 5 positions)
     
     // AI should detect this as a major threat requiring blocking
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Min);
+    let moves = MoveGenerator::order_moves(&board, Player::Min);
     
     // Should identify (9,8) as a critical blocking move
     assert!(moves.contains(&(9, 8)), 
@@ -73,7 +73,7 @@ fn test_creates_gapped_winning_move() {
     // Pattern: X X . X X (4 stones, gap at position 6)
     // Playing at (9,6) creates 5 in a row
     
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Max);
+    let moves = MoveGenerator::order_moves(&board, Player::Max);
     
     // Should recognize (9,6) as an immediate winning move (prioritized first)
     assert!(!moves.is_empty(), "Should generate moves");
@@ -99,7 +99,7 @@ fn test_gapped_vs_consecutive_threat_priority() {
     board.place_stone(9, 6, Player::Min);
     board.place_stone(9, 8, Player::Min);
     
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Max);
+    let moves = MoveGenerator::order_moves(&board, Player::Max);
     
     // Should prioritize blocking the immediate consecutive threat first
     let blocks_consecutive = moves.contains(&(5, 4)) || moves.contains(&(5, 9));
@@ -111,7 +111,7 @@ fn test_gapped_vs_consecutive_threat_priority() {
     board_gapped_only.place_stone(9, 6, Player::Min);
     board_gapped_only.place_stone(9, 8, Player::Min);
     
-    let moves_gapped = MoveGenerator::get_candidate_moves(&board_gapped_only, Player::Max);
+    let moves_gapped = MoveGenerator::order_moves(&board_gapped_only, Player::Max);
     let blocks_gapped = moves_gapped.contains(&(9, 7));
     
     assert!(blocks_gapped, "Should detect and block gapped threats when no consecutive threats exist");
@@ -131,7 +131,7 @@ fn test_vertical_gapped_pattern_like_image() {
     board.place_stone(11, 9, Player::Max);  // X
     // Vertical pattern: X . X . X . X
     
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Min);
+    let moves = MoveGenerator::order_moves(&board, Player::Min);
     
     // Should recognize this as a major threat and block the gaps
     let gap_positions = [(6, 9), (8, 9), (10, 9)];

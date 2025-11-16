@@ -1,6 +1,6 @@
 //! Comprehensive battle tests for gapped pattern detection features.
 
-use gomoku::ai::move_generation::MoveGenerator;
+use gomoku::ai::move_ordering::MoveGenerator;
 use gomoku::core::board::{Board, Player};
 
 #[test]
@@ -14,7 +14,7 @@ fn test_alternating_pattern_not_threat() {
     }
     // Pattern: X O X O X O X O X O (row 9, cols 5-14)
     
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Max);
+    let moves = MoveGenerator::order_moves(&board, Player::Max);
     
     // Should NOT treat this as a must-block situation since it's alternating
     // Should be more than just a few blocking moves
@@ -40,7 +40,7 @@ fn test_real_gapped_threat_vs_alternating() {
         board.place_stone(10, 5 + i, player);
     }
     
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Min);
+    let moves = MoveGenerator::order_moves(&board, Player::Min);
     
     // Should prioritize blocking the real gapped threat, not the alternating pattern
     let blocks_real_threat = moves.contains(&(5, 6)) || moves.contains(&(5, 8)) || moves.contains(&(5, 10));
@@ -67,7 +67,7 @@ fn test_multiple_gapped_threats() {
     board.place_stone(9, 12, Player::Max);
     board.place_stone(11, 12, Player::Max);
     
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Min);
+    let moves = MoveGenerator::order_moves(&board, Player::Min);
     
     // Should detect both threats
     let blocks_horizontal = moves.contains(&(5, 6)) || moves.contains(&(5, 8));
@@ -88,7 +88,7 @@ fn test_gapped_threat_near_board_edge() {
     board.place_stone(0, 4, Player::Max);   // X
     board.place_stone(0, 6, Player::Max);   // X
     
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Min);
+    let moves = MoveGenerator::order_moves(&board, Player::Min);
     
     // Should still detect even near edges
     let blocks_edge_threat = moves.contains(&(0, 3)) || moves.contains(&(0, 5));
@@ -109,7 +109,7 @@ fn test_gapped_threat_with_obstacles() {
     board.place_stone(9, 13, Player::Max);  // X
     // Pattern: X . X . O . X . X
     
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Min);
+    let moves = MoveGenerator::order_moves(&board, Player::Min);
     
     // Should NOT treat this as a unified threat since it's broken by obstacle
     // Should be normal zone-based moves, not critical blocking
@@ -129,7 +129,7 @@ fn test_diagonal_gapped_threats() {
     board.place_stone(9, 9, Player::Max);   // X
     board.place_stone(11, 11, Player::Max); // X
     
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Min);
+    let moves = MoveGenerator::order_moves(&board, Player::Min);
     
     // Should detect diagonal gapped threats
     let blocks_diagonal = moves.contains(&(6, 6)) || moves.contains(&(8, 8)) || moves.contains(&(10, 10));
@@ -160,7 +160,7 @@ fn test_performance_with_many_stones() {
     }
     
     let start = std::time::Instant::now();
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Min);
+    let moves = MoveGenerator::order_moves(&board, Player::Min);
     let duration = start.elapsed();
     
     // Should complete quickly even with many stones
@@ -181,7 +181,7 @@ fn test_gapped_winning_move_detection() {
     board.place_stone(9, 9, Player::Max);   // X
     // Pattern: X X . X X - filling (9,7) creates 5 in a row
     
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Max);
+    let moves = MoveGenerator::order_moves(&board, Player::Max);
     
     // Should recognize the winning move and include it (prioritized first)
     assert!(!moves.is_empty(), "Should generate moves");
@@ -212,7 +212,7 @@ fn test_complex_mixed_patterns() {
         board.place_stone(12, 5 + i, player);
     }
     
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Max);
+    let moves = MoveGenerator::order_moves(&board, Player::Max);
     
     // Should detect at least one threat (consecutive has higher priority but both should be detected)
     let blocks_consecutive = moves.contains(&(5, 4)) || moves.contains(&(5, 8));
@@ -245,8 +245,8 @@ fn test_symmetry_and_consistency() {
     board2.place_stone(7, 9, Player::Max);
     board2.place_stone(9, 9, Player::Max);
     
-    let moves1 = MoveGenerator::get_candidate_moves(&board1, Player::Min);
-    let moves2 = MoveGenerator::get_candidate_moves(&board2, Player::Min);
+    let moves1 = MoveGenerator::order_moves(&board1, Player::Min);
+    let moves2 = MoveGenerator::order_moves(&board2, Player::Min);
     
     // Should generate similar number of moves for similar threats
     let diff = (moves1.len() as i32 - moves2.len() as i32).abs();
@@ -274,8 +274,8 @@ fn test_early_game_vs_late_game() {
         }
     }
     
-    let early_moves = MoveGenerator::get_candidate_moves(&early_board, Player::Min);
-    let late_moves = MoveGenerator::get_candidate_moves(&late_board, Player::Min);
+    let early_moves = MoveGenerator::order_moves(&early_board, Player::Min);
+    let late_moves = MoveGenerator::order_moves(&late_board, Player::Min);
     
     // Both should detect the gapped threat
     assert!(!early_moves.is_empty(), "Should detect threat in early game");

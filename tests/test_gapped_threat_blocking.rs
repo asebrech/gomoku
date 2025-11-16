@@ -1,6 +1,6 @@
 //! Test to verify AI detects gapped threats like in the user's image.
 
-use gomoku::ai::move_generation::MoveGenerator;
+use gomoku::ai::move_ordering::MoveGenerator;
 use gomoku::core::board::{Board, Player};
 
 #[test]
@@ -15,7 +15,7 @@ fn test_ai_blocks_gapped_threat_from_image() {
     // Pattern: X . X . X . X (4 stones with gaps that could become 5)
     
     // AI playing as Min should detect this as a must-block threat
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Min);
+    let moves = MoveGenerator::order_moves(&board, Player::Min);
     
     // Should detect the gaps as critical blocking positions
     let gap_positions = [(7, 9), (9, 9), (11, 9)];
@@ -51,7 +51,7 @@ fn test_ai_creates_gapped_winning_move() {
     board.place_stone(12, 9, Player::Max);  // X
     // Playing at (7,9), (9,9), or (11,9) could create a winning line
     
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Max);
+    let moves = MoveGenerator::order_moves(&board, Player::Max);
     
     // Should include the gap positions as candidate moves
     let gap_positions = [(7, 9), (9, 9), (11, 9)];
@@ -75,7 +75,7 @@ fn test_horizontal_gapped_threat() {
     board.place_stone(9, 9, Player::Max);   // X
     board.place_stone(9, 11, Player::Max);  // X
     
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Min);
+    let moves = MoveGenerator::order_moves(&board, Player::Min);
     
     // Should block the horizontal gaps
     let gap_positions = [(9, 6), (9, 8), (9, 10)];

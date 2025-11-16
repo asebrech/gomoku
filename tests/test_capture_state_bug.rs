@@ -130,7 +130,7 @@ fn test_capture_breaking_complete_sequence() {
     
     // If Pink is in check (five is breakable), Blue should be able to break it
     if state.player_in_check == Some(Player::Max) {
-        let breaking_moves = state.get_candidate_moves();
+        let breaking_moves = state.order_moves();
         println!("Breaking moves available: {:?}", breaking_moves);
         
         assert!(!breaking_moves.is_empty(), "Should have breaking moves if in check");
@@ -151,7 +151,7 @@ fn test_capture_breaking_complete_sequence() {
         // If game continues, Blue makes another move (this was triggering the bug)
         if state.winner.is_none() && state.player_in_check.is_none() {
             println!("Blue makes follow-up move...");
-            let valid_moves = state.get_candidate_moves();
+            let valid_moves = state.order_moves();
             if !valid_moves.is_empty() {
                 state.make_move(valid_moves[0]);
                 
@@ -303,7 +303,7 @@ fn test_real_capture_sequence_integration() {
             
             // Additional move should not cause issues
             if state.winner.is_none() {
-                let next_moves = state.get_candidate_moves();
+                let next_moves = state.order_moves();
                 if !next_moves.is_empty() {
                     state.make_move(next_moves[0]);
                     
@@ -358,7 +358,7 @@ fn test_screenshot_bug_regression() {
             // Step 2: Blue captures to break the five (screenshot 2)
             println!("\n=== STEP 2: Blue captures to break five ===");
             
-            let breaking_moves = state.get_candidate_moves();
+            let breaking_moves = state.order_moves();
             println!("Available breaking moves: {:?}", breaking_moves);
             
             if !breaking_moves.is_empty() {

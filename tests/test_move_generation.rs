@@ -1,5 +1,5 @@
 use gomoku::core::board::{Board, Player};
-use gomoku::ai::move_generation::MoveGenerator;
+use gomoku::ai::move_ordering::MoveGenerator;
 use gomoku::core::state::GameState;
 
 #[test]
@@ -15,7 +15,7 @@ fn test_creates_five_in_row_fix() {
     board.place_stone(0, 3, Player::Max);
     
     // Position (0, 4) should be identified as winning move
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Max);
+    let moves = MoveGenerator::order_moves(&board, Player::Max);
     
     // Should return only the winning move
     assert_eq!(moves.len(), 1);
@@ -33,7 +33,7 @@ fn test_creates_five_in_row_with_gap() {
     board.place_stone(5, 9, Player::Max);
     
     // Position (5, 8) should complete the five
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Max);
+    let moves = MoveGenerator::order_moves(&board, Player::Max);
     
     // Should contain the winning move
     assert!(!moves.is_empty());
@@ -59,7 +59,7 @@ fn test_threat_moves_prioritization() {
     }
     
     // Get candidate moves - should not be empty even if many threats
-    let moves = state.get_candidate_moves();
+    let moves = state.order_moves();
     
     // Should return moves (prioritized if >30)
     assert!(!moves.is_empty(), "Should return threat moves even when many candidates");
@@ -78,7 +78,7 @@ fn test_winning_move_detection_various_patterns() {
     board.place_stone(7, 5, Player::Max);
     board.place_stone(8, 5, Player::Max);
     
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Max);
+    let moves = MoveGenerator::order_moves(&board, Player::Max);
     
     // Should find winning moves at (4, 5) and/or (9, 5)
     assert!(!moves.is_empty());
@@ -98,7 +98,7 @@ fn test_blocking_opponent_winning_move() {
     board.place_stone(10, 13, Player::Min);
     
     // Our move should block
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Max);
+    let moves = MoveGenerator::order_moves(&board, Player::Max);
     
     // Should return blocking moves
     assert!(!moves.is_empty());
@@ -116,7 +116,7 @@ fn test_open_four_detection() {
     board.place_stone(10, 14, Player::Min);
     
     // Both (10, 10) and (10, 15) are empty - this is an open four threat
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Max);
+    let moves = MoveGenerator::order_moves(&board, Player::Max);
     
     // Must block the open four - should return both blocking positions
     assert!(!moves.is_empty());
@@ -127,7 +127,7 @@ fn test_open_four_detection() {
 #[test]
 fn test_empty_board_returns_center() {
     let board = Board::new(19);
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Max);
+    let moves = MoveGenerator::order_moves(&board, Player::Max);
     
     assert_eq!(moves.len(), 1);
     assert_eq!(moves[0], (9, 9)); // Center of 19x19 board
@@ -140,7 +140,7 @@ fn test_zone_based_moves_early_game() {
     // Place one stone
     board.place_stone(9, 9, Player::Max);
     
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Min);
+    let moves = MoveGenerator::order_moves(&board, Player::Min);
     
     // Should return zone-based moves around the center
     assert!(!moves.is_empty());

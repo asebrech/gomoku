@@ -45,7 +45,7 @@ fn test_opponent_can_only_play_breaking_moves_when_five_exists() {
         assert_eq!(state.current_player, Player::Min, "It should be Blue's turn after Pink creates a five");
         assert_eq!(state.winner, None, "Game should not be over yet - five is breakable");
         
-        let available_moves = state.get_candidate_moves();
+        let available_moves = state.order_moves();
         
         println!("Available moves for Blue: {} moves", available_moves.len());
         println!("Moves: {:?}", available_moves);
@@ -105,7 +105,7 @@ fn test_player_with_breakable_five_waits_for_opponent() {
         assert_eq!(state.current_player, Player::Min);
         
         // Blue should be able to make moves (breaking moves)
-        let blue_moves = state.get_candidate_moves();
+        let blue_moves = state.order_moves();
         assert!(!blue_moves.is_empty(), "Blue should have moves available to break the five");
     }
 }

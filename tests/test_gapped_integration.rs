@@ -1,6 +1,6 @@
 //! Test to demonstrate gapped pattern integration with move generation.
 
-use gomoku::ai::move_generation::MoveGenerator;
+use gomoku::ai::move_ordering::MoveGenerator;
 use gomoku::core::board::{Board, Player};
 
 #[test]
@@ -13,7 +13,7 @@ fn test_gapped_pattern_integration() {
     board.place_stone(9, 9, Player::Max);  // X
     // Pattern: X . X . X
     
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Max);
+    let moves = MoveGenerator::order_moves(&board, Player::Max);
     
     // The move generation should now consider moves around this gapped pattern
     // At minimum, it should generate zone-based moves around these stones
@@ -50,7 +50,7 @@ fn test_gapped_vs_consecutive_pattern_priority() {
     board.place_stone(9, 5, Player::Max);
     board.place_stone(9, 7, Player::Max);
     
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Max);
+    let moves = MoveGenerator::order_moves(&board, Player::Max);
     
     // Should prioritize completing the consecutive three
     // but also consider the gapped pattern

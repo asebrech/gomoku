@@ -193,7 +193,7 @@ pub fn lazy_smp_search(
         (available_cores * 3 / 5).max(1)
     });
 
-    if state.get_candidate_moves().is_empty() {
+    if state.order_moves().is_empty() {
         return SearchResult {
             best_move: None,
             score: 0,

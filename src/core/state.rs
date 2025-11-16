@@ -4,7 +4,7 @@
 //! - Maintain the `Board` and player to move.
 //! - Track captures, history and a running Zobrist hash for fast TT lookups.
 //! - Provide helper methods used by search (make_move, undo_move,
-//!   get_candidate_moves, is_terminal, ...).
+//!   order_moves, is_terminal, ...).
 //!
 //! Important invariants:
 //! - `current_hash` must reflect the board and current player and is updated
@@ -12,7 +12,7 @@
 //!
 use crate::core::zobrist::ZobristHash;
 use crate::ai::pattern_history::PatternHistoryAnalyzer;
-use crate::ai::move_generation::MoveGenerator;
+use crate::ai::move_ordering::MoveGenerator;
 use crate::core::board::{Board, Player};
 use crate::core::captures::CaptureHandler;
 use crate::core::rules::{WinDetection, DoubleThreeDetection, CaptureBreaking};
@@ -216,7 +216,7 @@ impl GameState {
         Self::new(board_size, win_condition)
     }
 
-    pub fn get_candidate_moves(&self) -> Vec<(usize, usize)> {
+    pub fn order_moves(&self) -> Vec<(usize, usize)> {
         if let Some(player_in_check) = self.player_in_check {
             // If a player is in check (has a breakable five), the OPPONENT must break it
             // player_in_check = player who HAS the breakable five
@@ -233,7 +233,7 @@ impl GameState {
             }
         }
         
-        MoveGenerator::get_candidate_moves(&self.board, self.current_player)
+        MoveGenerator::order_moves(&self.board, self.current_player)
     }
 
     pub fn is_move_legal(&self, mv: (usize, usize)) -> bool {
@@ -349,7 +349,7 @@ impl GameState {
     }
 
     pub fn is_terminal(&self) -> bool {
-        self.winner.is_some() || self.get_candidate_moves().is_empty()
+        self.winner.is_some() || self.order_moves().is_empty()
     }
 
     pub fn check_winner(&self) -> Option<Player> {

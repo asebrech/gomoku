@@ -1,6 +1,6 @@
 //! Test capture move bonus functionality
 
-use gomoku::ai::move_generation::MoveGenerator;
+use gomoku::ai::move_ordering::MoveGenerator;
 use gomoku::core::board::{Board, Player};
 
 #[test]
@@ -19,7 +19,7 @@ fn test_capture_move_gets_bonus() {
     board.place_stone(5, 5, Player::Min);
     board.place_stone(6, 6, Player::Max);
     
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Max);
+    let moves = MoveGenerator::order_moves(&board, Player::Max);
     
     // Verify we get moves
     assert!(!moves.is_empty(), "Should generate candidate moves");
@@ -48,7 +48,7 @@ fn test_multiple_capture_directions() {
     board.place_stone(12, 10, Player::Min);
     board.place_stone(13, 10, Player::Max);
     
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Max);
+    let moves = MoveGenerator::order_moves(&board, Player::Max);
     
     // Move (10,10) should get double bonus for captures in two directions
     assert!(!moves.is_empty(), "Should generate moves");
@@ -65,7 +65,7 @@ fn test_no_capture_no_bonus() {
     board.place_stone(11, 9, Player::Min);
     board.place_stone(11, 11, Player::Max);
     
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Max);
+    let moves = MoveGenerator::order_moves(&board, Player::Max);
     
     // Should still generate moves, just without capture bonuses
     assert!(!moves.is_empty(), "Should generate normal moves");
