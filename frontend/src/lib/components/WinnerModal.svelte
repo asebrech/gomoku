@@ -131,7 +131,7 @@
         onclick={onClose}
         fullWidth
       >
-        Close
+        {$_('game.winnerModal.close')}
       </Button>
     </div>
   </div>

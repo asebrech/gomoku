@@ -17,6 +17,15 @@
       "aiVsAi": "IA vs IA",
       "back": "Retour au Menu"
     },
+    "players": {
+      "ai1": "IA 1",
+      "ai2": "IA 2",
+      "player1": "Joueur 1",
+      "player2": "Joueur 2"
+    },
+    "status": {
+      "initializing": "Initialisation..."
+    },
     "scoreboard": {
       "captures": "Captures"
     },
@@ -50,7 +59,59 @@
     "draw": "Match Nul !",
     "newGame": "Nouvelle Partie",
     "undo": "Annuler",
-    "settings": "Paramètres"
+    "settings": "Paramètres",
+    "winnerModal": {
+      "congratulations": "Félicitations !",
+      "wins": "gagne !",
+      "draw": "Match nul !",
+      "close": "Fermer",
+      "newGame": "Nouvelle Partie",
+      "backToMenu": "Retour au Menu"
+    }
+  },
+  "history": {
+    "title": "Historique des Parties",
+    "back": "Retour",
+    "clearAll": "Tout Effacer",
+    "filter": {
+      "all": "Toutes",
+      "ongoing": "En Cours",
+      "finished": "Terminées"
+    },
+    "empty": {
+      "title": "Aucune partie trouvée",
+      "description": "Commencez à jouer pour voir votre historique ici.",
+      "descriptionFiltered": "Aucune partie {filter} trouvée.",
+      "startPlaying": "Commencer à Jouer"
+    },
+    "match": {
+      "replay": "Rejouer",
+      "resume": "Reprendre",
+      "delete": "Supprimer",
+      "gameMode": {
+        "aiVsAi": "IA vs IA",
+        "playerVsPlayer": "Joueur vs Joueur",
+        "playerVsAi": "Joueur vs IA"
+      },
+      "status": {
+        "ongoing": "En Cours",
+        "draw": "Match Nul",
+        "won": "{winner} a Gagné"
+      },
+      "info": {
+        "board": "Plateau",
+        "moves": "Coups",
+        "aiDepth": "Profondeur IA",
+        "captures": "captures"
+      }
+    },
+    "deleteConfirm": {
+      "title": "Supprimer la Partie",
+      "message": "Êtes-vous sûr de vouloir supprimer cette partie ? Cette action est irréversible.",
+      "cancel": "Annuler",
+      "delete": "Supprimer"
+    },
+    "clearAllConfirm": "Êtes-vous sûr de vouloir supprimer tout l'historique ? Cette action est irréversible."
   },
   "settings": {
     "title": "Paramètres",

@@ -207,6 +207,21 @@ impl WasmGameState {
         
         positions
     }
+
+    /// Get the complete move history as a JS array
+    /// Returns an array of move objects with row and col properties
+    pub fn get_move_history(&self) -> js_sys::Array {
+        let history = js_sys::Array::new();
+        
+        for (row, col) in &self.inner.move_history {
+            let move_obj = js_sys::Object::new();
+            js_sys::Reflect::set(&move_obj, &"row".into(), &JsValue::from(*row)).unwrap();
+            js_sys::Reflect::set(&move_obj, &"col".into(), &JsValue::from(*col)).unwrap();
+            history.push(&move_obj);
+        }
+        
+        history
+    }
 }
 
 impl GameState {

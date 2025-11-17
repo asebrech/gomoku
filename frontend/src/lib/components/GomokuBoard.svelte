@@ -70,7 +70,6 @@
     const row = Math.round(y / cellSize);
     
     if (row >= 0 && row < actualSize && col >= 0 && col < actualSize) {
-      console.log(`Clicked: row ${row}, col ${col}, svgCoords: (${svgX}, ${svgY}), boardCoords: (${x}, ${y})`);
       onCellClick?.(row, col);
     }
   }

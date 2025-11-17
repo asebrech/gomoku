@@ -11,6 +11,7 @@
   import { gameSettings } from '$lib/stores/gameSettings';
   import { currentTheme } from '$lib/theme/themeStore';
   import { playStoneSound, playWinSound, playLoseSound } from '$lib/utils/soundEffects';
+  import { matchHistory, generateMatchId, type MatchData } from '$lib/stores/matchHistory';
   
   interface Props {
     player1Type: 'human' | 'ai';
@@ -21,24 +22,26 @@
     autoStart?: boolean;
     moveDelay?: number;
     showSpeedControl?: boolean;
+    resumeMatchId?: string; // Match ID to resume
     onBack?: () => void;
   }
   
   let {
     player1Type,
     player2Type,
-    player1Name = player1Type === 'ai' ? 'AI 1' : 'Player 1',
-    player2Name = player2Type === 'ai' ? 'AI 2' : 'Player 2',
+    player1Name = player1Type === 'ai' ? $_('game.players.ai1') : $_('game.players.player1'),
+    player2Name = player2Type === 'ai' ? $_('game.players.ai2') : $_('game.players.player2'),
     aiDepth = $gameSettings.aiDepth,
     autoStart = false,
     moveDelay = 500,
     showSpeedControl = false,
+    resumeMatchId = undefined,
     onBack
   }: Props = $props();
   
   let board = $state(Array(19).fill(null).map(() => Array(19).fill(null)));
   let gameInstance: any = $state(null);
-  let gameStatus = $state('Initializing...');
+  let gameStatus = $state($_('game.status.initializing'));
   let isPlaying = $state(false);
   let isPaused = $state(false);
   let isGameOver = $state(false);
@@ -75,6 +78,12 @@
   // Last move tracking for visual effect
   let lastMovePosition = $state<{row: number, col: number} | null>(null);
   
+  // Match tracking for history
+  let currentMatchId = $state<string | null>(null);
+  let gameStartTime = $state<number | null>(null);
+  let matchAddedToStore = $state(false); // Track if match has been added to store
+  let autoSaveInterval: NodeJS.Timeout | null = null;
+  
   const isFullAI = player1Type === 'ai' && player2Type === 'ai';
   const hasHuman = player1Type === 'human' || player2Type === 'human';
   
@@ -100,6 +109,140 @@
     return 'Player vs AI';
   });
   
+  // Get move history from WASM
+  function getMoveHistory(): Array<{ row: number; col: number }> {
+    if (!gameInstance) return [];
+    
+    try {
+      const history = gameInstance.get_move_history();
+      if (!history) return [];
+      
+      const moves: Array<{ row: number; col: number }> = [];
+      for (let i = 0; i < history.length; i++) {
+        const move = history[i];
+        if (move && typeof move.row === 'number' && typeof move.col === 'number') {
+          moves.push({ row: move.row, col: move.col });
+        }
+      }
+      return moves;
+    } catch (error) {
+      console.error('Error getting move history:', error);
+      return [];
+    }
+  }
+  
+  // Resume a match from history
+  async function resumeMatch(match: MatchData) {
+    if (!gameInstance) {
+      console.error('Cannot resume: game instance not initialized');
+      return;
+    }
+    
+    // Replay all moves from history
+    let lastMove = null;
+    for (const move of match.moveHistory) {
+      if (gameInstance.is_move_legal_coords(move.row, move.col)) {
+        gameInstance.make_move_coords(move.row, move.col);
+        totalMoves++;
+        lastMove = move; // Track the last move
+      } else {
+        console.error('Invalid move in history:', move);
+      }
+    }
+    
+    // Update board from WASM state
+    updateBoardFromWasm();
+    
+    // Set the last move position for highlighting
+    if (lastMove) {
+      lastMovePosition = { row: lastMove.row, col: lastMove.col };
+    }
+    
+    // Restore match metadata
+    currentMatchId = match.id;
+    gameStartTime = match.date.getTime();
+    player1Captures = match.player1Captures;
+    player2Captures = match.player2Captures;
+    matchAddedToStore = true; // Match already exists in store
+    
+    // Update game state - use the same logic as startGame
+    shouldStop = false;
+    isPlaying = true;
+    isPaused = false;
+    isGameOver = false;
+    gameStatus = 'Game resumed';
+    
+    // Start auto-save
+    startAutoSave();
+    
+    // Start the game loop which will handle both human and AI turns
+    playGameLoop();
+  }
+  
+  // Save or update match in history
+  function saveMatchToHistory() {
+    if (!gameInstance) {
+      return;
+    }
+    
+    if (!gameStartTime) {
+      return;
+    }
+    
+    const now = Date.now();
+    const duration = Math.floor((now - gameStartTime) / 1000); // seconds
+    
+    const matchData: MatchData = {
+      id: currentMatchId || generateMatchId(),
+      date: new Date(gameStartTime),
+      player1Name: player1Name,
+      player2Name: player2Name,
+      player1Type: player1Type,
+      player2Type: player2Type,
+      boardSize: $gameSettings.boardSize,
+      winCondition: $gameSettings.winCondition,
+      aiDepth: (player1Type === 'ai' || player2Type === 'ai') ? aiDepth : undefined,
+      moveHistory: getMoveHistory(),
+      winner: isGameOver ? winnerPlayer : null,
+      status: isGameOver ? 'finished' : 'ongoing',
+      totalMoves: totalMoves,
+      player1Captures: player1Captures,
+      player2Captures: player2Captures,
+      duration: duration
+    };
+    
+    if (matchAddedToStore) {
+      // Update existing match in store
+      matchHistory.updateMatch(matchData.id, matchData);
+    } else {
+      // Add new match to store
+      currentMatchId = matchData.id;
+      matchHistory.addMatch(matchData);
+      matchAddedToStore = true;
+    }
+  }
+  
+  // Start auto-save interval (every 30 seconds)
+  function startAutoSave() {
+    if (autoSaveInterval) {
+      clearInterval(autoSaveInterval);
+    }
+    
+    autoSaveInterval = setInterval(() => {
+      if (gameStartTime && totalMoves > 0) {
+        saveMatchToHistory();
+      }
+    }, 30000); // 30 seconds
+  }
+  
+  // Stop auto-save interval
+  function stopAutoSave() {
+    if (autoSaveInterval) {
+      clearInterval(autoSaveInterval);
+      autoSaveInterval = null;
+    }
+  }
+  
   onMount(async () => {
     try {
       // Import WASM module (already initialized in root layout)
@@ -107,7 +250,6 @@
       
       // Create game instance with settings from store
       gameInstance = new wasmModule.WasmGameState($gameSettings.boardSize, $gameSettings.winCondition);
-      console.log(`Game initialized! Board: ${$gameSettings.boardSize}x${$gameSettings.boardSize}, Win: ${$gameSettings.winCondition}`);
       
       // Initialize board with correct size
       board = Array($gameSettings.boardSize).fill(null).map(() => Array($gameSettings.boardSize).fill(null));
@@ -115,8 +257,16 @@
       isGameOver = false;
       gameStatus = 'Ready to start';
       
-      // Auto-start only for AI vs AI mode when autoStart is true
-      if (autoStart && isFullAI) {
+      // Check if we need to resume a match
+      if (resumeMatchId) {
+        const matchToResume = $matchHistory.find(m => m.id === resumeMatchId);
+        if (matchToResume && matchToResume.status === 'ongoing') {
+          await resumeMatch(matchToResume);
+          // Clear the resume flag
+          sessionStorage.removeItem('resumeMatchId');
+        }
+      } else if (autoStart && isFullAI) {
+        // Auto-start only for AI vs AI mode when autoStart is true
         startGame();
       }
     } catch (error) {
@@ -131,7 +281,17 @@
     isPlaying = false;
     isPaused = true;
     waitingForHumanMove = false;
-    console.log('Game component destroyed, stopping game loop');
+    
+    // Clear auto-save interval
+    if (autoSaveInterval) {
+      clearInterval(autoSaveInterval);
+      autoSaveInterval = null;
+    }
+    
+    // Save one last time before destroying (if game has started)
+    if (currentMatchId && gameStartTime) {
+      saveMatchToHistory();
+    }
   });
   
   function updateBoardFromWasm() {
@@ -322,6 +482,10 @@
           gameStatus = 'Game Over - Draw';
         }
         isPlaying = false;
+        
+        // Save match on game completion
+        stopAutoSave();
+        saveMatchToHistory();
       }
       
       waitingForHumanMove = false;
@@ -363,8 +527,6 @@
       lastDepthReached = aiMoveResult.depth_reached;
       lastNodesSearched = Math.round(aiMoveResult.nodes_searched);
       lastAIScore = aiMoveResult.score;
-      
-      console.log(`AI Move: depth=${lastDepthReached}, nodes=${lastNodesSearched}, score=${lastAIScore}, time=${lastMoveTime}ms`);
       
       return { row: aiMoveResult.row, col: aiMoveResult.col };
     } catch (error) {
@@ -455,6 +617,14 @@
     isPlaying = true;
     isPaused = false;
     isGameOver = false;
+    
+    // Initialize match tracking if this is a new game
+    if (!gameStartTime) {
+      gameStartTime = Date.now();
+      currentMatchId = generateMatchId();
+      startAutoSave();
+    }
+    
     playGameLoop();
   }
   
@@ -481,6 +651,12 @@
       // Wait a moment for any running loop to stop
       await new Promise(resolve => setTimeout(resolve, 100));
       
+      // Stop auto-save and save final state if game was in progress
+      stopAutoSave();
+      if (gameStartTime && totalMoves > 0) {
+        saveMatchToHistory();
+      }
+      
       // Now reset the game state
       shouldStop = false;
       gameInstance.reset();
@@ -505,6 +681,11 @@
       lastAIScore = 0;
       lastMovePosition = null;
       aiHintPosition = null;
+      
+      // Reset match tracking for new game
+      currentMatchId = null;
+      gameStartTime = null;
+      matchAddedToStore = false;
       
       // Auto-restart for AI vs AI only
       if (autoStart && isFullAI) {
@@ -762,7 +943,7 @@
               class="text-xl font-bold"
               style="color: {winnerColor};"
             >
-              {cleanWinnerName} Wins!
+              {cleanWinnerName} {$_('game.stats.wins')}
             </p>
             <svg width="24" height="24" class="inline-block">
               <circle
@@ -793,7 +974,7 @@
         <!-- Game Controls - Start button only for AI vs AI -->
         {#if !isPlaying && !isPaused && isFullAI}
           <Button variant="primary" size="sm" onclick={startGame} disabled={!gameInstance || isGameOver}>
-            Start Match
+            {$_('game.stats.startMatch')}
           </Button>
         {/if}
         
@@ -801,20 +982,20 @@
         {#if isFullAI}
           {#if isPlaying}
             <Button variant="primary" size="sm" onclick={pauseGame}>
-              Pause
+              {$_('game.stats.pause')}
             </Button>
           {/if}
           
           {#if isPaused && !isGameOver}
             <Button variant="primary" size="sm" onclick={resumeGame}>
-              Resume
+              {$_('game.stats.resume')}
             </Button>
           {/if}
         {/if}
         
         <!-- Undo button -->
         <Button variant="primary" size="sm" onclick={undoMove} disabled={totalMoves === 0 || isGameOver}>
-          Undo
+          {$_('game.undo')}
         </Button>
         
         <!-- Continue button after undo (when it's AI's turn) -->
