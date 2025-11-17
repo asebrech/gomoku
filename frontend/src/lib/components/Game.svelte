@@ -104,9 +104,9 @@
   
   // Generate game mode display name
   const gameModeDisplay = $derived(() => {
-    if (player1Type === 'ai' && player2Type === 'ai') return 'AI vs AI';
-    if (player1Type === 'human' && player2Type === 'human') return 'Player vs Player';
-    return 'Player vs AI';
+    if (player1Type === 'ai' && player2Type === 'ai') return $_('history.match.gameMode.aiVsAi');
+    if (player1Type === 'human' && player2Type === 'human') return $_('history.match.gameMode.playerVsPlayer');
+    return $_('history.match.gameMode.playerVsAi');
   });
   
   // Get move history from WASM
