@@ -31,8 +31,8 @@
   };
 </script>
 
-<div class="min-h-[calc(100vh-4rem)] py-12 px-4">
-  <div class="max-w-4xl mx-auto">
+<div class="h-full w-full overflow-y-auto">
+  <div class="max-w-4xl mx-auto px-4 py-12">
     <!-- Title -->
     <div class="text-center mb-12">
       <h1 class="text-6xl font-black text-transparent bg-clip-text mb-4"

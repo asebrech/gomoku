@@ -1,13 +1,20 @@
 import { get } from 'svelte/store';
 import { audioSettings } from '$lib/stores/audioSettings';
 
+// Import sound assets so Vite can process them correctly in production
+import clickSound from '$lib/assets/sound/click.mp3';
+import gameWinSound from '$lib/assets/sound/game_win.wav';
+import gameLoseSound from '$lib/assets/sound/game_lose.wav';
+import stoneOneSound from '$lib/assets/sound/stone_one.wav';
+import stoneTwoSound from '$lib/assets/sound/stone_two.wav';
+
 // Sound effect paths
 const SOUND_PATHS = {
-  click: '/src/lib/assets/sound/click.mp3',
-  gameWin: '/src/lib/assets/sound/game_win.wav',
-  gameLose: '/src/lib/assets/sound/game_lose.wav',
-  stoneOne: '/src/lib/assets/sound/stone_one.wav',
-  stoneTwo: '/src/lib/assets/sound/stone_two.wav'
+  click: clickSound,
+  gameWin: gameWinSound,
+  gameLose: gameLoseSound,
+  stoneOne: stoneOneSound,
+  stoneTwo: stoneTwoSound
 };
 
 // Preloaded audio elements for better performance

@@ -55,8 +55,8 @@
   });
 </script>
 
-<div class="min-h-[calc(100vh-4rem)] py-8">
-  <div class="max-w-2xl mx-auto px-4">
+<div class="h-full w-full overflow-y-auto">
+  <div class="max-w-2xl mx-auto px-4 py-8 sm:py-12">
     <div class="text-center mb-8">
       <h1 class="text-5xl font-black text-transparent bg-clip-text mb-4"
           style="background-image: {$currentTheme.gradientPrimary}; -webkit-background-clip: text; background-clip: text;">

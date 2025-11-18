@@ -23,6 +23,21 @@
 	--glow-accent: 0 0 30px rgba(255, 51, 204, 0.7);
 }
 
+/* Prevent unwanted scrolling */
+html, body, #svelte {
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+	height: 100%;
+	width: 100%;
+}
+
+/* Ensure app wrapper takes full height */
+body > div {
+	height: 100%;
+	width: 100%;
+}
+
 /* Smooth transitions for theme changes */
 * {
 	transition-property: background-color, border-color, color, fill, stroke;

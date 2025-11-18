@@ -7,6 +7,7 @@
     onCellClick?: (row: number, col: number) => void;
     currentPlayer?: 'black' | 'white';
     doubleThreePositions?: Array<{row: number, col: number}>;
+    forcedCapturePositions?: Array<{row: number, col: number}>;
     aiHintPosition?: {row: number, col: number} | null;
     lastMovePosition?: {row: number, col: number} | null;
     canHumanPlay?: boolean;
@@ -18,6 +19,7 @@
     currentPlayer = 'black',
     onCellClick,
     doubleThreePositions = [],
+    forcedCapturePositions = [],
     aiHintPosition = null,
     lastMovePosition = null,
     canHumanPlay = true
@@ -70,7 +72,6 @@
     const row = Math.round(y / cellSize);
     
     if (row >= 0 && row < actualSize && col >= 0 && col < actualSize) {
-      console.log(`Clicked: row ${row}, col ${col}, svgCoords: (${svgX}, ${svgY}), boardCoords: (${x}, ${y})`);
       onCellClick?.(row, col);
     }
   }
@@ -95,9 +96,9 @@
     const row = Math.round(y / cellSize);
     
     if (row >= 0 && row < actualSize && col >= 0 && col < actualSize) {
-      // Only show hover if the cell is empty, not a double-three position, and human can play
-      const isDoubleThree = doubleThreePositions.some(pos => pos.row === row && pos.col === col);
-      if (!board[row]?.[col] && !isDoubleThree && canHumanPlay) {
+      // Show hover on empty cells when human can play AND the position is legal
+      const isLegalPosition = forcedCapturePositions.some(pos => pos.row === row && pos.col === col);
+      if (!board[row]?.[col] && canHumanPlay && isLegalPosition) {
         hoverRow = row;
         hoverCol = col;
       } else {
@@ -249,6 +250,20 @@
           class="pointer-events-none"
         />
       {/if}
+      
+      <!-- Forced capture position indicators (small green dots) -->
+      {#each forcedCapturePositions as pos}
+        {#if !board[pos.row]?.[pos.col]}
+          <circle
+            cx={padding + pos.col * cellSize}
+            cy={padding + pos.row * cellSize}
+            r={isMobile ? "2" : "2.5"}
+            fill="white"
+            opacity="0.65"
+            class="pointer-events-none"
+          />
+        {/if}
+      {/each}
       
       <!-- AI Hint indicator -->
       {#if aiHintPosition && !board[aiHintPosition.row]?.[aiHintPosition.col]}

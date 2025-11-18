@@ -17,6 +17,15 @@
       "aiVsAi": "AI vs AI",
       "back": "Back to Menu"
     },
+    "players": {
+      "ai1": "AI 1",
+      "ai2": "AI 2",
+      "player1": "Player 1",
+      "player2": "Player 2"
+    },
+    "status": {
+      "initializing": "Initializing..."
+    },
     "scoreboard": {
       "captures": "Captures"
     },
@@ -50,7 +59,59 @@
     "draw": "Draw!",
     "newGame": "New Game",
     "undo": "Undo",
-    "settings": "Settings"
+    "settings": "Settings",
+    "winnerModal": {
+      "congratulations": "Congratulations!",
+      "wins": "wins!",
+      "draw": "It's a draw!",
+      "close": "Close",
+      "newGame": "New Game",
+      "backToMenu": "Back to Menu"
+    }
+  },
+  "history": {
+    "title": "Match History",
+    "back": "Back",
+    "clearAll": "Clear All",
+    "filter": {
+      "all": "All",
+      "ongoing": "Ongoing",
+      "finished": "Finished"
+    },
+    "empty": {
+      "title": "No matches found",
+      "description": "Start playing to see your match history here.",
+      "descriptionFiltered": "No {filter} matches found.",
+      "startPlaying": "Start Playing"
+    },
+    "match": {
+      "replay": "Replay",
+      "resume": "Resume",
+      "delete": "Delete",
+      "gameMode": {
+        "aiVsAi": "AI vs AI",
+        "playerVsPlayer": "Player vs Player",
+        "playerVsAi": "Player vs AI"
+      },
+      "status": {
+        "ongoing": "Ongoing",
+        "draw": "Draw",
+        "won": "{winner} Won"
+      },
+      "info": {
+        "board": "Board",
+        "moves": "Moves",
+        "aiDepth": "AI Depth",
+        "captures": "captures"
+      }
+    },
+    "deleteConfirm": {
+      "title": "Delete Match",
+      "message": "Are you sure you want to delete this match? This action cannot be undone.",
+      "cancel": "Cancel",
+      "delete": "Delete"
+    },
+    "clearAllConfirm": "Are you sure you want to delete all match history? This cannot be undone."
   },
   "settings": {
     "title": "Settings",

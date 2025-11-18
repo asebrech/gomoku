@@ -17,6 +17,15 @@
       "aiVsAi": "IA vs IA",
       "back": "Volver al Menú"
     },
+    "players": {
+      "ai1": "IA 1",
+      "ai2": "IA 2",
+      "player1": "Jugador 1",
+      "player2": "Jugador 2"
+    },
+    "status": {
+      "initializing": "Inicializando..."
+    },
     "scoreboard": {
       "captures": "Capturas"
     },
@@ -50,7 +59,59 @@
     "draw": "¡Empate!",
     "newGame": "Nueva Partida",
     "undo": "Deshacer",
-    "settings": "Configuración"
+    "settings": "Configuración",
+    "winnerModal": {
+      "congratulations": "¡Felicitaciones!",
+      "wins": "¡gana!",
+      "draw": "¡Es un empate!",
+      "close": "Cerrar",
+      "newGame": "Nueva Partida",
+      "backToMenu": "Volver al Menú"
+    }
+  },
+  "history": {
+    "title": "Historial de Partidas",
+    "back": "Volver",
+    "clearAll": "Borrar Todo",
+    "filter": {
+      "all": "Todas",
+      "ongoing": "En Curso",
+      "finished": "Finalizadas"
+    },
+    "empty": {
+      "title": "No se encontraron partidas",
+      "description": "Comienza a jugar para ver tu historial aquí.",
+      "descriptionFiltered": "No se encontraron partidas {filter}.",
+      "startPlaying": "Comenzar a Jugar"
+    },
+    "match": {
+      "replay": "Repetir",
+      "resume": "Reanudar",
+      "delete": "Eliminar",
+      "gameMode": {
+        "aiVsAi": "IA vs IA",
+        "playerVsPlayer": "Jugador vs Jugador",
+        "playerVsAi": "Jugador vs IA"
+      },
+      "status": {
+        "ongoing": "En Curso",
+        "draw": "Empate",
+        "won": "{winner} Ganó"
+      },
+      "info": {
+        "board": "Tablero",
+        "moves": "Movimientos",
+        "aiDepth": "Profundidad IA",
+        "captures": "capturas"
+      }
+    },
+    "deleteConfirm": {
+      "title": "Eliminar Partida",
+      "message": "¿Estás seguro de que quieres eliminar esta partida? Esta acción no se puede deshacer.",
+      "cancel": "Cancelar",
+      "delete": "Eliminar"
+    },
+    "clearAllConfirm": "¿Estás seguro de que quieres eliminar todo el historial? Esta acción no se puede deshacer."
   },
   "settings": {
     "title": "Configuración",
