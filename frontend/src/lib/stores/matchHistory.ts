@@ -105,6 +105,11 @@ function createMatchHistoryStore() {
 export const matchHistory = createMatchHistoryStore();
 
 // Helper function to generate a unique match ID
+let idCounter = 0;
 export function generateMatchId(): string {
-  return `match_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  // Use timestamp + counter + random for better uniqueness
+  const timestamp = Date.now();
+  const counter = idCounter++;
+  const random = Math.random().toString(36).substring(2, 9);
+  return `match_${timestamp}_${counter}_${random}`;
 }
