@@ -62,6 +62,9 @@
   let showDoubleThree = $state($gameSettings.showDoubleThree);
   let doubleThreePositions = $state<Array<{row: number, col: number}>>([]);
   
+  // Forced capture positions (when there's a breakable five)
+  let forcedCapturePositions = $state<Array<{row: number, col: number}>>([]);
+  
   // AI hint feature
   let showAIHint = $state($gameSettings.showAIHint);
   let aiHintPosition = $state<{row: number, col: number} | null>(null);
@@ -329,6 +332,11 @@
       if (showDoubleThree && !isGameOver) {
         updateDoubleThreePositions();
       }
+      
+      // Update forced capture positions
+      if (!isGameOver) {
+        updateForcedCapturePositions();
+      }
     } catch (error) {
       console.error('Error updating board:', error);
     }
@@ -368,6 +376,48 @@
     } catch (error) {
       console.error('Error getting double-three positions:', error);
       doubleThreePositions = [];
+    }
+  }
+  
+  function updateForcedCapturePositions() {
+    // Guard against calling when game instance doesn't exist or game is over
+    if (!gameInstance || isGameOver) {
+      forcedCapturePositions = [];
+      return;
+    }
+    
+    try {
+      const legalMoves = gameInstance.get_legal_moves();
+      
+      if (!legalMoves) {
+        forcedCapturePositions = [];
+        return;
+      }
+      
+      // Get total number of empty positions on the board
+      let emptyCount = 0;
+      for (let row = 0; row < board.length; row++) {
+        for (let col = 0; col < board[row].length; col++) {
+          if (board[row][col] === null) emptyCount++;
+        }
+      }
+      
+      // Always show dots for legal moves
+      forcedCapturePositions = [];
+      for (let i = 0; i < legalMoves.length; i++) {
+        const pos = legalMoves[i];
+        if (pos && typeof pos.row === 'number' && typeof pos.col === 'number') {
+          forcedCapturePositions.push({ row: pos.row, col: pos.col });
+        }
+      }
+      
+      // If moves are restricted, log it
+      if (legalMoves.length < emptyCount) {
+        console.log('[DEBUG] Moves restricted! Showing', forcedCapturePositions.length, 'legal positions out of', emptyCount, 'empty positions');
+      }
+    } catch (error) {
+      console.error('Error getting forced capture positions:', error);
+      forcedCapturePositions = [];
     }
   }
   
@@ -827,6 +877,7 @@
             onCellClick={handleCellClick}
             currentPlayer={currentPlayer === 1 ? 'black' : 'white'}
             {doubleThreePositions}
+            {forcedCapturePositions}
             {aiHintPosition}
             {lastMovePosition}
             canHumanPlay={canHumanPlay()}
@@ -903,6 +954,7 @@
         onCellClick={handleCellClick}
         currentPlayer={currentPlayer === 1 ? 'black' : 'white'}
         {doubleThreePositions}
+        {forcedCapturePositions}
         {aiHintPosition}
         {lastMovePosition}
         canHumanPlay={canHumanPlay()}

@@ -222,6 +222,24 @@ impl WasmGameState {
         
         history
     }
+
+    /// Get all legal moves for the current player.
+    /// When there's a breakable five, this returns only the forced capture positions.
+    /// Otherwise, returns all empty positions that don't create double-three.
+    /// Returns a JS array of Move objects.
+    pub fn get_legal_moves(&self) -> js_sys::Array {
+        let positions = js_sys::Array::new();
+        let moves = self.inner.get_legal_moves();
+        
+        for (row, col) in moves {
+            let move_obj = js_sys::Object::new();
+            js_sys::Reflect::set(&move_obj, &"row".into(), &JsValue::from(row)).unwrap();
+            js_sys::Reflect::set(&move_obj, &"col".into(), &JsValue::from(col)).unwrap();
+            positions.push(&move_obj);
+        }
+        
+        positions
+    }
 }
 
 impl GameState {
@@ -274,6 +292,33 @@ impl GameState {
         }
         
         MoveGenerator::get_candidate_moves(&self.board, self.current_player)
+    }
+
+    pub fn get_legal_moves(&self) -> Vec<(usize, usize)> {
+        // If there's a breakable five, only the forced capture moves are legal
+        if let Some(player_in_check) = self.player_in_check {
+            if player_in_check != self.current_player {
+                if let Some(check_pos) = self.check_position {
+                    let breaking_moves = CaptureBreaking::get_breaking_capture_moves(&self.board, check_pos.0, check_pos.1, player_in_check);
+                    if !breaking_moves.is_empty() {
+                        return breaking_moves;
+                    } else {
+                        return vec![];
+                    }
+                }
+            }
+        }
+        
+        // Otherwise, return all empty positions that don't create double-three
+        let mut legal_moves = Vec::new();
+        for row in 0..self.board.size {
+            for col in 0..self.board.size {
+                if self.is_move_legal((row, col)) {
+                    legal_moves.push((row, col));
+                }
+            }
+        }
+        legal_moves
     }
 
     pub fn is_move_legal(&self, mv: (usize, usize)) -> bool {
