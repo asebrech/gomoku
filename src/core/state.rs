@@ -11,7 +11,6 @@
 //!   on every make/undo move path.
 //!
 use crate::core::zobrist::ZobristHash;
-use crate::ai::pattern_history::PatternHistoryAnalyzer;
 use crate::ai::move_ordering::MoveGenerator;
 use crate::core::board::{Board, Player};
 use crate::core::captures::CaptureHandler;
@@ -53,7 +52,6 @@ pub struct GameState {
     pub min_captures: usize,
     pub capture_history: Vec<Vec<(usize, usize)>>,
     pub move_history: Vec<(usize, usize)>,
-    pub pattern_analyzer: PatternHistoryAnalyzer,
     pub zobrist_hash: ZobristHash,
     pub current_hash: u64,
     pub player_in_check: Option<Player>,
@@ -201,7 +199,6 @@ impl GameState {
             min_captures: 0,
             capture_history: Vec::new(),
             move_history: Vec::new(),
-            pattern_analyzer: PatternHistoryAnalyzer::new(),
             zobrist_hash: zobrist_hash.clone(),
             current_hash: 0,
             player_in_check: None,
@@ -300,16 +297,11 @@ impl GameState {
     fn update_pattern_analysis(&mut self) {
         let current_player = self.current_player;
         let capture_history_len = self.capture_history.len();
-        let last_captures = if capture_history_len > 0 {
+        let _last_captures = if capture_history_len > 0 {
             self.capture_history[capture_history_len - 1].clone()
         } else {
             Vec::new()
         };
-        
-        let move_player = current_player.opponent();
-        let captures_made = last_captures.len() / 2;
-        
-        self.pattern_analyzer.analyze_move(move_player, captures_made);
     }
 
     pub fn undo_move(&mut self, move_: (usize, usize)) {
