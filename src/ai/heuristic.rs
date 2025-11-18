@@ -1,10 +1,12 @@
 use crate::core::board::{Board, Player};
 use crate::core::patterns::{DIRECTIONS, PatternAnalyzer, PatternFreedom};
 use crate::core::state::GameState;
+use crate::core::captures::CaptureHandler;
 
 pub struct Heuristic;
 
 pub const WINNING_SCORE: i32 = 1_000_000;
+pub const CAPTURE_VULNERABILITY_BASE: i32 = 3_000;  // Reduced from 8,000 - tactics should take priority
 pub const CAPTURE_BONUS_MULTIPLIER: i32 = 15_000;
 pub const LIVE_FOUR_SCORE: i32 = 15_000;         // _XXXX_ (guaranteed win next move)
 pub const HALF_FREE_FOUR_SCORE: i32 = 3_500;     // _XXXX| or |XXXX_ (one side open)
@@ -37,7 +39,18 @@ impl Heuristic {
         
         let capture_bonus = Self::calculate_capture_bonus(state);
         
-        max_pattern_score - min_pattern_score + capture_bonus
+        // Check if either player has a strong tactical position (live four or multiple threats)
+        // If so, reduce capture vulnerability penalty as tactics take priority
+        let has_strong_tactics = max_pattern_score >= LIVE_FOUR_SCORE || min_pattern_score >= LIVE_FOUR_SCORE;
+        
+        let capture_vulnerability_penalty = if has_strong_tactics {
+            // Reduce penalty significantly when there are strong tactical threats
+            Self::evaluate_capture_vulnerability(state) / 4
+        } else {
+            Self::evaluate_capture_vulnerability(state)
+        };
+        
+        max_pattern_score - min_pattern_score + capture_bonus - capture_vulnerability_penalty
     }
 
     fn analyze_all_patterns(board: &Board, win_condition: usize) -> (i32, i32) {
@@ -180,6 +193,131 @@ impl Heuristic {
             0
         };
         max_bonus - min_bonus
+    }
+    
+    /// Evaluates vulnerability to captures based on:
+    /// 1. How many capturable pairs the current player has on the board
+    /// 2. How close the opponent is to winning by capture
+    /// 3. Whether opponent can capture and win immediately
+    /// Returns a penalty score (higher = more vulnerable)
+    fn evaluate_capture_vulnerability(state: &GameState) -> i32 {
+        let current_player = state.current_player;
+        let opponent = current_player.opponent();
+        
+        let opponent_captures = match opponent {
+            Player::Max => state.max_captures,
+            Player::Min => state.min_captures,
+        };
+        
+        // Count how many capturable pairs the current player has
+        let capturable_pairs = Self::count_capturable_pairs(&state.board, current_player, opponent);
+        
+        if capturable_pairs == 0 {
+            return 0;
+        }
+        
+        // Check if opponent can win by capture immediately
+        let can_win_immediately = opponent_captures >= state.capture_to_win - 1 &&
+            Self::opponent_can_capture_and_win(state, opponent);
+        
+        if can_win_immediately {
+            // Critical: opponent can win by capture next move - huge penalty
+            return 900_000;
+        }
+        
+        // Calculate graduated penalty based on:
+        // - Number of capturable pairs (more pairs = more vulnerable)
+        // - Opponent's capture progress (closer to winning = more dangerous)
+        let progress_multiplier = if opponent_captures >= state.capture_to_win - 2 {
+            5  // Very close to winning
+        } else if opponent_captures >= state.capture_to_win - 3 {
+            3  // Getting close
+        } else if opponent_captures >= state.capture_to_win / 2 {
+            2  // Halfway there
+        } else {
+            1  // Early game
+        };
+        
+        CAPTURE_VULNERABILITY_BASE * capturable_pairs as i32 * progress_multiplier
+    }
+    
+    /// Counts how many capturable pair patterns exist for the given player
+    fn count_capturable_pairs(board: &Board, player: Player, opponent: Player) -> usize {
+        let mut count = 0;
+        let player_bits = board.get_player_bits(player);
+        
+        board.iterate_bits(player_bits, |row, col| {
+            for &(dx, dy) in &DIRECTIONS {
+                // Check if this stone is part of a capturable pair
+                // Pattern: O X X _ (opponent can place at _ to capture)
+                let next_r = row as isize + dx;
+                let next_c = col as isize + dy;
+                
+                if !PatternAnalyzer::is_in_bounds(board, next_r, next_c) {
+                    continue;
+                }
+                
+                let next_idx = board.index(next_r as usize, next_c as usize);
+                if !Board::is_bit_set(player_bits, next_idx) {
+                    continue;
+                }
+                
+                // Found two consecutive stones - check both ends
+                let before_r = row as isize - dx;
+                let before_c = col as isize - dy;
+                let after_r = next_r + dx;
+                let after_c = next_c + dy;
+                
+                let before_vulnerable = PatternAnalyzer::is_in_bounds(board, before_r, before_c) &&
+                    board.get_player(before_r as usize, before_c as usize) == Some(opponent);
+                    
+                let after_vulnerable = PatternAnalyzer::is_in_bounds(board, after_r, after_c) &&
+                    board.get_player(after_r as usize, after_c as usize) == Some(opponent);
+                
+                if before_vulnerable || after_vulnerable {
+                    count += 1;
+                }
+            }
+        });
+        
+        // Divide by 2 since each pair is counted twice
+        count / 2
+    }
+    
+    /// Checks if opponent can capture and win on their next move
+    fn opponent_can_capture_and_win(state: &GameState, opponent: Player) -> bool {
+        let opponent_captures = match opponent {
+            Player::Max => state.max_captures,
+            Player::Min => state.min_captures,
+        };
+        
+        for row in 0..state.board.size {
+            for col in 0..state.board.size {
+                if state.board.get_player(row, col).is_some() {
+                    continue;
+                }
+                
+                let mut temp_board = state.board.clone();
+                let idx = temp_board.index(row, col);
+                
+                Board::set_bit(&mut temp_board.occupied, idx);
+                match opponent {
+                    Player::Max => Board::set_bit(&mut temp_board.max_bits, idx),
+                    Player::Min => Board::set_bit(&mut temp_board.min_bits, idx),
+                }
+                
+                let captures = CaptureHandler::detect_captures(&temp_board, row, col, opponent);
+                
+                if !captures.is_empty() {
+                    let capture_pairs = captures.len() / 2;
+                    if opponent_captures + capture_pairs >= state.capture_to_win {
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        false
     }
 }
 

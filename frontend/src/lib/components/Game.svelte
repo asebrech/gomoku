@@ -328,15 +328,11 @@
       player1Captures = gameInstance.get_max_captures();
       player2Captures = gameInstance.get_min_captures();
       
-      // Update double-three positions if the toggle is on and game is not over
-      if (showDoubleThree && !isGameOver) {
-        updateDoubleThreePositions();
-      }
+      // Update double-three positions (function has its own guards)
+      updateDoubleThreePositions();
       
-      // Update forced capture positions
-      if (!isGameOver) {
-        updateForcedCapturePositions();
-      }
+      // Update forced capture positions (function has its own guards)
+      updateForcedCapturePositions();
     } catch (error) {
       console.error('Error updating board:', error);
     }
@@ -710,9 +706,9 @@
       // Now reset the game state
       shouldStop = false;
       gameInstance.reset();
-      updateBoardFromWasm();
       isGameOver = false;
       isPaused = false;
+      updateBoardFromWasm();
       waitingForHumanMove = false;
       needsAIContinue = false;
       winnerPlayer = null;

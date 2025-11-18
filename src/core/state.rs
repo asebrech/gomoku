@@ -355,7 +355,7 @@ impl GameState {
     }
 
     fn update_pattern_analysis(&mut self) {
-        let current_player = self.current_player;
+        let _current_player = self.current_player;
         let capture_history_len = self.capture_history.len();
         let _last_captures = if capture_history_len > 0 {
             self.capture_history[capture_history_len - 1].clone()

@@ -117,8 +117,11 @@ fn test_heuristic_blocked_line() {
     let score = Heuristic::evaluate(&state, 1);
 
     // Completely blocked patterns should not contribute to score
-    // since they have no winning potential
-    assert_eq!(score, 0); // Should be zero since blocked pattern has no value
+    // since they have no winning potential. However, Max now has capturable pairs
+    // (stones next to Min stones) which creates a vulnerability penalty.
+    // With reduced penalty (3000 instead of 8000), the penalty should be smaller.
+    assert!(score < 0, "Score should be negative due to capture vulnerability: {}", score);
+    assert!(score >= -10_000, "Penalty should be moderate in early game: {}", score);
 }
 
 #[test]
@@ -563,5 +566,12 @@ fn test_heuristic_multiple_half_free_fours() {
     
     let score = Heuristic::evaluate(&state, 1);
     
-    assert!(score >= 7_000 && score <= 8_500, "Two half-free fours (3500 each) plus smaller patterns: {}", score);
+    // Two half-free fours (3500 each) = 7000
+    // But Max has capturable pairs (XXXX next to O stones) creating vulnerability
+    // With strong tactics present, penalty is reduced by 1/4
+    // Base: CAPTURE_VULNERABILITY_BASE * pairs * 1 = 3000 * 2 * 1 = 6000
+    // Reduced: 6000 / 4 = 1500 (due to strong tactics)
+    // Net score: 7000 - 1500 = ~5500
+    assert!(score > 4_000, "Score should be positive with strong tactics: {}", score);
+    assert!(score <= 8_500, "Score should account for vulnerability: {}", score);
 }
