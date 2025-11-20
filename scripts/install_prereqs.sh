@@ -179,17 +179,6 @@ else
     warn "No frontend directory found at $ROOT_DIR/frontend"
 fi
 
-# Create a simple environment setup script for immediate use
-ENV_SCRIPT="$ROOT_DIR/scripts/setup_env.sh"
-cat > "$ENV_SCRIPT" << 'EOF'
-#!/bin/bash
-# Source this file to set up the development environment
-export PATH="$HOME/.cargo/bin:$HOME/.local/bin:$HOME/.local/share/pnpm:$PATH"
-export PNPM_HOME="$HOME/.local/share/pnpm"
-echo "Environment set up. You can now use rustc, wasm-pack, node, and pnpm."
-EOF
-chmod +x "$ENV_SCRIPT"
-
 info "Prerequisites installation complete. Summary:" 
 info " - rustup: $(command_exists rustup && echo 'installed' || echo 'missing')"
 info " - rust toolchain: $TOOLCHAIN"
@@ -200,12 +189,21 @@ info " - pnpm: $(command_exists pnpm && echo 'installed' || echo 'missing')"
 echo ""
 echo "=== IMPORTANT ==="
 echo "To use the installed tools in your CURRENT shell session, run:"
-echo "  source $ROOT_DIR/scripts/setup_env.sh"
+echo "  source $ROOT_DIR/scripts/install_prereqs.sh"
 echo ""
 echo "For future terminal sessions, the tools will be available after running:"
 echo "  source ~/.bashrc"
 echo "Or by restarting your terminal."
 echo ""
 echo "Quick start (run these commands):"
-echo "  source $ROOT_DIR/scripts/setup_env.sh"
+echo "  source $ROOT_DIR/scripts/install_prereqs.sh"
 echo "  make wasm && cd frontend && pnpm run dev"
+
+# Environment setup - this section can be sourced to set up the current shell
+export PATH="$HOME/.cargo/bin:$HOME/.local/bin:$HOME/.local/share/pnpm:$PATH"
+export PNPM_HOME="$HOME/.local/share/pnpm"
+
+# Only show this message when sourcing (not when executing)
+if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    echo "Environment set up. You can now use rustc, wasm-pack, node, and pnpm."
+fi
