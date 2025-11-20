@@ -46,6 +46,7 @@
   let isPaused = $state(false);
   let isGameOver = $state(false);
   let currentPlayer = $state(1); // 1 or 2
+  let actualBoardSize = $state($gameSettings.boardSize); // Track actual board size for this game
   let currentPlayerName = $state(player1Name);
   let winnerPlayer = $state<number | null>(null); // Track winner (1 or 2)
   let showWinnerModal = $state(false); // Control winner modal visibility
@@ -202,11 +203,11 @@
       player2Name: player2Name,
       player1Type: player1Type,
       player2Type: player2Type,
-      boardSize: $gameSettings.boardSize,
-      winCondition: $gameSettings.winCondition,
+      boardSize: actualBoardSize,
+      winCondition: gameInstance ? gameInstance.inner?.win_condition || 5 : 5,
       aiDepth: (player1Type === 'ai' || player2Type === 'ai') ? aiDepth : undefined,
       moveHistory: getMoveHistory(),
-      winner: isGameOver ? winnerPlayer : null,
+      winner: isGameOver && winnerPlayer !== null ? (winnerPlayer as 1 | 2) : null,
       status: isGameOver ? 'finished' : 'ongoing',
       totalMoves: totalMoves,
       player1Captures: player1Captures,
@@ -251,16 +252,32 @@
       // Import WASM module (already initialized in root layout)
       const wasmModule = await import('$lib/wasm/pkg/gomoku');
       
-      // Create game instance with settings from store
-      gameInstance = new wasmModule.WasmGameState($gameSettings.boardSize, $gameSettings.winCondition);
+      // Check if we need to resume a match first to get the correct settings
+      let boardSize = $gameSettings.boardSize;
+      let winCondition = $gameSettings.winCondition;
+      
+      if (resumeMatchId) {
+        const matchToResume = $matchHistory.find(m => m.id === resumeMatchId);
+        if (matchToResume && matchToResume.status === 'ongoing') {
+          // Use the match's original settings, not current user settings
+          boardSize = matchToResume.boardSize;
+          winCondition = matchToResume.winCondition;
+        }
+      }
+      
+      // Create game instance with correct settings (either match settings or current settings)
+      gameInstance = new wasmModule.WasmGameState(boardSize, winCondition);
+      
+      // Update the actual board size being used for this game
+      actualBoardSize = boardSize;
       
       // Initialize board with correct size
-      board = Array($gameSettings.boardSize).fill(null).map(() => Array($gameSettings.boardSize).fill(null));
+      board = Array(boardSize).fill(null).map(() => Array(boardSize).fill(null));
       updateBoardFromWasm();
       isGameOver = false;
       gameStatus = 'Ready to start';
       
-      // Check if we need to resume a match
+      // Now resume the match if needed
       if (resumeMatchId) {
         const matchToResume = $matchHistory.find(m => m.id === resumeMatchId);
         if (matchToResume && matchToResume.status === 'ongoing') {
@@ -897,7 +914,7 @@
     <div class="flex-shrink-0 overflow-y-auto">
       <GameStats
         gameMode={gameModeDisplay()}
-        boardSize={$gameSettings.boardSize}
+        boardSize={actualBoardSize}
         aiDepth={player1Type === 'ai' || player2Type === 'ai' ? aiDepth : undefined}
         currentPlayer={currentPlayerName}
         winnerPlayer={winnerPlayer}
