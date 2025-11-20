@@ -126,7 +126,7 @@
     "aiMaxThinkingTime": "Tiempo Máximo de Pensamiento IA",
     "visualAids": "Ayudas Visuales",
     "showDoubleThree": "Mostrar Doble-Tres del Oponente",
-    "showDoubleThreeHint": "Resalta posiciones doble-tres ilegales del oponente con marcadores X rojos (tus posiciones siempre se muestran)",
+    "showDoubleThreeHint": "Muestra posiciones doble-tres ilegales del oponente con marcadores X colorados (tus posiciones siempre se muestran con tu color)",
     "showAIHint": "Mostrar Pista IA",
     "showAIHintDescription": "Muestra el movimiento sugerido por la IA con un anillo dorado (solo juegos humanos)",
     "themeEditor": "Editor de Temas",

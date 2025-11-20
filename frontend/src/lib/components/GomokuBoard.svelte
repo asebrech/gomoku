@@ -6,7 +6,7 @@
     board?: Array<Array<'black' | 'white' | null>>;
     onCellClick?: (row: number, col: number) => void;
     currentPlayer?: 'black' | 'white';
-    doubleThreePositions?: Array<{row: number, col: number}>;
+    doubleThreePositions?: Array<{row: number, col: number, player: number}>;
     forcedCapturePositions?: Array<{row: number, col: number}>;
     aiHintPosition?: {row: number, col: number} | null;
     lastMovePosition?: {row: number, col: number} | null;
@@ -111,9 +111,6 @@
     }
   }
   
-  function isDoubleThreePosition(row: number, col: number): boolean {
-    return doubleThreePositions.some(pos => pos.row === row && pos.col === col);
-  }
   
   function handleMouseLeave() {
     hoverRow = null;
@@ -202,18 +199,19 @@
         {/each}
       {/each}
       
-      <!-- Double-three markers (red crosses) -->
-      {#each doubleThreePositions as pos}
+      <!-- Double-three markers with player-specific colors -->
+      {#each doubleThreePositions as pos (`${pos.row}-${pos.col}-${pos.player}`)}
         {#if !board[pos.row]?.[pos.col]}
-          <g class="animate-fade-in">
-            <!-- Red X mark -->
+          {@const strokeColor = pos.player === 1 ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2}
+          <g>
+            <!-- X mark with player color -->
             <line
               x1={padding + pos.col * cellSize - (isMobile ? 4 : 6)}
               y1={padding + pos.row * cellSize - (isMobile ? 4 : 6)}
               x2={padding + pos.col * cellSize + (isMobile ? 4 : 6)}
               y2={padding + pos.row * cellSize + (isMobile ? 4 : 6)}
-              stroke="#FF0000"
-              stroke-width="2"
+              stroke={strokeColor}
+              stroke-width="2.5"
               stroke-linecap="round"
             />
             <line
@@ -221,19 +219,19 @@
               y1={padding + pos.row * cellSize - (isMobile ? 4 : 6)}
               x2={padding + pos.col * cellSize - (isMobile ? 4 : 6)}
               y2={padding + pos.row * cellSize + (isMobile ? 4 : 6)}
-              stroke="#FF0000"
-              stroke-width="2"
+              stroke={strokeColor}
+              stroke-width="2.5"
               stroke-linecap="round"
             />
-            <!-- Optional: Add a subtle glow effect -->
+            <!-- Subtle glow effect with player color -->
             <circle
               cx={padding + pos.col * cellSize}
               cy={padding + pos.row * cellSize}
               r={isMobile ? "6" : "8"}
               fill="none"
-              stroke="#FF0000"
+              stroke={strokeColor}
               stroke-width="1"
-              opacity="0.3"
+              opacity="0.4"
             />
           </g>
         {/if}

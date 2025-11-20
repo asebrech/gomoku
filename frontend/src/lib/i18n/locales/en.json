@@ -126,7 +126,7 @@
     "aiMaxThinkingTime": "AI Max Thinking Time",
     "visualAids": "Visual Aids",
     "showDoubleThree": "Show Opponent Double-Three",
-    "showDoubleThreeHint": "Highlights opponent's illegal double-three positions with red X markers (your positions are always shown)",
+    "showDoubleThreeHint": "Shows opponent's illegal double-three positions with color-coded X markers (your positions are always shown with your color)",
     "showAIHint": "Show AI Hint",
     "showAIHintDescription": "Displays AI-suggested move with a golden ring (Human games only)",
     "themeEditor": "Theme Editor",

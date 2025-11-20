@@ -61,7 +61,7 @@
   
   // Double-three visualization
   let showDoubleThree = $state($gameSettings.showDoubleThree);
-  let doubleThreePositions = $state<Array<{row: number, col: number}>>([]);
+  let doubleThreePositions = $state<Array<{row: number, col: number, player: number, isOwn?: boolean}>>([]);
   
   // Forced capture positions (when there's a breakable five)
   let forcedCapturePositions = $state<Array<{row: number, col: number}>>([]);
@@ -362,28 +362,69 @@
       return;
     }
     
-    // Determine if current player is human
-    const currentPlayerType = currentPlayer === 1 ? player1Type : player2Type;
-    const isCurrentPlayerHuman = currentPlayerType === 'human';
-    
-    // Always show for human players, only show for AI/opponent if toggle is on
-    if (!isCurrentPlayerHuman && !showDoubleThree) {
-      doubleThreePositions = [];
-      return;
-    }
-    
     try {
-      const positions = gameInstance.get_double_three_positions();
-      if (!positions) {
-        doubleThreePositions = [];
-        return;
-      }
+      // Get double-three positions for both players
+      const player1Positions = gameInstance.get_double_three_positions_for_player(0); // Player::Max = 0
+      const player2Positions = gameInstance.get_double_three_positions_for_player(1); // Player::Min = 1
       
       doubleThreePositions = [];
-      for (let i = 0; i < positions.length; i++) {
-        const pos = positions[i];
-        if (pos && typeof pos.row === 'number' && typeof pos.col === 'number') {
-          doubleThreePositions.push({ row: pos.row, col: pos.col });
+      
+      // Always show current player's positions
+      if (currentPlayer === 1) {
+        // Current player is Player 1, show their positions
+        for (let i = 0; i < player1Positions.length; i++) {
+          const pos = player1Positions[i];
+          if (pos && typeof pos.row === 'number' && typeof pos.col === 'number') {
+            doubleThreePositions.push({ 
+              row: pos.row, 
+              col: pos.col, 
+              player: 1,
+              isOwn: true  // Mark as own position
+            });
+          }
+        }
+        
+        // Show opponent (Player 2) positions only if toggle is on
+        if (showDoubleThree) {
+          for (let i = 0; i < player2Positions.length; i++) {
+            const pos = player2Positions[i];
+            if (pos && typeof pos.row === 'number' && typeof pos.col === 'number') {
+              doubleThreePositions.push({ 
+                row: pos.row, 
+                col: pos.col, 
+                player: 2,
+                isOwn: false  // Mark as enemy position
+              });
+            }
+          }
+        }
+      } else {
+        // Current player is Player 2, show their positions
+        for (let i = 0; i < player2Positions.length; i++) {
+          const pos = player2Positions[i];
+          if (pos && typeof pos.row === 'number' && typeof pos.col === 'number') {
+            doubleThreePositions.push({ 
+              row: pos.row, 
+              col: pos.col, 
+              player: 2,
+              isOwn: true  // Mark as own position
+            });
+          }
+        }
+        
+        // Show opponent (Player 1) positions only if toggle is on
+        if (showDoubleThree) {
+          for (let i = 0; i < player1Positions.length; i++) {
+            const pos = player1Positions[i];
+            if (pos && typeof pos.row === 'number' && typeof pos.col === 'number') {
+              doubleThreePositions.push({ 
+                row: pos.row, 
+                col: pos.col, 
+                player: 1,
+                isOwn: false  // Mark as enemy position
+              });
+            }
+          }
         }
       }
     } catch (error) {
@@ -846,8 +887,7 @@
   });
   
   $effect(() => {
-    // Update double-three positions when toggle changes, board updates, or current player changes
-    // Always show for human players, only show for opponent if toggle is on
+    // Update double-three positions when board updates or current player changes
     // Use untrack to prevent infinite loops when updating doubleThreePositions
     if (gameInstance && !isGameOver) {
       // Track currentPlayer so we update when turn changes
@@ -859,6 +899,17 @@
       // Clear positions when game is over
       untrack(() => {
         doubleThreePositions = [];
+      });
+    }
+  });
+
+  $effect(() => {
+    // Update double-three positions immediately when toggle changes
+    if (gameInstance && !isGameOver) {
+      // Track showDoubleThree toggle
+      const _ = showDoubleThree;
+      untrack(() => {
+        updateDoubleThreePositions();
       });
     }
   });

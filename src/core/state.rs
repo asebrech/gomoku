@@ -154,6 +154,12 @@ impl WasmGameState {
     /// Get all positions that would create a double-three for the current player
     /// Returns a JS array of Move objects
     pub fn get_double_three_positions(&self) -> js_sys::Array {
+        self.get_double_three_positions_for_player(self.inner.current_player)
+    }
+
+    /// Get all positions that would create a double-three for a specific player
+    /// Returns a JS array of Move objects with player info
+    pub fn get_double_three_positions_for_player(&self, player: Player) -> js_sys::Array {
         let positions = js_sys::Array::new();
         let size = self.inner.board.size;
         
@@ -167,11 +173,12 @@ impl WasmGameState {
                         &self.inner.board, 
                         row, 
                         col, 
-                        self.inner.current_player
+                        player
                     ) {
                         let move_obj = js_sys::Object::new();
                         js_sys::Reflect::set(&move_obj, &"row".into(), &JsValue::from(row)).unwrap();
                         js_sys::Reflect::set(&move_obj, &"col".into(), &JsValue::from(col)).unwrap();
+                        js_sys::Reflect::set(&move_obj, &"player".into(), &JsValue::from(player as u8)).unwrap();
                         positions.push(&move_obj);
                     }
                 }
@@ -179,6 +186,20 @@ impl WasmGameState {
         }
         
         positions
+    }
+
+    /// Get double-three positions for both players
+    /// Returns a JS object with 'current' and 'opponent' arrays
+    pub fn get_all_double_three_positions(&self) -> js_sys::Object {
+        let result = js_sys::Object::new();
+        
+        let current_positions = self.get_double_three_positions_for_player(self.inner.current_player);
+        let opponent_positions = self.get_double_three_positions_for_player(self.inner.current_player.opponent());
+        
+        js_sys::Reflect::set(&result, &"current".into(), &current_positions).unwrap();
+        js_sys::Reflect::set(&result, &"opponent".into(), &opponent_positions).unwrap();
+        
+        result
     }
 
     /// Get the complete move history as a JS array

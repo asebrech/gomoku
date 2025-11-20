@@ -136,7 +136,7 @@
     "aiMaxThinkingTime": "Temps de Réflexion Max IA",
     "visualAids": "Aides Visuelles",
     "showDoubleThree": "Afficher Double-Trois de l'Adversaire",
-    "showDoubleThreeHint": "Met en surbrillance les positions double-trois illégales de l'adversaire avec des marqueurs X rouges (vos positions sont toujours affichées)",
+    "showDoubleThreeHint": "Affiche les positions double-trois illégales de l'adversaire avec des marqueurs X colorés (vos positions sont toujours affichées avec votre couleur)",
     "showAIHint": "Afficher l'Indice IA",
     "showAIHintDescription": "Affiche le mouvement suggéré par l'IA avec un anneau doré (jeux humains uniquement)",
     "themeEditor": "Éditeur de Thème",
