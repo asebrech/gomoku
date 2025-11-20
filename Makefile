@@ -1,5 +1,9 @@
 NAME = gomoku
 
+# Environment setup for tools
+export PATH := $(HOME)/.cargo/bin:$(HOME)/.local/bin:$(HOME)/.local/share/pnpm:$(PATH)
+export PNPM_HOME := $(HOME)/.local/share/pnpm
+
 # Default target: build for production (42 school requirement)
 all: $(NAME)
 
