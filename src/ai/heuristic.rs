@@ -1,151 +1,70 @@
-//! Heuristic evaluation functions and utilities.
-//!
-//! This module contains the board pattern analysis and a heuristic evaluator
-//! used by search routines to estimate a GameState's value when a terminal
-//! state or full search depth hasn't been reached.
-//!
-//! The evaluator looks for common Gomoku patterns (five-in-a-row, live four,
-//! half-free four, live three, etc.) and combines pattern counts with
-//! capture information and a lightweight historical bonus to produce a single
-//! score for the current position.
-//!
-//! Relevant concepts and further reading:
-//! - Pattern-based heuristics: <https://en.wikipedia.org/wiki/Gomoku>
-//! - Common pattern types and their evaluation in board games: <https://www.chessprogramming.org/Threats>
-//!
-//! Notes on scoring:
-//! - Scores are chosen to (a) prefer immediate wins over long-term potential,
-//!   (b) make captures meaningful, and (c) keep values within i32 range.
-//! - Values are ordinal (relative) rather than absolute probabilities.
-//!
-//! The rest of the file contains helpers to scan and classify line patterns on
-//! the board. These helpers are intentionally small and focused to make the
-//! heuristic fast and easy to test.
-
 use crate::core::board::{Board, Player};
+use crate::core::patterns::{DIRECTIONS, PatternAnalyzer, PatternFreedom};
 use crate::core::state::GameState;
-use crate::core::patterns::{PatternAnalyzer, PatternFreedom, DIRECTIONS};
+use crate::core::captures::CaptureHandler;
 
 pub struct Heuristic;
 
-const WINNING_SCORE: i32 = 1_000_000;
-const FIVE_IN_ROW_SCORE: i32 = 100_000;
-const LIVE_FOUR_SINGLE_SCORE: i32 = 15_000;
-const LIVE_FOUR_MULTIPLE_SCORE: i32 = 20_000;
-const HALF_FREE_FOUR_SCORE: i32 = 5_000;
-const WINNING_THREAT_SCORE: i32 = 10_000;
-const DEAD_FOUR_SCORE: i32 = 1_000;
-const LIVE_THREE_SCORE: i32 = 500;
-const HALF_FREE_THREE_SCORE: i32 = 200;
-const DEAD_THREE_SCORE: i32 = 100;
-const LIVE_TWO_SCORE: i32 = 50;
-const HALF_FREE_TWO_SCORE: i32 = 20;
-const CAPTURE_BONUS_MULTIPLIER: i32 = 1_000;
+pub const WINNING_SCORE: i32 = 1_000_000;
+pub const CAPTURE_VULNERABILITY_BASE: i32 = 3_000;  // Reduced from 8,000 - tactics should take priority
+pub const CAPTURE_BONUS_MULTIPLIER: i32 = 15_000;
+pub const LIVE_FOUR_SCORE: i32 = 15_000;         // _XXXX_ (guaranteed win next move)
+pub const HALF_FREE_FOUR_SCORE: i32 = 3_500;     // _XXXX| or |XXXX_ (one side open)
+pub const LIVE_THREE_SCORE: i32 = 500;           // _XXX_ (can become _XXXX_)
+pub const HALF_FREE_THREE_SCORE: i32 = 200;      // _XXX| or |XXX_ (one side open)
+pub const LIVE_TWO_SCORE: i32 = 50;              // _XX_ (can grow in both directions)
+pub const HALF_FREE_TWO_SCORE: i32 = 20;         // _XX| or |XX_ (one side open)
 
-#[derive(Debug, Clone, Copy)]
-struct PatternCounts {
-    five_in_row: u8,
-    live_four: u8,
-    half_free_four: u8,
-    dead_four: u8,
-    live_three: u8,
-    half_free_three: u8,
-    dead_three: u8,
-    live_two: u8,
-    half_free_two: u8,
-}
-
-impl PatternCounts {
-    const fn new() -> Self {
-        Self {
-            five_in_row: 0,
-            live_four: 0,
-            half_free_four: 0,
-            dead_four: 0,
-            live_three: 0,
-            half_free_three: 0,
-            dead_three: 0,
-            live_two: 0,
-            half_free_two: 0,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct PatternInfo {
-    length: usize,
-    freedom: PatternFreedom,
-}
+pub const GAPPED_FOUR_SCORE: i32 = 400;          // XXXX_X or X_XXXX (4 stones, 1 gap)
+pub const GAPPED_THREE_ONE_SCORE: i32 = 150;     // XXX_X or X_XXX (3 stones, 1 gap)
+pub const GAPPED_THREE_TWO_SCORE: i32 = 100;     // XX_X_X or X_X_X (3 stones, 2 gaps)
+pub const GAPPED_TWO_ONE_SCORE: i32 = 25;        // XX_X or X_X (2 stones, 1 gap)
+pub const GAPPED_TWO_TWO_SCORE: i32 = 15;        // X__XX or X__X (2 stones, 2 gaps)
+pub const GAPPED_OTHER_SCORE: i32 = 5;           // Other gapped combinations
 
 impl Heuristic {
-    /// Evaluate a GameState and return an integer score.
-    ///
-    /// Positive values favour Player::Max, negative values favour
-    /// Player::Min. The `depth` parameter is used to prefer faster
-    /// wins/losses (a common technique: WIN_SCORE +/- depth).
-    ///
-    /// The evaluator combines:
-    /// - Terminal checks (wins/losses/draws)
-    /// - Pattern counts (five, live four, live three, ...)
-    /// - Capture-based bonuses
-    /// - A small historical bias from `PatternHistoryAnalyzer`.
-    ///
-    /// See also: pattern-based heuristics and Gomoku evaluation notes.
-    pub fn evaluate(state: &GameState, depth: i32) -> i32 {
+    pub fn evaluate(state: &GameState, _depth: i32) -> i32 {
         if let Some(winner) = state.check_winner() {
             return match winner {
-                Player::Max => WINNING_SCORE + depth,
-                Player::Min => -WINNING_SCORE - depth,
+                Player::Max => WINNING_SCORE,
+                Player::Min => -WINNING_SCORE,
             };
         }
-
-        if state.max_captures >= 5 {
-            return WINNING_SCORE + depth;
-        }
-        if state.min_captures >= 5 {
-            return -WINNING_SCORE - depth;
-        }
-
         if state.board.is_full() {
             return 0;
         }
-
-        let (max_counts, min_counts) =
-            Self::analyze_both_players(&state.board, state.win_condition);
-
-        if max_counts.five_in_row > 0 || max_counts.live_four > 1 {
-            return WINNING_SCORE + depth;
-        }
-        if min_counts.five_in_row > 0 || min_counts.live_four > 1 {
-            return -WINNING_SCORE - depth;
-        }
-
-        let max_score = Self::calculate_pattern_score(max_counts);
-        let min_score = Self::calculate_pattern_score(min_counts);
+        
+        let (max_pattern_score, min_pattern_score) =
+            Self::analyze_all_patterns(&state.board, state.win_condition);
+        
         let capture_bonus = Self::calculate_capture_bonus(state);
-        let historical_bonus = Self::calculate_historical_bonus(state);
-
-        max_score - min_score + capture_bonus + historical_bonus
+        
+        // Check if either player has a strong tactical position (live four or multiple threats)
+        // If so, reduce capture vulnerability penalty as tactics take priority
+        let has_strong_tactics = max_pattern_score >= LIVE_FOUR_SCORE || min_pattern_score >= LIVE_FOUR_SCORE;
+        
+        let capture_vulnerability_penalty = if has_strong_tactics {
+            // Reduce penalty significantly when there are strong tactical threats
+            Self::evaluate_capture_vulnerability(state) / 4
+        } else {
+            Self::evaluate_capture_vulnerability(state)
+        };
+        
+        max_pattern_score - min_pattern_score + capture_bonus - capture_vulnerability_penalty
     }
 
-    fn calculate_historical_bonus(state: &GameState) -> i32 {
-        let max_bonus = state.pattern_analyzer.calculate_historical_bonus(Player::Max);
-        let min_bonus = state.pattern_analyzer.calculate_historical_bonus(Player::Min);
-        max_bonus - min_bonus
-    }
-
-    fn analyze_both_players(board: &Board, win_condition: usize) -> (PatternCounts, PatternCounts) {
-        let mut max_counts = PatternCounts::new();
-        let mut min_counts = PatternCounts::new();
-        let mut analyzed = vec![vec![0u8; board.size]; board.size];
-
+    fn analyze_all_patterns(board: &Board, win_condition: usize) -> (i32, i32) {
+        let mut max_score = 0;
+        let mut min_score = 0;
+        let mut consecutive_analyzed = vec![vec![0u8; board.size]; board.size];
+        let mut gap_analyzed = vec![vec![0u8; board.size]; board.size];
+        
         for row in 0..board.size {
             for col in 0..board.size {
                 let idx = board.index(row, col);
                 if !Board::is_bit_set(&board.occupied, idx) {
                     continue;
                 }
-                
                 let player = if Board::is_bit_set(&board.max_bits, idx) {
                     Player::Max
                 } else {
@@ -154,9 +73,9 @@ impl Heuristic {
                 
                 for (dir_idx, &(dx, dy)) in DIRECTIONS.iter().enumerate() {
                     let bit_mask = 1u8 << dir_idx;
-
-                    if analyzed[row][col] & bit_mask == 0 {
-                        if let Some(pattern_info) = Self::analyze_pattern(
+                    
+                    if consecutive_analyzed[row][col] & bit_mask == 0 {
+                        let bonus = Self::analyze_consecutive_pattern(
                             board,
                             row,
                             col,
@@ -164,199 +83,102 @@ impl Heuristic {
                             dy,
                             player,
                             win_condition,
-                            &mut analyzed,
+                            &mut consecutive_analyzed,
                             bit_mask,
-                        ) {
-                            match player {
-                                Player::Max => {
-                                    Self::update_counts(&mut max_counts, pattern_info)
-                                }
-                                Player::Min => {
-                                    Self::update_counts(&mut min_counts, pattern_info)
-                                }
-                            }
+                        );
+                        match player {
+                            Player::Max => max_score += bonus,
+                            Player::Min => min_score += bonus,
+                        }
+                    }
+                    
+                    if gap_analyzed[row][col] & bit_mask == 0 {
+                        let bonus = Self::analyze_gapped_pattern(
+                            board,
+                            row,
+                            col,
+                            dx,
+                            dy,
+                            player,
+                            &mut gap_analyzed,
+                            bit_mask,
+                        );
+                        match player {
+                            Player::Max => max_score += bonus,
+                            Player::Min => min_score += bonus,
                         }
                     }
                 }
             }
         }
-
-        (max_counts, min_counts)
+        (max_score, min_score)
     }
-
-    fn analyze_pattern(
+    fn analyze_consecutive_pattern(
         board: &Board,
-        start_row: usize,
-        start_col: usize,
+        row: usize,
+        col: usize,
         dx: isize,
         dy: isize,
         player: Player,
         win_condition: usize,
         analyzed: &mut [Vec<u8>],
         bit_mask: u8,
-    ) -> Option<PatternInfo> {
-        let (pattern_start_row, pattern_start_col) =
-            Self::find_pattern_start(board, start_row, start_col, dx, dy, player);
-
-        if analyzed[pattern_start_row][pattern_start_col] & bit_mask != 0 {
-            return None;
-        }
-
-        let consecutive_after_start =
-            PatternAnalyzer::count_consecutive(board, pattern_start_row, pattern_start_col, dx, dy, player);
-
-        let length = consecutive_after_start + 1;
-
-        if length < 2 {
-            return None;
-        }
-
-        let length = length.min(win_condition);
-        
-        let total_available_space = Self::count_total_space(
+    ) -> i32 {
+        let pattern_info = PatternAnalyzer::analyze_consecutive_from_position(
             board,
-            pattern_start_row,
-            pattern_start_col,
+            row,
+            col,
             dx,
             dy,
-            length,
+            player,
+            win_condition,
         );
         
-        if total_available_space < win_condition {
-            return None;
+        let Some((length, _pattern_start_row, _pattern_start_col, _total_space, freedom)) = pattern_info else {
+            return 0;
+        };
+        
+        let backward = PatternAnalyzer::count_consecutive(board, row, col, -dx, -dy, player);
+        let forward = PatternAnalyzer::count_consecutive(board, row, col, dx, dy, player);
+        
+        analyzed[row][col] |= bit_mask;
+        
+        for dist in 1..=backward {
+            let r = (row as isize - dx * dist as isize) as usize;
+            let c = (col as isize - dy * dist as isize) as usize;
+            analyzed[r][c] |= bit_mask;
         }
         
-        let freedom =
-            Self::analyze_pattern_freedom(board, pattern_start_row, pattern_start_col, dx, dy, length);
-
-        Self::mark_pattern_analyzed(
-            pattern_start_row,
-            pattern_start_col,
-            dx,
-            dy,
-            length,
-            analyzed,
-            bit_mask,
-        );
-
-        Some(PatternInfo { length, freedom })
+        for dist in 1..=forward {
+            let r = (row as isize + dx * dist as isize) as usize;
+            let c = (col as isize + dy * dist as isize) as usize;
+            analyzed[r][c] |= bit_mask;
+        }
+        
+        score_consecutive_pattern(length.min(win_condition), freedom)
     }
 
-    fn mark_pattern_analyzed(
-        start_row: usize,
-        start_col: usize,
+    fn analyze_gapped_pattern(
+        board: &Board,
+        row: usize,
+        col: usize,
         dx: isize,
         dy: isize,
-        length: usize,
+        player: Player,
         analyzed: &mut [Vec<u8>],
         bit_mask: u8,
-    ) {
-        for i in 0..length {
-            let row = (start_row as isize + i as isize * dx) as usize;
-            let col = (start_col as isize + i as isize * dy) as usize;
-            if row < analyzed.len() && col < analyzed[0].len() {
-                analyzed[row][col] |= bit_mask;
-            }
-        }
-    }
-
-    fn count_total_space(
-        board: &Board,
-        start_row: usize,
-        start_col: usize,
-        dx: isize,
-        dy: isize,
-        pattern_length: usize,
-    ) -> usize {
-        let mut space = pattern_length;
+    ) -> i32 {
+        let stones = PatternAnalyzer::collect_gapped_stones(board, row, col, dx, dy, player, 6);
         
-        space += Self::count_empty_in_direction(board, start_row as isize - dx, start_col as isize - dy, -dx, -dy);
-        
-        let end_row = start_row as isize + (pattern_length - 1) as isize * dx;
-        let end_col = start_col as isize + (pattern_length - 1) as isize * dy;
-        space += Self::count_empty_in_direction(board, end_row + dx, end_col + dy, dx, dy);
-        
-        space
-    }
-
-    fn count_empty_in_direction(
-        board: &Board,
-        start_row: isize,
-        start_col: isize,
-        dx: isize,
-        dy: isize,
-    ) -> usize {
-        let mut count = 0;
-        let mut current_row = start_row;
-        let mut current_col = start_col;
-        
-        while PatternAnalyzer::is_in_bounds(board, current_row, current_col) {
-            let idx = board.index(current_row as usize, current_col as usize);
-            if !Board::is_bit_set(&board.occupied, idx) {
-                count += 1;
-                current_row += dx;
-                current_col += dy;
-            } else {
-                break;
-            }
-        }
-        
-        count
-    }
-
-    fn update_counts(counts: &mut PatternCounts, pattern: PatternInfo) {
-        match pattern.length {
-            5 => counts.five_in_row += 1,
-            4 => match pattern.freedom {
-                PatternFreedom::Free => counts.live_four += 1,
-                PatternFreedom::HalfFree => counts.half_free_four += 1,
-                PatternFreedom::Flanked => counts.dead_four += 1,
-            },
-            3 => match pattern.freedom {
-                PatternFreedom::Free => counts.live_three += 1,
-                PatternFreedom::HalfFree => counts.half_free_three += 1,
-                PatternFreedom::Flanked => counts.dead_three += 1,
-            },
-            2 => match pattern.freedom {
-                PatternFreedom::Free => counts.live_two += 1,
-                PatternFreedom::HalfFree => counts.half_free_two += 1,
-                PatternFreedom::Flanked => {},
-            },
-            _ => {}
-        }
-    }
-
-    fn calculate_pattern_score(counts: PatternCounts) -> i32 {
-        let mut score = 0;
-
-        if counts.five_in_row > 0 {
-            score += FIVE_IN_ROW_SCORE;
-        }
-
-        score += match counts.live_four {
-            1 => LIVE_FOUR_SINGLE_SCORE,
-            n if n > 1 => LIVE_FOUR_MULTIPLE_SCORE,
-            _ => 0,
+        let Some((stone_count, gaps, _span)) = PatternAnalyzer::analyze_gapped_pattern(&stones) else {
+            return 0;
         };
-
-        if counts.live_three >= 2
-            || counts.dead_four >= 2
-            || (counts.dead_four >= 1 && counts.live_three >= 1)
-            || (counts.half_free_four >= 1 && counts.live_three >= 1)
-            || (counts.half_free_four >= 2)
-        {
-            score += WINNING_THREAT_SCORE;
+        
+        for &(r, c) in &stones {
+            analyzed[r][c] |= bit_mask;
         }
-
-        score += (counts.half_free_four as i32) * HALF_FREE_FOUR_SCORE
-            + (counts.dead_four as i32) * DEAD_FOUR_SCORE
-            + (counts.live_three as i32) * LIVE_THREE_SCORE
-            + (counts.half_free_three as i32) * HALF_FREE_THREE_SCORE
-            + (counts.dead_three as i32) * DEAD_THREE_SCORE
-            + (counts.live_two as i32) * LIVE_TWO_SCORE
-            + (counts.half_free_two as i32) * HALF_FREE_TWO_SCORE;
-
-        score
+        
+        score_gapped_pattern(stone_count, gaps)
     }
 
     fn calculate_capture_bonus(state: &GameState) -> i32 {
@@ -365,73 +187,171 @@ impl Heuristic {
         } else {
             0
         };
-        
         let min_bonus = if state.min_captures > 0 {
             (CAPTURE_BONUS_MULTIPLIER as f32 * (state.min_captures as f32).sqrt()) as i32
         } else {
             0
         };
-        
         max_bonus - min_bonus
     }
-
-    fn find_pattern_start(
-        board: &Board,
-        row: usize,
-        col: usize,
-        dx: isize,
-        dy: isize,
-        player: Player,
-    ) -> (usize, usize) {
+    
+    /// Evaluates vulnerability to captures based on:
+    /// 1. How many capturable pairs the current player has on the board
+    /// 2. How close the opponent is to winning by capture
+    /// 3. Whether opponent can capture and win immediately
+    /// Returns a penalty score (higher = more vulnerable)
+    fn evaluate_capture_vulnerability(state: &GameState) -> i32 {
+        let current_player = state.current_player;
+        let opponent = current_player.opponent();
+        
+        let opponent_captures = match opponent {
+            Player::Max => state.max_captures,
+            Player::Min => state.min_captures,
+        };
+        
+        // Count how many capturable pairs the current player has
+        let capturable_pairs = Self::count_capturable_pairs(&state.board, current_player, opponent);
+        
+        if capturable_pairs == 0 {
+            return 0;
+        }
+        
+        // Check if opponent can win by capture immediately
+        let can_win_immediately = opponent_captures >= state.capture_to_win - 1 &&
+            Self::opponent_can_capture_and_win(state, opponent);
+        
+        if can_win_immediately {
+            // Critical: opponent can win by capture next move - huge penalty
+            return 900_000;
+        }
+        
+        // Calculate graduated penalty based on:
+        // - Number of capturable pairs (more pairs = more vulnerable)
+        // - Opponent's capture progress (closer to winning = more dangerous)
+        let progress_multiplier = if opponent_captures >= state.capture_to_win - 2 {
+            5  // Very close to winning
+        } else if opponent_captures >= state.capture_to_win - 3 {
+            3  // Getting close
+        } else if opponent_captures >= state.capture_to_win / 2 {
+            2  // Halfway there
+        } else {
+            1  // Early game
+        };
+        
+        CAPTURE_VULNERABILITY_BASE * capturable_pairs as i32 * progress_multiplier
+    }
+    
+    /// Counts how many capturable pair patterns exist for the given player
+    fn count_capturable_pairs(board: &Board, player: Player, opponent: Player) -> usize {
+        let mut count = 0;
         let player_bits = board.get_player_bits(player);
         
-        let mut current_row = row as isize;
-        let mut current_col = col as isize;
-
-        loop {
-            let prev_row = current_row - dx;
-            let prev_col = current_col - dy;
-
-            if prev_row >= 0
-                && prev_row < board.size as isize
-                && prev_col >= 0
-                && prev_col < board.size as isize
-            {
-                let idx = board.index(prev_row as usize, prev_col as usize);
-                if Board::is_bit_set(player_bits, idx) {
-                    current_row = prev_row;
-                    current_col = prev_col;
-                } else {
-                    break;
+        board.iterate_bits(player_bits, |row, col| {
+            for &(dx, dy) in &DIRECTIONS {
+                // Check if this stone is part of a capturable pair
+                // Pattern: O X X _ (opponent can place at _ to capture)
+                let next_r = row as isize + dx;
+                let next_c = col as isize + dy;
+                
+                if !PatternAnalyzer::is_in_bounds(board, next_r, next_c) {
+                    continue;
                 }
-            } else {
-                break;
+                
+                let next_idx = board.index(next_r as usize, next_c as usize);
+                if !Board::is_bit_set(player_bits, next_idx) {
+                    continue;
+                }
+                
+                // Found two consecutive stones - check both ends
+                let before_r = row as isize - dx;
+                let before_c = col as isize - dy;
+                let after_r = next_r + dx;
+                let after_c = next_c + dy;
+                
+                let before_vulnerable = PatternAnalyzer::is_in_bounds(board, before_r, before_c) &&
+                    board.get_player(before_r as usize, before_c as usize) == Some(opponent);
+                    
+                let after_vulnerable = PatternAnalyzer::is_in_bounds(board, after_r, after_c) &&
+                    board.get_player(after_r as usize, after_c as usize) == Some(opponent);
+                
+                if before_vulnerable || after_vulnerable {
+                    count += 1;
+                }
+            }
+        });
+        
+        // Divide by 2 since each pair is counted twice
+        count / 2
+    }
+    
+    /// Checks if opponent can capture and win on their next move
+    fn opponent_can_capture_and_win(state: &GameState, opponent: Player) -> bool {
+        let opponent_captures = match opponent {
+            Player::Max => state.max_captures,
+            Player::Min => state.min_captures,
+        };
+        
+        for row in 0..state.board.size {
+            for col in 0..state.board.size {
+                if state.board.get_player(row, col).is_some() {
+                    continue;
+                }
+                
+                let mut temp_board = state.board.clone();
+                let idx = temp_board.index(row, col);
+                
+                Board::set_bit(&mut temp_board.occupied, idx);
+                match opponent {
+                    Player::Max => Board::set_bit(&mut temp_board.max_bits, idx),
+                    Player::Min => Board::set_bit(&mut temp_board.min_bits, idx),
+                }
+                
+                let captures = CaptureHandler::detect_captures(&temp_board, row, col, opponent);
+                
+                if !captures.is_empty() {
+                    let capture_pairs = captures.len() / 2;
+                    if opponent_captures + capture_pairs >= state.capture_to_win {
+                        return true;
+                    }
+                }
             }
         }
-
-        (current_row as usize, current_col as usize)
+        
+        false
     }
+}
 
-    fn analyze_pattern_freedom(
-        board: &Board,
-        start_row: usize,
-        start_col: usize,
-        dx: isize,
-        dy: isize,
-        length: usize,
-    ) -> PatternFreedom {
-        let before_row = start_row as isize - dx;
-        let before_col = start_col as isize - dy;
-        let start_open = PatternAnalyzer::is_valid_empty(board, before_row, before_col);
+#[inline]
+pub fn score_consecutive_pattern(length: usize, freedom: PatternFreedom) -> i32 {
+    match length {
+        5 => WINNING_SCORE,
+        4 => match freedom {
+            PatternFreedom::Free => LIVE_FOUR_SCORE,
+            PatternFreedom::HalfFree => HALF_FREE_FOUR_SCORE,
+            PatternFreedom::Flanked => 0,
+        },
+        3 => match freedom {
+            PatternFreedom::Free => LIVE_THREE_SCORE,
+            PatternFreedom::HalfFree => HALF_FREE_THREE_SCORE,
+            PatternFreedom::Flanked => 0,
+        },
+        2 => match freedom {
+            PatternFreedom::Free => LIVE_TWO_SCORE,
+            PatternFreedom::HalfFree => HALF_FREE_TWO_SCORE,
+            PatternFreedom::Flanked => 0,
+        },
+        _ => 0,
+    }
+}
 
-        let end_row = start_row as isize + (length as isize * dx);
-        let end_col = start_col as isize + (length as isize * dy);
-        let end_open = PatternAnalyzer::is_valid_empty(board, end_row, end_col);
-
-        match (start_open, end_open) {
-            (true, true) => PatternFreedom::Free,
-            (true, false) | (false, true) => PatternFreedom::HalfFree,
-            (false, false) => PatternFreedom::Flanked,
-        }
+#[inline]
+pub fn score_gapped_pattern(stones: usize, gaps: usize) -> i32 {
+    match (stones, gaps) {
+        (4, 1) => GAPPED_FOUR_SCORE,
+        (3, 1) => GAPPED_THREE_ONE_SCORE,
+        (3, 2) => GAPPED_THREE_TWO_SCORE,
+        (2, 1) => GAPPED_TWO_ONE_SCORE,
+        (2, 2) => GAPPED_TWO_TWO_SCORE,
+        _ => GAPPED_OTHER_SCORE,
     }
 }

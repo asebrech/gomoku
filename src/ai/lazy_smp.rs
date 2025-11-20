@@ -23,7 +23,7 @@ use crate::core::state::GameState;
 use rayon::prelude::*;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use instant::{Duration, Instant};
 
 use super::{minimax::mtdf, transposition::TranspositionTable};
 
@@ -92,11 +92,13 @@ fn lazy_smp_worker(
     max_depth: i32,
     shared_state: Arc<SharedSearchState>,
     worker_id: usize,
-    start_time: Instant,
     time_limit: Option<Duration>,
 ) -> (i32, Option<(usize, usize)>, i32, u64) {
+    // Each worker creates its own start time in its own thread context
+    let worker_start = Instant::now();
+    
     let mut local_state = state.clone();
-    let mut tt = TranspositionTable::new(2_000_000);
+    let mut tt = TranspositionTable::new(500_000);
 
     let mut best_move = None;
     let mut best_score = 0;
@@ -126,7 +128,7 @@ fn lazy_smp_worker(
         }
 
         if let Some(limit) = time_limit {
-            if start_time.elapsed() >= limit {
+            if worker_start.elapsed() >= limit {
                 shared_state.signal_stop();
                 break;
             }
@@ -141,7 +143,7 @@ fn lazy_smp_worker(
             first_guess,
             search_depth,
             &mut tt,
-            &start_time,
+            &worker_start,
             time_limit,
         );
 
@@ -187,14 +189,11 @@ pub fn lazy_smp_search(
     let time_limit = Duration::from_millis(time_limit_ms);
 
     let threads = num_threads.unwrap_or_else(|| {
-        std::thread::available_parallelism()
-            .map(|n| n.get())
-            .unwrap_or(4)
-            .min(8)
+        let available_cores = rayon::current_num_threads();
+        (available_cores * 3 / 5).max(1)
     });
 
-    let initial_moves = state.get_candidate_moves();
-    if initial_moves.is_empty() {
+    if state.order_moves().is_empty() {
         return SearchResult {
             best_move: None,
             score: 0,
@@ -217,7 +216,6 @@ pub fn lazy_smp_search(
                 max_depth,
                 shared_state_clone,
                 worker_id,
-                start_time,
                 Some(time_limit),
             )
         })

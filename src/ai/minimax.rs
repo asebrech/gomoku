@@ -19,7 +19,7 @@
 
 use crate::core::state::GameState;
 use std::cmp::{max, min};
-use std::time::{Duration, Instant};
+use instant::{Duration, Instant};
 
 use super::{heuristic::Heuristic, transposition::{TranspositionTable, EntryType}};
 
@@ -69,7 +69,7 @@ fn alpha_beta_with_memory(
         return (eval, nodes_visited);
     }
 
-    let mut moves = state.get_candidate_moves();
+    let mut moves = state.order_moves();
     
     if let Some(best_move) = tt_result.best_move {
         if let Some(pos) = moves.iter().position(|&m| m == best_move) {

@@ -1,0 +1,334 @@
+<script lang="ts">
+  import { currentTheme } from '$lib/theme/themeStore';
+  import Button from './Button.svelte';
+  import Toggle from './Toggle.svelte';
+  import { _ } from 'svelte-i18n';
+  
+  interface Props {
+    gameMode: string;
+    boardSize: number;
+    aiDepth?: number;
+    currentPlayer: string;
+    winnerPlayer?: number | null;
+    player1Name?: string;
+    player2Name?: string;
+    totalMoves: number;
+    player1Captures?: number;
+    player2Captures?: number;
+    totalThinkingTime?: number;
+    lastMoveTime?: number;
+    aiMoveCount?: number;
+    lastDepthReached?: number;
+    lastNodesSearched?: number;
+    lastAIScore?: number;
+    // New props for controls
+    showDoubleThree?: boolean;
+    onToggleDoubleThree?: (value: boolean) => void;
+    showAIHint?: boolean;
+    onToggleAIHint?: (value: boolean) => void;
+    isCalculatingHint?: boolean;
+    isPlaying?: boolean;
+    isPaused?: boolean;
+    isGameOver?: boolean;
+    isFullAI?: boolean;
+    hasHuman?: boolean;
+    gameInstance?: any;
+    needsAIContinue?: boolean;
+    onStartGame?: () => void;
+    onPauseGame?: () => void;
+    onResumeGame?: () => void;
+    onUndoMove?: () => void;
+    onContinueAI?: () => void;
+    onResetGame?: () => void;
+    onBack?: () => void;
+  }
+  
+  let {
+    gameMode,
+    boardSize,
+    aiDepth,
+    currentPlayer,
+    winnerPlayer = null,
+    player1Name = 'Player 1',
+    player2Name = 'Player 2',
+    totalMoves,
+    player1Captures = 0,
+    player2Captures = 0,
+    totalThinkingTime = 0,
+    lastMoveTime = 0,
+    aiMoveCount = 0,
+    lastDepthReached = 0,
+    lastNodesSearched = 0,
+    lastAIScore = 0,
+    // Controls
+    showDoubleThree = false,
+    onToggleDoubleThree,
+    showAIHint = false,
+    onToggleAIHint,
+    isCalculatingHint = false,
+    isPlaying = false,
+    isPaused = false,
+    isGameOver = false,
+    isFullAI = false,
+    hasHuman = false,
+    gameInstance,
+    needsAIContinue = false,
+    onStartGame,
+    onPauseGame,
+    onResumeGame,
+    onUndoMove,
+    onContinueAI,
+    onResetGame,
+    onBack
+  }: Props = $props();
+  
+  function formatTime(ms: number): string {
+    if (ms < 1000) return `${ms}ms`;
+    return `${(ms / 1000).toFixed(1)}s`;
+  }
+  
+  function formatNodes(nodes: number): string {
+    if (nodes < 1000) return `${nodes}`;
+    if (nodes < 1000000) return `${(nodes / 1000).toFixed(1)}K`;
+    return `${(nodes / 1000000).toFixed(1)}M`;
+  }
+</script>
+
+<div class="flex flex-col items-stretch w-full h-full">
+  <div 
+    class="rounded-lg p-4 min-w-[280px] max-w-[320px] flex-shrink-0"
+    style="background: {$currentTheme.background}99; border: 3px solid {$currentTheme.primary}; box-shadow: {$currentTheme.glowPrimary};"
+  >
+    <h2 
+      class="text-xl font-bold text-center mb-2"
+      style="color: {$currentTheme.primary};"
+    >
+      {gameMode}
+    </h2>
+    
+    <!-- Game Over Message -->
+    {#if isGameOver && winnerPlayer !== null}
+      {@const winnerName = winnerPlayer === 1 ? player1Name : player2Name}
+      {@const cleanWinnerName = winnerName?.replace(/\s*\((Black|White)\)\s*/i, '').trim() || winnerName}
+      {@const winnerColor = winnerPlayer === 1 ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2}
+      <div 
+        class="rounded-lg px-4 py-3 mb-3 text-center animate-fade-in"
+        style="background: {$currentTheme.background}; border: 3px solid {winnerColor}; box-shadow: 0 0 20px {winnerColor}60;"
+      >
+        <div class="flex items-center justify-center gap-2 mb-1">
+          <svg width="24" height="24" class="inline-block">
+            <defs>
+              <radialGradient id="winnerSmallGradient">
+                <stop offset="30%" stop-color={winnerColor} stop-opacity="0.9" />
+                <stop offset="100%" stop-color={winnerColor} stop-opacity="1" />
+              </radialGradient>
+              <filter id="winnerSmallShadow">
+                <feDropShadow dx="1" dy="2" stdDeviation="2" flood-opacity="0.7"/>
+              </filter>
+            </defs>
+            <circle
+              cx="12"
+              cy="12"
+              r="10"
+              fill="url(#winnerSmallGradient)"
+              filter="url(#winnerSmallShadow)"
+            />
+          </svg>
+          <p 
+            class="text-xl font-bold"
+            style="color: {winnerColor};"
+          >
+            {cleanWinnerName} {$_('game.stats.wins')}
+          </p>
+          <svg width="24" height="24" class="inline-block">
+            <circle
+              cx="12"
+              cy="12"
+              r="10"
+              fill="url(#winnerSmallGradient)"
+              filter="url(#winnerSmallShadow)"
+            />
+          </svg>
+        </div>
+      </div>
+    {/if}
+    
+    <!-- Turn Display -->
+    <div class="mb-3 pb-3 border-b" style="border-color: {$currentTheme.primary}33;">
+      <div class="flex justify-between items-center">
+        <span class="text-white/80 font-medium text-sm">{$_('game.stats.turn')}</span>
+        <p 
+          class="text-2xl font-bold"
+          style="color: {$currentTheme.primary}; text-shadow: {$currentTheme.glowPrimary};"
+        >
+          {totalMoves}
+        </p>
+      </div>
+    </div>
+  
+  <div class="space-y-2">
+    <!-- Board Size -->
+    <div class="flex justify-between items-center">
+      <span class="text-white/80 font-medium text-sm">{$_('game.stats.boardSize')}</span>
+      <span class="font-bold" style="color: {$currentTheme.secondary};">
+        {boardSize}x{boardSize}
+      </span>
+    </div>
+    
+    {#if aiDepth}
+      <!-- AI Depth -->
+      <div class="flex justify-between items-center">
+        <span class="text-white/80 font-medium text-sm">{$_('game.stats.aiMaxDepth')}</span>
+        <span class="font-bold" style="color: {$currentTheme.secondary};">
+          {aiDepth}
+        </span>
+      </div>
+    {/if}
+    
+    <div class="border-t my-2" style="border-color: {$currentTheme.primary}33;"></div>
+    
+    <!-- Current Player -->
+    <div class="flex justify-between items-center">
+      <span class="text-white/80 font-medium text-sm">{$_('game.stats.currentTurn')}</span>
+      <span class="font-bold" style="color: {$currentTheme.primary};">
+        {currentPlayer}
+      </span>
+    </div>
+    
+    {#if aiDepth !== undefined}
+      <div class="border-t my-2" style="border-color: {$currentTheme.primary}33;"></div>
+      
+      <!-- Actual Depth Reached -->
+      {#if lastDepthReached > 0}
+        <div class="flex justify-between items-center">
+          <span class="text-white/80 font-medium text-sm">{$_('game.stats.depthReached')}</span>
+          <span class="font-bold text-lg" style="color: {$currentTheme.accent};">
+            {lastDepthReached}
+          </span>
+        </div>
+      {/if}
+      
+      <!-- Last Move Time -->
+      <div class="flex justify-between items-center">
+        <span class="text-white/80 font-medium text-sm">{$_('game.stats.aiLastMove')}</span>
+        <span class="font-bold text-lg" style="color: {$currentTheme.secondary};">
+          {lastMoveTime > 0 ? formatTime(lastMoveTime) : '--'}
+        </span>
+      </div>
+      
+      <!-- Nodes Searched -->
+      {#if lastNodesSearched > 0}
+        <div class="flex justify-between items-center">
+          <span class="text-white/80 font-medium text-sm">{$_('game.stats.nodesSearched')}</span>
+          <span class="font-bold" style="color: {$currentTheme.secondary};">
+            {formatNodes(lastNodesSearched)}
+          </span>
+        </div>
+      {/if}
+      
+      <!-- AI Evaluation Score -->
+      {#if lastAIScore !== 0}
+        <div class="flex justify-between items-center">
+          <span class="text-white/80 font-medium text-sm">{$_('game.stats.evaluation')}</span>
+          <span class="font-bold" style="color: {lastAIScore > 0 ? $currentTheme.stonePlayer1 : $currentTheme.stonePlayer2};">
+            {lastAIScore > 0 ? '+' : ''}{lastAIScore}
+          </span>
+        </div>
+      {/if}
+    {/if}
+  </div>
+  
+  <!-- Divider -->
+  <div class="border-t my-3" style="border-color: {$currentTheme.primary}33;"></div>
+  
+  <!-- Game Controls -->
+  <div class="space-y-2">
+    <h3 
+      class="text-base font-bold text-center mb-2"
+      style="color: {$currentTheme.primary};"
+    >
+      {$_('game.stats.controls')}
+    </h3>
+    
+    <!-- Double-three visibility toggle -->
+    <div class="flex justify-between items-center">
+      <Toggle 
+        checked={showDoubleThree}
+        onchange={onToggleDoubleThree}
+        label={$_('game.stats.showDoubleThree')}
+        id="double-three-toggle"
+      />
+    </div>
+    
+    <!-- AI Hint toggle (only for games with human players) -->
+    {#if hasHuman}
+      <div class="flex justify-between items-center">
+        <Toggle 
+          checked={showAIHint}
+          onchange={onToggleAIHint}
+          label={$_('game.stats.aiHint')}
+          id="ai-hint-toggle"
+          disabled={isPlaying && isFullAI}
+        />
+        {#if isCalculatingHint}
+          <span class="ml-2 text-xs text-cyan-400 animate-pulse">{$_('game.stats.computing')}</span>
+        {/if}
+      </div>
+    {/if}
+    
+    <!-- Game Controls - Start button only for AI vs AI -->
+    {#if !isPlaying && !isPaused && isFullAI}
+      <Button variant="primary" size="sm" onclick={onStartGame} disabled={!gameInstance || isGameOver} fullWidth>
+        {$_('game.stats.startMatch')}
+      </Button>
+    {/if}
+    
+    <!-- AI vs AI Controls -->
+    {#if isFullAI}
+      
+      {#if isPlaying}
+        <Button variant="primary" size="sm" onclick={onPauseGame} fullWidth>
+          {$_('game.stats.pause')}
+        </Button>
+      {/if}
+      
+      {#if isPaused && !isGameOver}
+        <Button variant="primary" size="sm" onclick={onResumeGame} fullWidth>
+          {$_('game.stats.resume')}
+        </Button>
+      {/if}
+      
+      <!-- Undo button for AI vs AI -->
+      <Button variant="primary" size="sm" onclick={onUndoMove} disabled={totalMoves === 0 || isGameOver} fullWidth>
+        {$_('game.stats.undoMove')}
+      </Button>
+    {/if}
+    
+    <!-- Undo button for human games -->
+    {#if hasHuman && !isFullAI}
+      <Button variant="primary" size="sm" onclick={onUndoMove} disabled={totalMoves === 0 || isGameOver} fullWidth>
+        {$_('game.stats.undoMove')}
+      </Button>
+    {/if}
+    
+    <!-- Continue button after undo (when it's AI's turn) -->
+    {#if needsAIContinue && hasHuman && !isFullAI}
+      <Button variant="primary" size="sm" onclick={onContinueAI} fullWidth>
+        {$_('game.stats.continueAI')}
+      </Button>
+    {/if}
+    
+    <!-- New Game -->
+    <Button variant="primary" size="sm" onclick={async () => await onResetGame?.()} fullWidth>
+      {$_('game.stats.newGame')}
+    </Button>
+    
+    <!-- Back button -->
+    {#if onBack}
+      <Button variant="primary" size="sm" onclick={onBack} fullWidth>
+        {$_('game.menu.back')}
+      </Button>
+    {/if}
+  </div>
+  </div>
+</div>

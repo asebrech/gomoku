@@ -1,9 +1,16 @@
+use wasm_bindgen::prelude::*;
+
+// Set up panic hook to log panics to console
+#[wasm_bindgen(start)]
+pub fn main() {
+    console_error_panic_hook::set_once();
+}
+
 pub mod ai {
     pub mod heuristic;
     pub mod lazy_smp;
     pub mod minimax;
-    pub mod move_generation;
-    pub mod pattern_history;
+    pub mod move_ordering;
     pub mod transposition;
 }
 
@@ -16,19 +23,8 @@ pub mod core {
     pub mod zobrist;
 }
 
-pub mod ui {
-    pub mod app;
-    pub mod display {
-        pub mod display;
-    }
-    pub mod screens {
-        pub mod game {
-            pub mod board;
-            pub mod game;
-            pub mod settings;
-        }
-        pub mod menu;
-        pub mod splash;
-        pub mod utils;
-    }
+/// Initialize the thread pool for parallel search in WASM
+#[wasm_bindgen]
+pub fn init_thread_pool(num_threads: usize) -> js_sys::Promise {
+    wasm_bindgen_rayon::init_thread_pool(num_threads)
 }

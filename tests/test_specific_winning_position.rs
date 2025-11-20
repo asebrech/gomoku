@@ -1,5 +1,5 @@
 use gomoku::core::board::{Board, Player};
-use gomoku::ai::move_generation::MoveGenerator;
+use gomoku::ai::move_ordering::MoveGenerator;
 
 #[test]
 fn test_winning_position_from_image() {
@@ -21,13 +21,13 @@ fn test_winning_position_from_image() {
     board.place_stone(6, 4, Player::Min);  // White
     
     // Black to move - should find the winning move at (2, 6) to complete 5 in a row
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Max);
+    let moves = MoveGenerator::order_moves(&board, Player::Max);
     
     println!("Generated moves: {:?}", moves);
     
-    // Should return only the winning move
-    assert_eq!(moves.len(), 1, "Should find exactly one winning move");
-    assert_eq!(moves[0], (2, 6), "Should find the winning move at (2, 6)");
+    assert!(!moves.is_empty(), "Should find moves");
+    assert!(moves.contains(&(2, 6)), "Should find the winning move at (2, 6)");
+    assert_eq!(moves[0], (2, 6), "Winning move should be prioritized first");
 }
 
 #[test]
@@ -51,7 +51,7 @@ fn test_winning_position_from_second_image() {
     
     // This position should be recognized as already won by Black
     // But let's check move generation doesn't crash
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Min);
+    let moves = MoveGenerator::order_moves(&board, Player::Min);
     
     println!("Moves after Black won: {:?}", moves);
     
@@ -71,7 +71,7 @@ fn test_pattern_with_gap_like_image() {
     // Gap at (8, 8)
     board.place_stone(9, 8, Player::Max);
     
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Max);
+    let moves = MoveGenerator::order_moves(&board, Player::Max);
     
     println!("Moves for gap pattern: {:?}", moves);
     
@@ -92,14 +92,14 @@ fn test_endpoint_completion_like_image() {
     board.place_stone(8, 8, Player::Max);
     // Empty at (9, 8) or (4, 8)
     
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Max);
+    let moves = MoveGenerator::order_moves(&board, Player::Max);
     
     println!("Moves for endpoint pattern: {:?}", moves);
     
-    // Should find either endpoint as winning move
-    assert_eq!(moves.len(), 1, "Should find exactly one winning move");
+    assert!(!moves.is_empty(), "Should find moves");
     assert!(moves[0] == (9, 8) || moves[0] == (4, 8), 
-            "Should find winning move at endpoint, got {:?}", moves[0]);
+            "First move should be a winning endpoint, got {:?}", moves[0]);
+    assert!(moves.contains(&(9, 8)) || moves.contains(&(4, 8)), "Should find winning move at endpoint");
 }
 
 #[test]
@@ -114,12 +114,12 @@ fn test_both_endpoints_available() {
     board.place_stone(9, 8, Player::Max);
     // Empty at both (5, 8) and (10, 8)
     
-    let moves = MoveGenerator::get_candidate_moves(&board, Player::Max);
+    let moves = MoveGenerator::order_moves(&board, Player::Max);
     
     println!("Moves for both endpoints available: {:?}", moves);
     
-    // Should find exactly one winning move (implementation picks first found)
-    assert_eq!(moves.len(), 1, "Should find exactly one winning move");
+    assert!(!moves.is_empty(), "Should find moves");
     assert!(moves[0] == (10, 8) || moves[0] == (5, 8), 
-            "Should find winning move at either endpoint, got {:?}", moves[0]);
+            "First move should be a winning endpoint, got {:?}", moves[0]);
+    assert!(moves.contains(&(10, 8)) || moves.contains(&(5, 8)), "Should find winning move at either endpoint");
 }

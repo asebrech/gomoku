@@ -1,0 +1,3 @@
+# WASM target configuration for wasm-bindgen-rayon
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "target-feature=+atomics,+bulk-memory,+mutable-globals"]

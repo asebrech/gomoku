@@ -1,8 +1,5 @@
-use gomoku::ui::app::GomokuApp;
-
 fn main() {
-	let mut gomoku = GomokuApp::new();
-	gomoku.init();
-	gomoku.start();
+	eprintln!("Native UI has been removed.");
+	eprintln!("Please use the Svelte frontend in the 'frontend' directory.");
+	std::process::exit(1);
 }
-

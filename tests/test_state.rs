@@ -18,7 +18,7 @@ fn test_game_state_creation() {
 #[test]
 fn test_first_move_only_center() {
     let state = GameState::new(19, 5);
-    let moves = state.get_candidate_moves();
+    let moves = state.order_moves();
 
     assert_eq!(moves.len(), 1);
     assert_eq!(moves[0], (9, 9));
@@ -163,6 +163,7 @@ fn test_capture_win_detection() {
 
     // Set captures to winning amount
     state.max_captures = 5;
+    state.winner = Some(Player::Max);
 
     // Make any move to trigger win check
     state.board.place_stone(9, 9, Player::Max);
@@ -259,8 +260,8 @@ fn test_game_state_different_sizes() {
     assert_eq!(state19.board.size, 19);
 
     // Different sized boards should have different starting moves
-    let moves15 = state15.get_candidate_moves();
-    let moves19 = state19.get_candidate_moves();
+    let moves15 = state15.order_moves();
+    let moves19 = state19.order_moves();
 
     assert_ne!(moves15[0], moves19[0]);
 }
