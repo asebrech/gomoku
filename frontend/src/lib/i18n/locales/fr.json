@@ -6,7 +6,17 @@
     "settings": "Paramètres",
     "themeEditor": "Éditeur de Thèmes",
     "credits": "Crédits",
-    "techStack": "Créé avec Rust, WASM & Svelte"
+      "themeSaved": "Thème créé avec succès !",
+      "themeUpdated": "Thème mis à jour avec succès !",
+      "themeDeleted": "Thème supprimé",
+      "themeApplied": "Thème appliqué : {name}",
+      "themeDuplicated": "Thème dupliqué !",
+      "themeExported": "Thème exporté !",
+      "enterName": "Veuillez saisir un nom de thème",
+      "themeNameExists": "Un thème avec ce nom existe déjà",
+      "themeColorsExist": "Un thème avec des couleurs identiques existe déjà",
+      "deleteConfirm": "Êtes-vous sûr de vouloir supprimer ce thème ?",
+      "exportFailed": "Échec de l'exportation du thème"
   },
   "game": {
     "title": "Plateau de Jeu",
@@ -203,6 +213,7 @@
       "themeDuplicated": "Thème dupliqué !",
       "themeExported": "Thème exporté !",
       "enterName": "Veuillez entrer un nom de thème",
+      "themeNameExists": "Un thème avec ce nom existe déjà",
       "deleteConfirm": "Êtes-vous sûr de vouloir supprimer ce thème ?",
       "exportFailed": "Échec de l'exportation du thème"
     },

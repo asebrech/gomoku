@@ -203,6 +203,7 @@
       "themeDuplicated": "Theme duplicated!",
       "themeExported": "Theme exported!",
       "enterName": "Please enter a theme name",
+      "themeNameExists": "A theme with this name already exists",
       "deleteConfirm": "Are you sure you want to delete this theme?",
       "exportFailed": "Failed to export theme"
     },

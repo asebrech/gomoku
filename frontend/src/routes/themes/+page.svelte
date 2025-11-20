@@ -135,17 +135,24 @@
     
     const completeTheme = editingTheme as ThemeColors;
     
+    // Check for duplicate name (case-insensitive) - this is the only validation we need
+    if (customThemes.isNameTaken(themeName.trim(), editingThemeId || undefined)) {
+      errorMessage = get(_)('themeEditor.messages.themeNameExists');
+      setTimeout(() => errorMessage = '', 3000);
+      return;
+    }
+    
     if (editingThemeId) {
       // Update existing theme
       customThemes.update(editingThemeId, {
-        name: themeName,
+        name: themeName.trim(),
         colors: completeTheme
       });
       successMessage = get(_)('themeEditor.messages.themeUpdated');
     } else {
       // Create new theme
       customThemes.add({
-        name: themeName,
+        name: themeName.trim(),
         colors: completeTheme
       });
       successMessage = get(_)('themeEditor.messages.themeSaved');
@@ -204,7 +211,16 @@
   function duplicateTheme(id: string) {
     const theme = themes.find(t => t.id === id);
     if (theme) {
-      customThemes.duplicate(id, `${theme.name} (Copy)`);
+      // Generate a unique name for the duplicate
+      let duplicateName = `${theme.name} (Copy)`;
+      let counter = 1;
+      
+      while (customThemes.isNameTaken(duplicateName)) {
+        duplicateName = `${theme.name} (Copy ${counter})`;
+        counter++;
+      }
+      
+      customThemes.duplicate(id, duplicateName);
       successMessage = get(_)('themeEditor.messages.themeDuplicated');
       setTimeout(() => successMessage = '', 3000);
     }
@@ -323,6 +339,18 @@
             </div>
           </div>
         {/each}
+        
+        <!-- Bottom Messages -->
+        {#if successMessage}
+          <div class="message success-message mb-4">
+            ✓ {successMessage}
+          </div>
+        {/if}
+        {#if errorMessage}
+          <div class="message error-message mb-4">
+            ✗ {errorMessage}
+          </div>
+        {/if}
         
         <!-- Bottom Save Button -->
         <div class="panel">

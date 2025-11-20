@@ -203,6 +203,7 @@
       "themeDuplicated": "¡Tema duplicado!",
       "themeExported": "¡Tema exportado!",
       "enterName": "Por favor ingresa un nombre de tema",
+      "themeNameExists": "Ya existe un tema con este nombre",
       "deleteConfirm": "¿Estás seguro de que quieres eliminar este tema?",
       "exportFailed": "Error al exportar el tema"
     },

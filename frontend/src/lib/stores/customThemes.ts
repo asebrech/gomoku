@@ -44,6 +44,15 @@ function createCustomThemesStore() {
 	return {
 		subscribe,
 		
+		// Check if theme name exists (case-insensitive)
+		isNameTaken: (name: string, excludeId?: string): boolean => {
+			return get({ subscribe }).some(theme => 
+				theme.name.toLowerCase() === name.toLowerCase() && theme.id !== excludeId
+			);
+		},
+		
+
+		
 		// Add a new custom theme
 		add: (theme: Omit<CustomTheme, 'id' | 'createdAt' | 'updatedAt'>) => {
 			const newTheme: CustomTheme = {
